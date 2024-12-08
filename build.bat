@@ -1,0 +1,1 @@
+cmake -S . -B build -DCMAKE_TOOLCHAIN_FILE=B:/Application/vcpkg/vcpkg/scripts/buildsystems/vcpkg.cmake -DDX_SDK_ROOT="C:\Program Files (x86)\Microsoft DirectX SDK (June 2010)"
