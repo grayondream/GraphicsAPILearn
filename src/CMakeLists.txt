@@ -1,14 +1,20 @@
 set(DX_APP_PATH "${DX_SOURCE_PATH}/app" CACHE STRING "app file's path")
 set(DX_EH_PATH "${DX_SOURCE_PATH}/EH" CACHE STRING "error handle file's path")
+set(DX_TRACY_PATH "${DX_SOURCE_PATH}/Tracy" CACHE STRING "tracy file's path")
+set(DX_BASE_PATH "${DX_SOURCE_PATH}/Base" CACHE STRING "base file's path")
 
 set(DX_SRC_FILES "" CACHE STRING "all source files")
 
 add_subdirectory(${DX_APP_PATH})
 add_subdirectory(${DX_EH_PATH})
+add_subdirectory(${DX_TRACY_PATH})
+add_subdirectory(${DX_BASE_PATH})
 
 add_executable(${PROJECT_NAME} WIN32 
 ${DX_APP_SRC_FILES} 
 ${DX_EH_SRC_FILES}
+${DX_TRACY_SRC_FILES}
+${DX_BASE_SRC_FILES}
 )
 
 target_link_libraries(${PROJECT_NAME}

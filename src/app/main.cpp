@@ -4,6 +4,7 @@
 #include <format>
 #include <cassert>
 #include "EH/ErrorHandle.hpp"
+#include "Base/GameTimer.hpp"
 
 #if defined(DEBUG) || defined(_DEBUG)
 #define DEFAULT_DX_DEVICE_FLAG D3D11_CREATE_DEVICE_DEBUG
@@ -77,9 +78,53 @@ int CreateD3DContext(HWND winId){
     hr = pDxgiFactory->CreateSwapChain(pDevice, &scDesc, &pDxgiSwapChain);
     eh::ExitIfFailed(hr, "Failed to get create swap chain!");
     
+    ID3D11RenderTargetView* pTargetView{};
+    ID3D11Texture2D* pBackBuffer{};
+    pDxgiSwapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), reinterpret_cast<void**>(&pBackBuffer));
+    hr = pDevice->CreateRenderTargetView(pBackBuffer, 0, &pTargetView);
+    eh::ExitIfFailed(hr, "Failed to create render target view!");
+
+    D3D11_TEXTURE2D_DESC depthTextureDesc{};
+    depthTextureDesc.Width = GAME_WIN_WIDTH;
+    depthTextureDesc.Height = GAME_WIN_HEIGHT;
+    depthTextureDesc.MipLevels = 1;
+    depthTextureDesc.ArraySize = 1;
+    depthTextureDesc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
+    if (GAME_ENABLE_MSAA) {
+        depthTextureDesc.SampleDesc.Count = 4;
+        depthTextureDesc.SampleDesc.Quality = quality - 1;
+    }
+    else {
+        depthTextureDesc.SampleDesc.Count = 1;
+        depthTextureDesc.SampleDesc.Quality = 0;
+    }
+
+    depthTextureDesc.Usage = D3D11_USAGE_DEFAULT;
+    depthTextureDesc.BindFlags = D3D11_BIND_DEPTH_STENCIL;
+    depthTextureDesc.CPUAccessFlags = 0;
+    depthTextureDesc.MiscFlags = 0;
+
+    ID3D11Texture2D* pDepthTexture{};
+    ID3D11DepthStencilView* pDepthView{};
+    pDevice->CreateTexture2D(&depthTextureDesc, 0, &pDepthTexture);
+    hr = pDevice->CreateDepthStencilView(pDepthTexture, 0, &pDepthView);
+    eh::ExitIfFailed(hr, "Failed to create depth stencil view!");
+
+    pD3dContext->OMSetRenderTargets(1, &pTargetView, pDepthView);
+
+    D3D11_VIEWPORT viewPort{};
+    viewPort.TopLeftX = 0;
+    viewPort.TopLeftY = 0;
+    viewPort.Width = GAME_WIN_WIDTH;
+    viewPort.Height = GAME_WIN_HEIGHT;
+    viewPort.MaxDepth = 1.0;
+    viewPort.MinDepth = 0.0;
+    pD3dContext->RSSetViewports(1, &viewPort);
+    const auto v = GetSecondsPreCount();
     pDxgiFactory->Release();
     pDxgiAdapter->Release();
     pDxgiDevice->Release();
+    pBackBuffer->Release();
     return 0;
 }
 
