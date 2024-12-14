@@ -10,11 +10,16 @@ add_subdirectory(${DX_EH_PATH})
 add_subdirectory(${DX_TRACY_PATH})
 add_subdirectory(${DX_BASE_PATH})
 
+add_source_group(${DX_SOURCE_PATH} "")
+
+file(GLOB_RECURSE all_hpp_files "${DX_SOURCE_PATH}/*.hpp")
+
 add_executable(${PROJECT_NAME} WIN32 
 ${DX_APP_SRC_FILES} 
 ${DX_EH_SRC_FILES}
 ${DX_TRACY_SRC_FILES}
 ${DX_BASE_SRC_FILES}
+${all_hpp_files}
 )
 
 target_link_libraries(${PROJECT_NAME}
