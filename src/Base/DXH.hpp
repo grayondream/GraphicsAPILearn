@@ -1,10 +1,12 @@
 #pragma once
 #pragma warning(push)
 #pragma warning(disable: 4005)
+#pragma warning(disable: 4838)
 
 #include <windows.h>
 #include <d3d11.h>
 #include <winrt/wrl/client.h>
+#include <xnamath.h>
 
 #if defined(DEBUG) || defined(_DEBUG)
 #define DEFAULT_DX_DEVICE_FLAG D3D11_CREATE_DEVICE_DEBUG

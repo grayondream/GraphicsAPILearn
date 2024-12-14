@@ -2,6 +2,7 @@
 #include <windows.h>
 #include <format>
 #include <string>
+#include <cassert>
 
 namespace ErrorHandle {
 	template <class... T>
@@ -14,12 +15,15 @@ namespace ErrorHandle {
 		if constexpr (std::is_same_v<T, HRESULT>) {
 			if (FAILED(value)) {
 				MessageError(fmt, args...);
+				assert(0);
 				exit(-1);
+
 			}
 		}
 		else {
 			if (!value) {
 				MessageError(fmt, args...);
+				assert(0);
 				exit(-1);
 			}
 		}

@@ -6,10 +6,12 @@
 #include <chrono>
 #include <thread>
 
+#include "Base/DXBaseConexpr.hpp"
 #include "EH/ErrorHandle.hpp"
 #include "Base/GameTimer.hpp"
 #include "Base/Log.hpp"
 #include "Base/Utils.hpp"
+#include <windowsx.h>
 
 namespace eh = ErrorHandle;
 using namespace base::log;
@@ -31,12 +33,9 @@ void Application::initD3DEnv(const HWND winId) {
     std::tie(_pd3dDevice, _pd3dDeviceCtx) = CreateD3DContextAndDevice();
     const auto quality = GetD3DMSAAQuality(_pd3dDevice);
     _pd3dSwapChain = CreateD3DSwapChain(_pd3dDevice, winId, quality, _attribute.winAttr.width, _attribute.winAttr.height, _attribute.enableMssa);
-    _pd3dRenderTargetView = CreateD3DRenderTargetView(_pd3dSwapChain, _pd3dDevice);
-
-    D3DSetupViewPort(_pd3dDeviceCtx, _attribute.winAttr.width, _attribute.winAttr.height);
-    const auto [depthTexture, depthView] = D3DCreateRenderTexture(_pd3dDevice, quality, _attribute.winAttr.width, _attribute.winAttr.height, _attribute.enableMssa);
-    _pd3dDeviceCtx->OMSetRenderTargets(1, _pd3dRenderTargetView.GetAddressOf(), depthView.Get());
+    updateRenderTargetWhileResize();
 }
+
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
     Application *pApp{};
      // 获取窗口实例
@@ -120,16 +119,84 @@ void Application::calcFrameRate() {
         << L"FPS: " << fps << L" "
         << L"Frame Time: " << mspf << L"(ms)";
     SetWindowTextW(_winId, os.str().c_str());
-    LOGI("Update Frame Info");
     frameCount = 0;
     timePassed += 1.0f;
 }
 
-void Application::onResize() {}
+void Application::updateRenderTargetWhileResize() {
+    _pd3dRenderTargetView = nullptr;
+    _depthBuffer = nullptr;
+    _depthView = nullptr;
+    LOGI("Resize Render Target into [{},{}]", _attribute.winAttr.width, _attribute.winAttr.height);
+    eh::ExitIfFailed(_pd3dSwapChain->ResizeBuffers(1, _attribute.winAttr.width, _attribute.winAttr.height, DXGI_FORMAT_R8G8B8A8_UNORM, 0), "Failed to Resize Buffer");
+    
+    ComPtr<ID3D11Texture2D> pBackBuffer{};
+    _pd3dSwapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), reinterpret_cast<void**>(pBackBuffer.GetAddressOf()));
+    auto hr = _pd3dDevice->CreateRenderTargetView(pBackBuffer.Get(), 0, _pd3dRenderTargetView.GetAddressOf());
+    eh::ExitIfFailed(hr, "Failed to create render target view!");
+    
+    const auto quality = GetD3DMSAAQuality(_pd3dDevice);
+    std::tie(_depthBuffer, _depthView) = D3DCreateRenderTexture(_pd3dDevice, quality, _attribute.winAttr.width, _attribute.winAttr.height, _attribute.enableMssa);
+    _pd3dDeviceCtx->OMSetRenderTargets(1, _pd3dRenderTargetView.GetAddressOf(), _depthView.Get());
+    D3DSetupViewPort(_pd3dDeviceCtx, _attribute.winAttr.width, _attribute.winAttr.height);
+}
 
-void Application::updateScene(const float dt) {}
+void Application::onResize(const UINT msg, const WPARAM wParam, const LPARAM lParam) {
+    if (LOWORD(lParam) != 0 && HIWORD(lParam) != 0) {
+        _attribute.winAttr.width = LOWORD(lParam);
+        _attribute.winAttr.height = HIWORD(lParam);
+    }
+    
+    assert(_pd3dDevice && _pd3dDeviceCtx);
+    switch (wParam) {
+    case SIZE_MINIMIZED: {
+        _state.paused = true;
+        _state.minimized = true;
+        _state.maximized = false;
+    }break;
+    case SIZE_MAXIMIZED: {
+        _state.paused = false;
+        _state.minimized = false;
+        _state.maximized = true;
+    }break;
+    case SIZE_RESTORED: {
+        if (_state.minimized) {
+            _state.paused = false;
+            _state.minimized = false;
+        }
+        else if (_state.maximized) {
+            _state.paused = false;
+            _state.maximized = false;
+        }
+        else if (_state.resizing) {
+            //TODO:
+        }
+    }break;
+    case WM_ENTERSIZEMOVE: {
+        _state.paused = true;
+        _state.resizing = true;
+        _timer.stop();
+        return;
+    }break;
+    case WM_EXITSIZEMOVE: {
+        _state.paused = false;
+        _state.resizing = false;
+        _timer.start();
+    }break;
+    }
 
-void Application::drawScene() {}
+    updateRenderTargetWhileResize();
+}
+
+void Application::updateScene(const float dt) {
+}
+
+void Application::drawScene() {
+    _pd3dDeviceCtx->ClearRenderTargetView(_pd3dRenderTargetView.Get(), reinterpret_cast<const float*>(&Colors::Red));
+    _pd3dDeviceCtx->ClearDepthStencilView(_depthView.Get(), D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);
+
+    eh::ExitIfFailed(_pd3dSwapChain->Present(0, 0), "Persent Failed");
+}
 
 void Application::onMouseDown(WPARAM btnState, int x, int y) { }
 void Application::onMouseUp(WPARAM btnState, int x, int y) { }
@@ -140,12 +207,55 @@ LRESULT Application::msgProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) 
     case WM_DESTROY:
         PostQuitMessage(0);
         return 0;
-    case WM_PAINT: {
-            PAINTSTRUCT ps;
-            HDC hdc = BeginPaint(hwnd, &ps);
-            FillRect(hdc, &ps.rcPaint, (HBRUSH)(COLOR_WINDOW + 1));
-            EndPaint(hwnd, &ps);
+    case WM_ACTIVATE: {
+        if (LOWORD(wParam) == WA_INACTIVE) {
+            _state.paused = true;
+            _timer.stop();
         }
+        else {
+            _state.paused = false;
+            _timer.start();
+        }
+        return 0;
+        }break;
+    case WM_SIZE:
+        onResize(msg, wParam, lParam);
+        return 0;
+    case WM_ENTERSIZEMOVE: {
+        _state.paused = true;
+        _state.resizing = true;
+        _timer.stop();
+        return 0;
+    } break;
+    case WM_EXITSIZEMOVE:
+        _state.paused = false;
+        _state.resizing = false;
+        _timer.start();
+        onResize(msg, wParam, lParam);
+        return 0;
+    case WM_MENUCHAR:
+        // Don't beep when we alt-enter.
+        return MAKELRESULT(0, MNC_CLOSE);
+
+        // Catch this message so to prevent the window from becoming too small.
+    case WM_GETMINMAXINFO:
+        ((MINMAXINFO*)lParam)->ptMinTrackSize.x = 200;
+        ((MINMAXINFO*)lParam)->ptMinTrackSize.y = 200;
+        return 0;
+
+    case WM_LBUTTONDOWN:
+    case WM_MBUTTONDOWN:
+    case WM_RBUTTONDOWN:
+        onMouseDown(wParam, GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
+        return 0;
+    case WM_LBUTTONUP:
+    case WM_MBUTTONUP:
+    case WM_RBUTTONUP:
+        onMouseUp(wParam, GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
+        return 0;
+    case WM_MOUSEMOVE:
+        onMouseMove(wParam, GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
+        return 0;
     }
 
     return DefWindowProc(hwnd, msg, wParam, lParam);
