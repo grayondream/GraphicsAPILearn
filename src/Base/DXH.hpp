@@ -6,4 +6,10 @@
 #include <d3d11.h>
 #include <winrt/wrl/client.h>
 
+#if defined(DEBUG) || defined(_DEBUG)
+#define DEFAULT_DX_DEVICE_FLAG D3D11_CREATE_DEVICE_DEBUG
+#else
+#define DEFAULT_DX_DEVICE_FLAG 0
+#endif
+
 #pragma warning(pop)
