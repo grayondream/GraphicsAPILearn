@@ -107,7 +107,8 @@ void Application::calcFrameRate() {
     static int frameCount = 0;
     static float timePassed = 0.0f;
     frameCount++;
-    if (_timer.totalTime() - timePassed < 1.0f) {
+    const auto gameTime = _timer.totalTime();
+    if (gameTime - timePassed < 1.0f) {
         return;
     }
 

@@ -19,10 +19,6 @@ __int64 GetCurrentTimeCount() {
 	return tt;
 }
 
-float GameTimer::gameTime() const {
-	return 	0;
-}
-
 float GameTimer::deltaTime() const {
 	return static_cast<float>(_deltaTime);
 }

@@ -12,7 +12,6 @@ public:
 public:
     GameTimer();
 
-    float gameTime() const;
     float deltaTime() const;
     float totalTime() const;
     GameTimer& reset();
