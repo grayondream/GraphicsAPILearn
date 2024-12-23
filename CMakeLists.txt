@@ -8,7 +8,7 @@ set(DX_CMAKE_PATH "${CMAKE_SOURCE_DIR}/cmake" CACHE STRING "all cmake tool file'
 include_directories(${DX_SDK_ROOT}/Include)
 include_directories(${DX_SOURCE_PATH})
 include_directories(${WINDOWS_SDK_ROOT})
-
+include_directories(${DX_SDK_ROOT}/Samples/C++/Effects11/Inc)
 link_directories(${DX_SDK_ROOT}/Lib/x64)
 
 include(${DX_CMAKE_PATH}/init.cmake)

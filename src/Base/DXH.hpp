@@ -4,9 +4,14 @@
 #pragma warning(disable: 4838)
 
 #include <windows.h>
+#include <windowsx.h>
 #include <d3d11.h>
+#include <d3dx11.h>
+#include <d3dx10.h>
 #include <winrt/wrl/client.h>
 #include <xnamath.h>
+#include <D3DX11async.h>
+#include <D3dx11effect.h>
 
 #if defined(DEBUG) || defined(_DEBUG)
 #define DEFAULT_DX_DEVICE_FLAG D3D11_CREATE_DEVICE_DEBUG

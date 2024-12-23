@@ -1,14 +1,14 @@
 #pragma once
+#include <tuple>
 #include <map>
 #include "Base/DXH.hpp"
 
 namespace Utils{
 	using Microsoft::WRL::ComPtr;
-std::pair<ComPtr<ID3D11Device>, ComPtr<ID3D11DeviceContext>> CreateD3DContextAndDevice();
+
+std::tuple<ComPtr<ID3D11Device>, ComPtr<ID3D11DeviceContext>, ComPtr<IDXGISwapChain> > CreateD3DDeviceAndtSwapChain(const HWND winId, const int width, const int height);
 
 UINT GetD3DMSAAQuality(const ComPtr<ID3D11Device> pDevice);
-
-ComPtr<IDXGISwapChain> CreateD3DSwapChain(const ComPtr<ID3D11Device> pDevice, const HWND winId, const UINT qualit, const int width, const int height, const bool enableMssaa);
 
 ComPtr<ID3D11RenderTargetView> CreateD3DRenderTargetView(const ComPtr<IDXGISwapChain> pDxgiSwapChain, const ComPtr<ID3D11Device> pDevice) ;
 

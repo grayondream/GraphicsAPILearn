@@ -25,31 +25,39 @@ public:
     };
 public:
     Application();
-    ~Application();
+    virtual ~Application();
 
-    bool init(const HINSTANCE, const CreateParam param);
+    virtual bool init(const HINSTANCE, const CreateParam param);
 
     int run(const int nShowCmd); 
 
     LRESULT msgProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
+protected:
+    void beginDrawScene();
+    virtual void drawScene();
+    void endDrawScene();
+
+    virtual void updateScene(const float dt);
+    
+    virtual void onResize(const UINT msg, const WPARAM wParam, const LPARAM lParam);
+    virtual void onMouseDown(WPARAM btnState, int x, int y);
+    virtual void onMouseUp(WPARAM btnState, int x, int y);
+    virtual void onMouseMove(WPARAM btnState, int x, int y);
+    float aspectRatio() {
+        return _attribute.winAttr.width * 1.0 / _attribute.winAttr.height;
+    }
+
+    HWND winId() {
+        return _winId;
+    }
 private:
-    
-
-    void updateScene(const float dt);
-
-    void drawScene();
-    
-    void onResize(const UINT msg, const WPARAM wParam, const LPARAM lParam);
-    void onMouseDown(WPARAM btnState, int x, int y);
-    void onMouseUp(WPARAM btnState, int x, int y);
-    void onMouseMove(WPARAM btnState, int x, int y);
-
     void createMainWindow(const HINSTANCE instance);
     void initD3DEnv(const HWND);
     void calcFrameRate();
     void updateRenderTargetWhileResize();
-private:
+
+protected:
     CreateParam _attribute{};
     State _state{};
     HWND _winId{};
@@ -60,5 +68,4 @@ private:
     ComPtr<ID3D11RenderTargetView> _pd3dRenderTargetView{};
     ComPtr< ID3D11Texture2D> _depthBuffer{};
     ComPtr<ID3D11DepthStencilView> _depthView{};
-
 };

@@ -1,7 +1,8 @@
-set(DX_APP_PATH "${DX_SOURCE_PATH}/app" CACHE STRING "app file's path")
+set(DX_APP_PATH "${DX_SOURCE_PATH}/App" CACHE STRING "app file's path")
 set(DX_EH_PATH "${DX_SOURCE_PATH}/EH" CACHE STRING "error handle file's path")
 set(DX_TRACY_PATH "${DX_SOURCE_PATH}/Tracy" CACHE STRING "tracy file's path")
 set(DX_BASE_PATH "${DX_SOURCE_PATH}/Base" CACHE STRING "base file's path")
+set(DX_CONFIG_PATH "${DX_SOURCE_PATH}/Config" CACHE STRING "config file's path")
 
 set(DX_SRC_FILES "" CACHE STRING "all source files")
 
@@ -9,6 +10,7 @@ add_subdirectory(${DX_APP_PATH})
 add_subdirectory(${DX_EH_PATH})
 add_subdirectory(${DX_TRACY_PATH})
 add_subdirectory(${DX_BASE_PATH})
+add_subdirectory(${DX_CONFIG_PATH})
 
 add_source_group(${DX_SOURCE_PATH} "")
 
@@ -27,7 +29,11 @@ user32.lib
 gdi32.lib
 kernel32.lib
 d3d11.lib
+d3dx11.lib
 d3dcompiler.lib
 dxguid.lib
+Effects11.lib
 )
+
+target_compile_definitions(${PROJECT_NAME} PRIVATE GAME_RES_ROOT="${GAME_RES_ROOT}")
 

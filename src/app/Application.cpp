@@ -22,6 +22,10 @@ Application::Application() {
 }
 
 Application::~Application() {
+    if (_pd3dSwapChain) {
+        _pd3dSwapChain->SetFullscreenState(FALSE, 0);
+    }
+
     if (_pd3dDeviceCtx) {
         _pd3dDeviceCtx->ClearState();
     }
@@ -30,13 +34,11 @@ Application::~Application() {
 }
 
 void Application::initD3DEnv(const HWND winId) {
-    std::tie(_pd3dDevice, _pd3dDeviceCtx) = CreateD3DContextAndDevice();
-    const auto quality = GetD3DMSAAQuality(_pd3dDevice);
-    _pd3dSwapChain = CreateD3DSwapChain(_pd3dDevice, winId, quality, _attribute.winAttr.width, _attribute.winAttr.height, _attribute.enableMssa);
+    std::tie(_pd3dDevice, _pd3dDeviceCtx, _pd3dSwapChain) = CreateD3DDeviceAndtSwapChain(winId, _attribute.winAttr.width, _attribute.winAttr.height);
     updateRenderTargetWhileResize();
 }
 
-LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
+LRESULT CALLBACK AppWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
     Application *pApp{};
      // 获取窗口实例
     pApp = reinterpret_cast<Application*>(GetWindowLongPtr(hwnd, GWLP_USERDATA));
@@ -52,9 +54,10 @@ void Application::createMainWindow(const HINSTANCE hInstance){
     const char CLASS_NAME[] = "Sample Window Class";
     // 注册窗口类
     WNDCLASS wc = {};
-    wc.lpfnWndProc = WindowProc;
+    wc.lpfnWndProc = AppWindowProc;
     wc.hInstance = hInstance;
     wc.lpszClassName = CLASS_NAME;
+    wc.hbrBackground = (HBRUSH)COLOR_WINDOW;
     RegisterClass(&wc);
 
     // 创建窗口
@@ -63,7 +66,7 @@ void Application::createMainWindow(const HINSTANCE hInstance){
         CLASS_NAME,
         _attribute.winAttr.title.c_str(),
         WS_OVERLAPPEDWINDOW,
-        CW_USEDEFAULT, CW_USEDEFAULT, 
+        400, 400,
         _attribute.winAttr.width, _attribute.winAttr.height,
         NULL, NULL, hInstance, NULL
     );
@@ -93,7 +96,9 @@ int Application::run(const int nShowCmd){
             if (!_state.paused) {
                 calcFrameRate();
                 updateScene(_timer.deltaTime());
+                beginDrawScene();
                 drawScene();
+                endDrawScene();
             }else {
                 std::this_thread::sleep_for(std::chrono::microseconds(100));
             }
@@ -129,7 +134,7 @@ void Application::updateRenderTargetWhileResize() {
     _depthBuffer = nullptr;
     _depthView = nullptr;
     LOGI("Resize Render Target into [{},{}]", _attribute.winAttr.width, _attribute.winAttr.height);
-    eh::ExitIfFailed(_pd3dSwapChain->ResizeBuffers(1, _attribute.winAttr.width, _attribute.winAttr.height, DXGI_FORMAT_R8G8B8A8_UNORM, 0), "Failed to Resize Buffer");
+    //eh::ExitIfFailed(_pd3dSwapChain->ResizeBuffers(1, _attribute.winAttr.width, _attribute.winAttr.height, DXGI_FORMAT_R8G8B8A8_UNORM, 0), "Failed to Resize Buffer");
     
     ComPtr<ID3D11Texture2D> pBackBuffer{};
     _pd3dSwapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), reinterpret_cast<void**>(pBackBuffer.GetAddressOf()));
@@ -137,12 +142,13 @@ void Application::updateRenderTargetWhileResize() {
     eh::ExitIfFailed(hr, "Failed to create render target view!");
     
     const auto quality = GetD3DMSAAQuality(_pd3dDevice);
-    std::tie(_depthBuffer, _depthView) = D3DCreateRenderTexture(_pd3dDevice, quality, _attribute.winAttr.width, _attribute.winAttr.height, _attribute.enableMssa);
-    _pd3dDeviceCtx->OMSetRenderTargets(1, _pd3dRenderTargetView.GetAddressOf(), _depthView.Get());
+    //std::tie(_depthBuffer, _depthView) = D3DCreateRenderTexture(_pd3dDevice, quality, _attribute.winAttr.width, _attribute.winAttr.height, _attribute.enableMssa);
+    _pd3dDeviceCtx->OMSetRenderTargets(1, _pd3dRenderTargetView.GetAddressOf(), NULL);
     D3DSetupViewPort(_pd3dDeviceCtx, _attribute.winAttr.width, _attribute.winAttr.height);
 }
 
 void Application::onResize(const UINT msg, const WPARAM wParam, const LPARAM lParam) {
+    return;
     if (LOWORD(lParam) != 0 && HIWORD(lParam) != 0) {
         _attribute.winAttr.width = LOWORD(lParam);
         _attribute.winAttr.height = HIWORD(lParam);
@@ -186,17 +192,22 @@ void Application::onResize(const UINT msg, const WPARAM wParam, const LPARAM lPa
     }break;
     }
 
-    updateRenderTargetWhileResize();
+    //updateRenderTargetWhileResize();
 }
 
 void Application::updateScene(const float dt) {
 }
 
-void Application::drawScene() {
-    _pd3dDeviceCtx->ClearRenderTargetView(_pd3dRenderTargetView.Get(), reinterpret_cast<const float*>(&Colors::Red));
-    _pd3dDeviceCtx->ClearDepthStencilView(_depthView.Get(), D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);
+void Application::beginDrawScene() {
+    _pd3dDeviceCtx->ClearRenderTargetView(_pd3dRenderTargetView.Get(), reinterpret_cast<const float*>(&Colors::LightSteelBlue));
+}
 
+void Application::endDrawScene() {
     eh::ExitIfFailed(_pd3dSwapChain->Present(0, 0), "Persent Failed");
+}
+
+void Application::drawScene() {
+
 }
 
 void Application::onMouseDown(WPARAM btnState, int x, int y) { }

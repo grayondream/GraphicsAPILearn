@@ -2,7 +2,7 @@
 #include "DXH.hpp"
 
 struct Vertex {
-	XMFLOAT3 pos{};
-	XMFLOAT4 color{};
+	FLOAT x, y, z; 
+	D3DXCOLOR color;
 };
 
