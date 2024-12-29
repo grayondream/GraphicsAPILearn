@@ -1,25 +1,20 @@
 #pragma once
 #include <string>
+#include "Base/DXH.hpp"
 #include "Base/GameTimer.hpp"
-#include "IApplication.hpp"
+#include "App/Application.hpp"
 
-class Application : public IApplication{
+using Microsoft::WRL::ComPtr;
+class DX11Application : public Application{
 public:
-    struct State {
-        bool paused{};
-        bool minimized{};
-        bool maximized{};
-        bool resizing{};
-    };
-public:
-    Application();
-    virtual ~Application();
+    DX11Application();
+    virtual ~DX11Application();
 
-    virtual bool init(const HINSTANCE, const WindowDesc& param) override;
+    virtual bool init(const HINSTANCE, const WindowDesc param);
 
-    virtual int run(const int nShowCmd) override; 
+    int run(const int nShowCmd); 
 
-    LRESULT msgProc(const HWND hwnd, const UINT msg, const WPARAM wParam, const LPARAM lParam);
+    LRESULT msgProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
 protected:
     void beginDrawScene();
@@ -39,14 +34,17 @@ protected:
     HWND winId() {
         return _winId;
     }
-
 private:
     void createMainWindow(const HINSTANCE instance);
+    void initD3DEnv(const HWND);
     void calcFrameRate();
-    
+    void updateRenderTargetWhileResize();
+
 protected:
-    WindowDesc _attribute{};
-    State _state{};
-    HWND _winId{};
-    GameTimer _timer{};
+    ComPtr<ID3D11Device> _pd3dDevice{};
+    ComPtr<ID3D11DeviceContext> _pd3dDeviceCtx{  };
+    ComPtr<IDXGISwapChain> _pd3dSwapChain{};
+    ComPtr<ID3D11RenderTargetView> _pd3dRenderTargetView{};
+    ComPtr< ID3D11Texture2D> _depthBuffer{};
+    ComPtr<ID3D11DepthStencilView> _depthView{};
 };

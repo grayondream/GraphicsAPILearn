@@ -1,18 +1,27 @@
 cmake_minimum_required(VERSION 3.20)
-project(dx11learn)
+project(renderLearn)
 set(CMAKE_CXX_STANDARD 20)
 
-set(DX_SOURCE_PATH "${CMAKE_SOURCE_DIR}/src" CACHE STRING "all source file's path")
-set(DX_CMAKE_PATH "${CMAKE_SOURCE_DIR}/cmake" CACHE STRING "all cmake tool file's path")
+set(RENDER_SOURCE_PATH "${CMAKE_SOURCE_DIR}/src" CACHE STRING "all source file's path")
+set(RENDER_CMAKE_PATH "${CMAKE_SOURCE_DIR}/cmake" CACHE STRING "all cmake tool file's path")
 
-include_directories(${DX_SDK_ROOT}/Include)
-include_directories(${DX_SOURCE_PATH})
+
+include_directories(${RENDER_SOURCE_PATH})
 include_directories(${WINDOWS_SDK_ROOT})
-include_directories(${DX_SDK_ROOT}/Samples/C++/Effects11/Inc)
-link_directories(${DX_SDK_ROOT}/Lib/x64)
 
-include(${DX_CMAKE_PATH}/init.cmake)
+option(ENABLE_DX11 "Enable Direct3D 11 support" ON)
+option(ENABLE_DX12 "Enable Direct3D 12 support" ON)
+option(ENABLE_OPENGL "Enable OpenGL" ON)
 
-set(PROJECT_NAME dxlearn)
+if(ENABLE_DX11 OR ENABLE_DX12)
+    include_directories(${DX_SDK_ROOT}/Include)
+    include_directories(${DX_SDK_ROOT}/Samples/C++/Effects11/Inc)
+    link_directories(${DX_SDK_ROOT}/Lib/x64)
+endif()
 
-add_subdirectory(${DX_SOURCE_PATH})
+
+include(${RENDER_CMAKE_PATH}/init.cmake)
+
+set(PROJECT_NAME renderLearn)
+
+add_subdirectory(${RENDER_SOURCE_PATH})

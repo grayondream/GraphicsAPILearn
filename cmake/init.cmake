@@ -9,5 +9,5 @@ function(include_cmake_files directory)
     endforeach()
 endfunction()
 
-message(STATUS "${DX_CMAKE_PATH}")
-include_cmake_files("${DX_CMAKE_PATH}")
+message(STATUS "${RENDER_CMAKE_PATH}")
+include_cmake_files("${RENDER_CMAKE_PATH}")

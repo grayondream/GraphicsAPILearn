@@ -31,3 +31,19 @@ function(add_source_group directory group_name)
         endif()
     endforeach()
 endfunction()
+
+function(remove_excluded_sources sources excluded_dir)
+    # 确保 excluded_dir 以斜杠结尾，以便于匹配
+    if(NOT excluded_dir MATCHES "/$")
+        set(excluded_dir "${excluded_dir}/")
+    endif()
+
+    # 遍历源文件列表
+    foreach(file ${sources})
+        # 检查文件是否在排除目录中
+        if(file MATCHES "^${excluded_dir}.*\\.cpp$")
+            message(STATUS "Removing excluded source: ${file}")
+            list(REMOVE_ITEM sources ${file})
+        endif()
+    endforeach()
+endfunction()

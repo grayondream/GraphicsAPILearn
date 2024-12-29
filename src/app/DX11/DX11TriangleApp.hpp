@@ -1,13 +1,13 @@
 #pragma once
-#include "Application.hpp"
+#include "DX11App.hpp"
 
-class TriangleApplication : public Application {
+class DX11TriangleApp : public DX11Application {
 public:
-    TriangleApplication();
-    virtual ~TriangleApplication();
+    DX11TriangleApp();
+    virtual ~DX11TriangleApp();
 
 public:
-    virtual bool init(const HINSTANCE, const CreateParam param) override;
+    virtual bool init(const HINSTANCE, const WindowDesc& param) override;
 
 private:
     void createGemBuffer();

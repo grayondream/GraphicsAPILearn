@@ -1,4 +1,4 @@
-#include "TriangleApplication.hpp"
+#include "DX11TriangleApp.hpp"
 #include "Base/Vertex.hpp"
 #include "Base/DXBaseConexpr.hpp"
 #include "EH/ErrorHandle.hpp"
@@ -10,42 +10,37 @@ namespace eh = ErrorHandle;
 namespace fs = std::filesystem;
 namespace sc = StaticCollector;
 
-TriangleApplication::TriangleApplication() {
+DX11TriangleApp::DX11TriangleApp() {
 }
 
-TriangleApplication::~TriangleApplication(){
+DX11TriangleApp::~DX11TriangleApp(){
     
 }
 
-void TriangleApplication::createGemBuffer() {
+void DX11TriangleApp::createGemBuffer() {
     Vertex vecs[] =
     {
-        {0.0f, 0.5f, 0.0f, D3DXCOLOR(1.0f, 0.0f, 0.0f, 1.0f)},
-        {0.45f, -0.5, 0.0f, D3DXCOLOR(0.0f, 1.0f, 0.0f, 1.0f)},
-        {-0.45f, -0.5f, 0.0f, D3DXCOLOR(0.0f, 0.0f, 1.0f, 1.0f)}
+        {{0.0f, 0.5f, 0.0f}, D3DXCOLOR(1.0f, 0.0f, 0.0f, 1.0f)},
+        {{0.45f, -0.5, 0.0f}, D3DXCOLOR(0.0f, 1.0f, 0.0f, 1.0f)},
+        {{-0.45f, -0.5f, 0.0f}, D3DXCOLOR(0.0f, 0.0f, 1.0f, 1.0f)}
     };
 
-
     D3D11_BUFFER_DESC vecDesc{};
-    vecDesc.Usage = D3D11_USAGE_DYNAMIC;
-    vecDesc.ByteWidth = sizeof(Vertex) * 3;
+    vecDesc.Usage = D3D11_USAGE_IMMUTABLE;
+    vecDesc.ByteWidth = sizeof(vecs);
     vecDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
-    vecDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
-
-    eh::ExitIfFailed(_pd3dDevice->CreateBuffer(&vecDesc, NULL, _pvecBuffer.GetAddressOf()), "Failed to create box vectrics buffer");
-
-    D3D11_MAPPED_SUBRESOURCE vecData{};
-    _pd3dDeviceCtx->Map(_pvecBuffer.Get(), NULL, D3D11_MAP_WRITE_DISCARD, NULL, &vecData);
-    memcpy(vecData.pData, vecs, sizeof(vecs));                 // copy the data
-    _pd3dDeviceCtx->Unmap(_pvecBuffer.Get(), NULL);
+    
+    D3D11_SUBRESOURCE_DATA data{};
+    data.pSysMem = vecs;
+    eh::ExitIfFailed(_pd3dDevice->CreateBuffer(&vecDesc, &data, _pvecBuffer.GetAddressOf()), "Failed to create box vectrics buffer");
 }
 
-void TriangleApplication::compileShader() {
+void DX11TriangleApp::compileShader() {
     DWORD sharedFlags{};
 
     ComPtr<ID3D10Blob> pvsShader{}, pfsShader{}, pErrorBlob{};
     const fs::path cfgPath(std::wstring(kResourceRoot));
-    const fs::path fxfile = cfgPath / L"box" / L"trangile.hlsl";
+    const fs::path fxfile = cfgPath / L"shape" / L"trangile.hlsl";
     auto hr = D3DX11CompileFromFileW(fxfile.wstring().c_str(), 0, 0, "vs_main", "vs_4_0", sharedFlags, 0, 0, pvsShader.GetAddressOf(), pErrorBlob.GetAddressOf(), 0);
     if (FAILED(hr) && pErrorBlob) {
         OutputDebugStringA(reinterpret_cast<const char*>(pErrorBlob->GetBufferPointer()));
@@ -83,7 +78,7 @@ void TriangleApplication::compileShader() {
     _pd3dDeviceCtx->IASetInputLayout(_pd3dLayout.Get());
 }
 
-bool TriangleApplication::init(const HINSTANCE ins, const CreateParam param) {
+bool DX11TriangleApp::init(const HINSTANCE ins, const WindowDesc& param) {
     if (!Application::init(ins, param)) {
         return false;
     }
@@ -93,11 +88,11 @@ bool TriangleApplication::init(const HINSTANCE ins, const CreateParam param) {
     return true;
 }
 
-void TriangleApplication::updateScene(const float dt) {
+void DX11TriangleApp::updateScene(const float dt) {
 
 }
 
-void TriangleApplication::drawScene() {
+void DX11TriangleApp::drawScene() {
     UINT stride = sizeof(Vertex);
     UINT offset = 0;
     auto* buffer = _pvecBuffer.Get();

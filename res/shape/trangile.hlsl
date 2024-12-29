@@ -1,12 +1,12 @@
-struct VOut
+struct vout
 {
     float4 position : SV_POSITION;
     float4 color : COLOR;
 };
 
-VOut vs_main(float4 position : POSITION, float4 color : COLOR)
+vout vs_main(float4 position : POSITION, float4 color : COLOR)
 {
-    VOut output;
+    vout output;
 
     output.position = position;
     output.color = color;

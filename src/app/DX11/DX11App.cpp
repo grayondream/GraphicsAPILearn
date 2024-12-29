@@ -1,3 +1,4 @@
+#include "DX11App.hpp"
 #include <iostream>
 #include <format>
 #include <cassert>
@@ -5,27 +6,42 @@
 #include <chrono>
 #include <thread>
 
-#include "Application.hpp"
+#include "Base/DXBaseConexpr.hpp"
 #include "EH/ErrorHandle.hpp"
 #include "Base/GameTimer.hpp"
 #include "Base/Log.hpp"
+#include "Base/Utils.hpp"
 #include <windowsx.h>
 
 namespace eh = ErrorHandle;
 using namespace base::log;
+using namespace Utils;
 
-Application::Application() {
+DX11Application::DX11Application() {
     LOGI("Game Start!");
 }
 
-Application::~Application() {
+DX11Application::~DX11Application() {
+    if (_pd3dSwapChain) {
+        _pd3dSwapChain->SetFullscreenState(FALSE, 0);
+    }
+
+    if (_pd3dDeviceCtx) {
+        _pd3dDeviceCtx->ClearState();
+    }
+
     LOGI("Game End!");
 }
 
-LRESULT CALLBACK AppWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
-    Application *pApp{};
+void DX11Application::initD3DEnv(const HWND winId) {
+    std::tie(_pd3dDevice, _pd3dDeviceCtx, _pd3dSwapChain) = CreateD3DDeviceAndtSwapChain(winId, _attribute.winAttr.width, _attribute.winAttr.height);
+    updateRenderTargetWhileResize();
+}
+
+LRESULT CALLBACK AppWindowProc1(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
+    DX11Application *pApp{};
      // 获取窗口实例
-    pApp = reinterpret_cast<Application*>(GetWindowLongPtr(hwnd, GWLP_USERDATA));
+    pApp = reinterpret_cast<DX11Application*>(GetWindowLongPtr(hwnd, GWLP_USERDATA));
     if (pApp) {
         // 调用实例的成员函数
         return pApp->msgProc(hwnd, uMsg, wParam, lParam);
@@ -34,11 +50,11 @@ LRESULT CALLBACK AppWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lPara
     return DefWindowProc(hwnd, uMsg, wParam, lParam);
 }
 
-void Application::createMainWindow(const HINSTANCE hInstance){
+void DX11Application::createMainWindow(const HINSTANCE hInstance){
     const char CLASS_NAME[] = "Sample Window Class";
     // 注册窗口类
     WNDCLASS wc = {};
-    wc.lpfnWndProc = AppWindowProc;
+    wc.lpfnWndProc = AppWindowProc1;
     wc.hInstance = hInstance;
     wc.lpszClassName = CLASS_NAME;
     wc.hbrBackground = (HBRUSH)COLOR_WINDOW;
@@ -59,14 +75,15 @@ void Application::createMainWindow(const HINSTANCE hInstance){
     SetWindowLongPtr(_winId, GWLP_USERDATA, (LONG_PTR)this);
 }
 
-bool Application::init(const HINSTANCE hInstance, const WindowDesc& param){
+bool DX11Application::init(const HINSTANCE hInstance, const WindowDesc param){
     _attribute = param;
     createMainWindow(hInstance);
-    LOGI("Create Main Windows successed");
+    initD3DEnv(_winId);
+    LOGI("Initialize D3D environment successed");
     return true;
 }
 
-int Application::run(const int nShowCmd){
+int DX11Application::run(const int nShowCmd){
     ShowWindow(_winId, nShowCmd);
     MSG msg{};
     _timer.reset();
@@ -91,7 +108,7 @@ int Application::run(const int nShowCmd){
     return 0;
 }
 
-void Application::calcFrameRate() {
+void DX11Application::calcFrameRate() {
     static int frameCount = 0;
     static float timePassed = 0.0f;
     frameCount++;
@@ -112,13 +129,32 @@ void Application::calcFrameRate() {
     timePassed += 1.0f;
 }
 
-void Application::onResize(const UINT msg, const WPARAM wParam, const LPARAM lParam) {
+void DX11Application::updateRenderTargetWhileResize() {
+    _pd3dRenderTargetView = nullptr;
+    _depthBuffer = nullptr;
+    _depthView = nullptr;
+    LOGI("Resize Render Target into [{},{}]", _attribute.winAttr.width, _attribute.winAttr.height);
+    //eh::ExitIfFailed(_pd3dSwapChain->ResizeBuffers(1, _attribute.winAttr.width, _attribute.winAttr.height, DXGI_FORMAT_R8G8B8A8_UNORM, 0), "Failed to Resize Buffer");
+    
+    ComPtr<ID3D11Texture2D> pBackBuffer{};
+    _pd3dSwapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), reinterpret_cast<void**>(pBackBuffer.GetAddressOf()));
+    auto hr = _pd3dDevice->CreateRenderTargetView(pBackBuffer.Get(), 0, _pd3dRenderTargetView.GetAddressOf());
+    eh::ExitIfFailed(hr, "Failed to create render target view!");
+    
+    const auto quality = GetD3DMSAAQuality(_pd3dDevice);
+    //std::tie(_depthBuffer, _depthView) = D3DCreateRenderTexture(_pd3dDevice, quality, _attribute.winAttr.width, _attribute.winAttr.height, _attribute.enableMssa);
+    _pd3dDeviceCtx->OMSetRenderTargets(1, _pd3dRenderTargetView.GetAddressOf(), NULL);
+    D3DSetupViewPort(_pd3dDeviceCtx, _attribute.winAttr.width, _attribute.winAttr.height);
+}
+
+void DX11Application::onResize(const UINT msg, const WPARAM wParam, const LPARAM lParam) {
     return;
     if (LOWORD(lParam) != 0 && HIWORD(lParam) != 0) {
         _attribute.winAttr.width = LOWORD(lParam);
         _attribute.winAttr.height = HIWORD(lParam);
     }
     
+    assert(_pd3dDevice && _pd3dDeviceCtx);
     switch (wParam) {
     case SIZE_MINIMIZED: {
         _state.paused = true;
@@ -159,25 +195,26 @@ void Application::onResize(const UINT msg, const WPARAM wParam, const LPARAM lPa
     //updateRenderTargetWhileResize();
 }
 
-void Application::updateScene(const float dt) {}
-
-void Application::beginDrawScene() {
-    return;
+void DX11Application::updateScene(const float dt) {
 }
 
-void Application::endDrawScene() {
-    return;
+void DX11Application::beginDrawScene() {
+    _pd3dDeviceCtx->ClearRenderTargetView(_pd3dRenderTargetView.Get(), reinterpret_cast<const float*>(&Colors::LightSteelBlue));
 }
 
-void Application::drawScene() {
-    return;
+void DX11Application::endDrawScene() {
+    eh::ExitIfFailed(_pd3dSwapChain->Present(0, 0), "Persent Failed");
 }
 
-void Application::onMouseDown(WPARAM btnState, int x, int y) { }
-void Application::onMouseUp(WPARAM btnState, int x, int y) { }
-void Application::onMouseMove(WPARAM btnState, int x, int y) { }
+void DX11Application::drawScene() {
 
-LRESULT Application::msgProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
+}
+
+void DX11Application::onMouseDown(WPARAM btnState, int x, int y) { }
+void DX11Application::onMouseUp(WPARAM btnState, int x, int y) { }
+void DX11Application::onMouseMove(WPARAM btnState, int x, int y) { }
+
+LRESULT DX11Application::msgProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
     switch (msg) {
     case WM_DESTROY:
         PostQuitMessage(0);
