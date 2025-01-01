@@ -17,13 +17,14 @@ static inline constexpr int GAME_ENABLE_MSAA = true;
  *  -   GL_Base:    空窗口使用GL ClearColor
  * DX11:
  *  -   DX11_Base:  空窗口使用DX11 ClearColor
+ *  -   DX11_Triangle   DX11渲染空三角形
  * DX12:
  */
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nShowCmd) {
     ConsoleDebugger consoleDebugger{};
     AppRegister::instance()->run();
 
-    const std::string appName = "DX11_Base";
+    const std::string appName = "DX11_Triangle";
     LOGI("Select {} Application", appName);
     auto app = AppRegister::instance()->get(appName);
     assert(app);

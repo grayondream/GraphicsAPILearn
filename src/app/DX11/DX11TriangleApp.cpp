@@ -40,7 +40,7 @@ void DX11TriangleApp::compileShader() {
 
     ComPtr<ID3D10Blob> pvsShader{}, pfsShader{}, pErrorBlob{};
     const fs::path cfgPath(std::wstring(kResourceRoot));
-    const fs::path fxfile = cfgPath / L"shape" / L"trangile.hlsl";
+    const fs::path fxfile = cfgPath / L"dx11" / L"shape" / L"trangile.hlsl";
     auto hr = D3DX11CompileFromFileW(fxfile.wstring().c_str(), 0, 0, "vs_main", "vs_4_0", sharedFlags, 0, 0, pvsShader.GetAddressOf(), pErrorBlob.GetAddressOf(), 0);
     if (FAILED(hr) && pErrorBlob) {
         OutputDebugStringA(reinterpret_cast<const char*>(pErrorBlob->GetBufferPointer()));
@@ -79,7 +79,7 @@ void DX11TriangleApp::compileShader() {
 }
 
 bool DX11TriangleApp::init(const HINSTANCE ins, const WindowDesc& param) {
-    if (!Application::init(ins, param)) {
+    if (!DX11App::init(ins, param)) {
         return false;
     }
 
