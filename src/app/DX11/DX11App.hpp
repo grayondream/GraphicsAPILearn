@@ -5,39 +5,23 @@
 #include "App/Application.hpp"
 
 using Microsoft::WRL::ComPtr;
-class DX11Application : public Application{
+class DX11App : public Application{
 public:
-    DX11Application();
-    virtual ~DX11Application();
+    DX11App();
+    virtual ~DX11App();
 
-    virtual bool init(const HINSTANCE, const WindowDesc param);
-
-    int run(const int nShowCmd); 
-
-    LRESULT msgProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
+    virtual bool init(const HINSTANCE, const WindowDesc& param) override;
 
 protected:
-    void beginDrawScene();
+    virtual void clearColor() override;
+    virtual void beginDrawScene();
     virtual void drawScene();
-    void endDrawScene();
+    virtual void endDrawScene();
 
     virtual void updateScene(const float dt);
     
-    virtual void onResize(const UINT msg, const WPARAM wParam, const LPARAM lParam);
-    virtual void onMouseDown(WPARAM btnState, int x, int y);
-    virtual void onMouseUp(WPARAM btnState, int x, int y);
-    virtual void onMouseMove(WPARAM btnState, int x, int y);
-    float aspectRatio() {
-        return _attribute.winAttr.width * 1.0 / _attribute.winAttr.height;
-    }
-
-    HWND winId() {
-        return _winId;
-    }
 private:
-    void createMainWindow(const HINSTANCE instance);
     void initD3DEnv(const HWND);
-    void calcFrameRate();
     void updateRenderTargetWhileResize();
 
 protected:

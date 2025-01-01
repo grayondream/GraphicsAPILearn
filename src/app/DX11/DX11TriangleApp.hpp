@@ -1,7 +1,7 @@
 #pragma once
 #include "DX11App.hpp"
 
-class DX11TriangleApp : public DX11Application {
+class DX11TriangleApp : public DX11App {
 public:
     DX11TriangleApp();
     virtual ~DX11TriangleApp();

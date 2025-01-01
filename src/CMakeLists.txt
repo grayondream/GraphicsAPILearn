@@ -69,6 +69,9 @@ dxguid.lib
 Effects11.lib
 )
 
+find_package(glm CONFIG REQUIRED)
+target_link_libraries(${PROJECT_NAME} glm::glm)
+
 target_compile_definitions(${PROJECT_NAME} PRIVATE GAME_RES_ROOT="${GAME_RES_ROOT}")
 
 if(${ENABLE_OPENGL})

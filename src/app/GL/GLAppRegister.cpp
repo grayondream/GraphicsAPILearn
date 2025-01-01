@@ -3,7 +3,6 @@
 #include "App/GL/GLTriangleApp.hpp"
 
 void RegisterGLApps(){
-#if ENABLE_OPENGL
+	AppRegister::instance()->push("GL_Base", std::make_shared<GLApp>());
 	AppRegister::instance()->push("GL_Triangle", std::make_shared<GLTriangleApp>());
-#endif
 }
