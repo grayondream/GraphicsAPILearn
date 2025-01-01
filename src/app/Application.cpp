@@ -70,25 +70,26 @@ int Application::run(const int nShowCmd){
     ShowWindow(_winId, nShowCmd);
     MSG msg{};
     _timer.reset();
-    while (msg.message != WM_QUIT) {
-        if (PeekMessage(&msg, 0, 0, 0, PM_REMOVE)) {
-            TranslateMessage(&msg);
-            DispatchMessage(&msg);
-        }else {
-            _timer.tick();
-            if (!_state.paused) {
-                calcFrameRate();
-                updateScene(_timer.deltaTime());
-                beginDrawScene();
-                drawScene();
-                endDrawScene();
-            }else {
-                std::this_thread::sleep_for(std::chrono::microseconds(100));
-            }
-        }
+    while (GetMessage(&msg, 0, 0, 0)) {
+        TranslateMessage(&msg);
+        DispatchMessage(&msg);
+        render();
     }
 
     return 0;
+}
+
+void Application::render() {
+    if (_state.paused) {
+        return;
+    }
+
+    _timer.tick();
+    calcFrameRate();
+    updateScene(_timer.deltaTime());
+    beginDrawScene();
+    drawScene();
+    endDrawScene();
 }
 
 void Application::calcFrameRate() {
@@ -162,6 +163,7 @@ void Application::onResize(const UINT msg, const WPARAM wParam, const LPARAM lPa
 void Application::updateScene(const float dt) {}
 
 void Application::beginDrawScene() {
+    clearColor();
     return;
 }
 
@@ -181,6 +183,10 @@ LRESULT Application::msgProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) 
     switch (msg) {
     case WM_DESTROY:
         PostQuitMessage(0);
+        return 0;
+    case WM_PAINT:
+        // 触发重绘
+        
         return 0;
     case WM_ACTIVATE: {
         if (LOWORD(wParam) == WA_INACTIVE) {

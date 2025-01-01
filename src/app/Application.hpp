@@ -22,10 +22,11 @@ public:
     LRESULT msgProc(const HWND hwnd, const UINT msg, const WPARAM wParam, const LPARAM lParam);
 
 protected:
-    void beginDrawScene();
+    void render();
+    virtual void clearColor() {}
+    virtual void beginDrawScene();
     virtual void drawScene();
-    void endDrawScene();
-
+    virtual void endDrawScene();
     virtual void updateScene(const float dt);
     
     virtual void onResize(const UINT msg, const WPARAM wParam, const LPARAM lParam);

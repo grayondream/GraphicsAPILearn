@@ -1,7 +1,7 @@
 #pragma once
-#include "App/Application.hpp"
+#include "GLApp.hpp"
 
-class GLTriangleApp : public Application {
+class GLTriangleApp : public GLApp {
 public:
 private:
 };
