@@ -39,15 +39,14 @@ void DX11TriangleApp::compileShader() {
     DWORD sharedFlags{};
 
     ComPtr<ID3D10Blob> pvsShader{}, pfsShader{}, pErrorBlob{};
-    const fs::path cfgPath(std::wstring(kResourceRoot));
-    const fs::path fxfile = cfgPath / L"dx11" / L"shape" / L"trangile.hlsl";
-    auto hr = D3DX11CompileFromFileW(fxfile.wstring().c_str(), 0, 0, "vs_main", "vs_4_0", sharedFlags, 0, 0, pvsShader.GetAddressOf(), pErrorBlob.GetAddressOf(), 0);
+    const fs::path file = StaticCollector::getDX11ShaderPath() / "Shape" / "trangile.hlsl";
+    auto hr = D3DX11CompileFromFileW(file.wstring().c_str(), 0, 0, "vs_main", "vs_4_0", sharedFlags, 0, 0, pvsShader.GetAddressOf(), pErrorBlob.GetAddressOf(), 0);
     if (FAILED(hr) && pErrorBlob) {
         OutputDebugStringA(reinterpret_cast<const char*>(pErrorBlob->GetBufferPointer()));
     }
 
     eh::ExitIfFailed(hr, "Compile VS Shader file failed");
-    hr = D3DX11CompileFromFileW(fxfile.wstring().c_str(), 0, 0, "ps_main", "ps_4_0", sharedFlags, 0, 0, pfsShader.GetAddressOf(), pErrorBlob.GetAddressOf(), 0);
+    hr = D3DX11CompileFromFileW(file.wstring().c_str(), 0, 0, "ps_main", "ps_4_0", sharedFlags, 0, 0, pfsShader.GetAddressOf(), pErrorBlob.GetAddressOf(), 0);
     if (FAILED(hr) && pErrorBlob) {
         OutputDebugStringA(reinterpret_cast<const char*>(pErrorBlob->GetBufferPointer()));
     }
