@@ -1,0 +1,1 @@
+include_directories(${RENDER_3PARTY_PATH}/glad/include)

@@ -4,4 +4,5 @@
 class GLTriangleApp : public GLApp {
 public:
 private:
+	void compileShader();
 };

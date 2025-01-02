@@ -1,0 +1,16 @@
+#pragma once
+#include <string>
+#include <map>
+
+class GLProgram {
+public:
+	bool init(const std::string vertFile = {}, const std::string fragFile = {});
+
+private:
+	std::pair<unsigned int, unsigned int> compileShader(const std::string vertFile, const std::string fragFile);
+	unsigned int createProgram(const std::string vertFile, const std::string fragFile);
+
+private:
+	unsigned int _program{};
+};
+

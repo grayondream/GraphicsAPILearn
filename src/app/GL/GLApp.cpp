@@ -2,11 +2,10 @@
 #include "gl/GL.h"
 #include "gl/GLU.h"
 #include "EH/ErrorHandle.hpp"
-
+#include "Base/Log.hpp"
 using namespace ErrorHandle;
 
 GLApp::GLApp() {
-
 }
 
 GLApp::~GLApp() {
@@ -25,6 +24,8 @@ bool GLApp::init(const HINSTANCE hinstance, const WindowDesc& param) {
 	Application::init(hinstance, param);
     _glContext = CreateOpenGLContext(winId());
     ExitIfFailed(!!_glContext, "Create GLContext Failed, the Gl Context is nullptr");
+    char* version = (char*)glGetString(GL_VERSION);
+    LOGI("OpenGL Version: {}", std::string(version));
     return !!_glContext;
 }
 
