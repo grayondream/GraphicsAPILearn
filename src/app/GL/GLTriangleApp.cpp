@@ -1,8 +1,16 @@
 #include "GLTriangleApp.hpp"
-#include "gl/gl.h"
-#include "glad/glad.h"
-#include "glad/glad.h"
+#include "Native/GL/GLProgram.hpp"
+#include "Config/StaticCollectorPredefined.hpp"
+#include "EH/ErrorHandle.hpp"
 
-void GLTriangleApp::compileShader() {
-	glCreateShader(GL_VERTEX_SHADER);
+bool GLTriangleApp::init(const HINSTANCE inst, const WindowDesc& param) {
+	if (!GLApp::init(inst, param)) {
+		return false;
+	}
+
+	const auto vfile = StaticCollector::getGLShaderPath() / "Shape" / "triangle.vert";
+	const auto ffile = StaticCollector::getGLShaderPath() / "Shape" / "triangle.frag";
+	auto ret = _program.init(vfile.string(), ffile.string());
+	ErrorHandle::ExitIfFailed(ret, "Create OpenGL program failed!");
+	return true;
 }

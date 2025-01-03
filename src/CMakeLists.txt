@@ -35,6 +35,7 @@ endif()
 add_executable(${PROJECT_NAME} WIN32 
 ${ALL_CPP_FILES} 
 ${ALL_HPP_FILES}
+${GLAD_SRC_FILES}
 )
 
 target_link_libraries(${PROJECT_NAME}
@@ -66,7 +67,6 @@ d3d11.lib
 d3dx11.lib
 d3dcompiler.lib
 dxguid.lib
-Effects11.lib
 )
 
 find_package(glm CONFIG REQUIRED)

@@ -18,6 +18,7 @@ protected:
 
 private:
 	HGLRC CreateOpenGLContext(const HWND winid);
+	bool initGlad();
 
 protected:
 	HGLRC _glContext{};
