@@ -32,7 +32,7 @@ std::pair<unsigned int, unsigned int> GLTriangleApp::createVertexBuffer() {
 	glBindVertexArray(vao);
 	{
 		glBindBuffer(GL_ARRAY_BUFFER, vbo);
-		glBufferData(GL_ARRAY_BUFFER, oneTriangle.byteSize(), oneTriangle.data(), GL_STATIC_DRAW);
+		glBufferData(GL_ARRAY_BUFFER, oneTriangle.byteSize(), oneTriangle.toGL().data(), GL_STATIC_DRAW);
 
 		glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 8 * sizeof(float), nullptr);
 		glEnableVertexAttribArray(0);

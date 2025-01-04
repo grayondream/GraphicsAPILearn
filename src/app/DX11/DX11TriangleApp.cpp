@@ -26,7 +26,7 @@ void DX11TriangleApp::createGemBuffer() {
     vecDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
     
     D3D11_SUBRESOURCE_DATA data{};
-    data.pSysMem = shape.data();
+    data.pSysMem = shape.toDX11().data();
     eh::ExitIfFailed(_pd3dDevice->CreateBuffer(&vecDesc, &data, _pvecBuffer.GetAddressOf()), "Failed to create box vectrics buffer");
 }
 
@@ -62,7 +62,7 @@ void DX11TriangleApp::compileShader() {
     D3D11_INPUT_ELEMENT_DESC ied[] =
     {
         {"POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0},
-        {"COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 12, D3D11_INPUT_PER_VERTEX_DATA, 0},
+        {"COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 16, D3D11_INPUT_PER_VERTEX_DATA, 0},
     };
 
     // Create the input layout

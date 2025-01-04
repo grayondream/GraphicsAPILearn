@@ -14,6 +14,8 @@ public:
 
 public:
 	virtual float* data() const override;
+	virtual  Triangle& toGL()  override;
+	virtual  Triangle& toDX11()  override;
 	virtual float* idx() const override;
 	virtual std::size_t byteSize() override {
 		return VertexCount * sizeof(Vertex);
