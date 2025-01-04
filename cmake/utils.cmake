@@ -6,16 +6,16 @@ function(add_source_group directory group_name)
 
     # 处理 .hpp 文件
     if(hpp_files)
-        message(STATUS "Add Header File into ${group_name}/include")
+        message(STATUS "Add Header File into ${group_name}")
         message(STATUS "${hpp_files}")
-        source_group("${group_name}/include" FILES ${hpp_files})
+        source_group("${group_name}" FILES ${hpp_files})
     endif()
 
     # 处理 .cpp 文件
     if(cpp_files)
-        message(STATUS "Add Header File into ${group_name}/src")
+        message(STATUS "Add Header File into ${group_name}")
         message(STATUS "${cpp_files}")
-        source_group("${group_name}/src" FILES ${cpp_files})
+        source_group("${group_name}" FILES ${cpp_files})
     endif()
 
     file(GLOB subdirs "${directory}/*")
