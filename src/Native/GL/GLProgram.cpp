@@ -21,6 +21,14 @@ static unsigned int GLCompileShader(const std::string file, const GLenum type) {
 	return shader;
 }
 
+GLProgram::~GLProgram() {
+	glDeleteProgram(_program);
+}
+
+void GLProgram::use() {
+	glUseProgram(_program);
+}
+
 bool GLProgram::init(const std::string vertFile, const std::string fragFile) {
 	_program = createProgram(vertFile, fragFile);
 	if (_program == GL_INVALID_INDEX) {

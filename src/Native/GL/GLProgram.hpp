@@ -4,7 +4,11 @@
 
 class GLProgram {
 public:
+	~GLProgram();
+
+public:
 	bool init(const std::string vertFile = {}, const std::string fragFile = {});
+	void use();
 
 private:
 	std::pair<unsigned int, unsigned int> compileShader(const std::string vertFile, const std::string fragFile);

@@ -4,8 +4,22 @@
 
 class GLTriangleApp : public GLApp {
 public:
+	virtual ~GLTriangleApp();
+public:
 	virtual bool init(const HINSTANCE, const WindowDesc& param) override;
+
+protected:
+	virtual void clearColor();
+	virtual void beginDrawScene();
+	virtual void drawScene();
+	virtual void endDrawScene();
+	virtual void updateScene(const float dt);
+
+private:
+	std::pair<unsigned int, unsigned int> createVertexBuffer();
 
 private:
 	GLProgram _program{};
+	unsigned int _vbo{};
+	unsigned int _vao{};
 };
