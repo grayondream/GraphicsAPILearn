@@ -1,7 +1,7 @@
 #include "GLAppRegister.hpp"
 #include "App/AppRegister.hpp"
-#include "App/GL/GLTriangleApp.hpp"
-#include "App/GL/GLRectApp.hpp"
+#include "GLTriangleApp.hpp"
+#include "GLRectApp.hpp"
 
 void RegisterGLApps(){
 	AppRegister::instance()->push("GL_Base", std::make_shared<GLApp>());

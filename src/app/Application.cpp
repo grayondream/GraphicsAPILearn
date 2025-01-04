@@ -15,11 +15,11 @@ namespace eh = ErrorHandle;
 using namespace base::log;
 
 Application::Application() {
-    LOGI("Game Start!");
+    
 }
 
 Application::~Application() {
-    LOGI("Game End!");
+    
 }
 
 LRESULT CALLBACK AppWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {

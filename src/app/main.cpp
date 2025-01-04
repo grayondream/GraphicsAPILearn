@@ -12,13 +12,15 @@ static inline constexpr int GAME_ENABLE_MSAA = true;
 
 /*
  * Application List:
- * Base: 空窗口
+ * Base: Draw a empty window
  * GL:
- *  -   GL_Base:    空窗口使用GL ClearColor
- *  -   GL_Triangle OpenGL渲染空三角形
+ *  -   GL_Base:            clear window's color into one color by OpenGL
+ *  -   GL_Triangle         draw a colored triangle by OpenGL
+ *  -   GL_Rect             draw a colored rect by OpenGL
  * DX11:
- *  -   DX11_Base:  空窗口使用DX11 ClearColor
- *  -   DX11_Triangle   DX11渲染空三角形
+ *  -   DX11_Base:          clear window's color into one color by DX11
+ *  -   DX11_Triangle       draw a colored triangle by DX11
+ *  -   DX11_Rect           draw a colored rect by DX11
  * DX12:
  */
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nShowCmd) {
