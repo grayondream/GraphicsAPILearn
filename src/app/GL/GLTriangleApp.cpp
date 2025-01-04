@@ -3,6 +3,7 @@
 #include "Config/StaticCollectorPredefined.hpp"
 #include "EH/ErrorHandle.hpp"
 #include "glad/glad.h"
+#include "Shape/Triangle.hpp"
 
 GLTriangleApp::~GLTriangleApp() {
 	glDeleteVertexArrays(1, &_vao);
@@ -23,12 +24,7 @@ bool GLTriangleApp::init(const HINSTANCE inst, const WindowDesc& param) {
 }
 
 std::pair<unsigned int, unsigned int> GLTriangleApp::createVertexBuffer() {
-	float vertices[] = {
-		-0.5f, -0.5f, 0.0f, // left  
-		 0.5f, -0.5f, 0.0f, // right 
-		 0.0f,  0.5f, 0.0f  // top   
-	};
-
+	Triangle oneTriangle{};
 	unsigned int vbo{}, vao{};
 	glGenVertexArrays(1, &vao);
 	glGenBuffers(1, &vbo);
@@ -36,10 +32,13 @@ std::pair<unsigned int, unsigned int> GLTriangleApp::createVertexBuffer() {
 	glBindVertexArray(vao);
 	{
 		glBindBuffer(GL_ARRAY_BUFFER, vbo);
-		glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+		glBufferData(GL_ARRAY_BUFFER, oneTriangle.byteSize(), oneTriangle.data(), GL_STATIC_DRAW);
 
-		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), nullptr);
+		glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 8 * sizeof(float), nullptr);
 		glEnableVertexAttribArray(0);
+
+		glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(4 * sizeof(float)));
+		glEnableVertexAttribArray(1);
 	}
 	glBindVertexArray(0);
 	return {vao, vbo};

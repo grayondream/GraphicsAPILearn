@@ -1,10 +1,18 @@
 #include "Triangle.hpp"
 
 Triangle::Triangle() {
-    Triangle({ 0, 0.5, 0.0 }, { - 0.5 , - 0.5, 0.0 }, { 0.5, -0.5, 0.0 });
+    store(
+        { 0.0f, 0.5f, 0.0f, 1.0f, 1.0f, 0.0f, 0.0f, 1.0f },
+        { -0.5f, -0.5f, 0.0f, 1.0f, 0.0f, 1.0f, 0.0f, 1.0f },
+        { 0.5f, -0.5f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f, 1.0f }
+    );
 }
 
-Triangle::Triangle(const glm::vec3& v1, const glm::vec3& v2, const glm::vec3& v3) {
+Triangle::Triangle(const Vertex& v1, const Vertex& v2, const Vertex& v3) {
+    store(v1, v2, v3);
+}
+
+void Triangle::store(const Vertex& v1, const Vertex& v2, const Vertex& v3) {
     _pts[0] = v1;
     _pts[1] = v2;
     _pts[2] = v3;
@@ -12,7 +20,7 @@ Triangle::Triangle(const glm::vec3& v1, const glm::vec3& v2, const glm::vec3& v3
 }
 
 float* Triangle::data() const {
-    return reinterpret_cast<float*>(const_cast<glm::vec3*>(_pts.data()));
+    return reinterpret_cast<float*>(const_cast<Vertex*>(_pts.data()));
 }
 
 float* Triangle::idx() const {

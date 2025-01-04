@@ -15,6 +15,7 @@ static inline constexpr int GAME_ENABLE_MSAA = true;
  * Base: 空窗口
  * GL:
  *  -   GL_Base:    空窗口使用GL ClearColor
+ *  -   GL_Triangle OpenGL渲染空三角形
  * DX11:
  *  -   DX11_Base:  空窗口使用DX11 ClearColor
  *  -   DX11_Triangle   DX11渲染空三角形

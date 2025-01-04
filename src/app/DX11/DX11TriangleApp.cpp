@@ -1,10 +1,10 @@
 #include "DX11TriangleApp.hpp"
-#include "Base/Vertex.hpp"
 #include "Base/DXBaseConexpr.hpp"
 #include "EH/ErrorHandle.hpp"
 #include "Config/StaticCollectorPredefined.hpp"
 #include <Base/MathHelper.h>
 #include <filesystem>
+#include "Shape/Triangle.hpp"
 
 namespace eh = ErrorHandle;
 namespace fs = std::filesystem;
@@ -18,20 +18,15 @@ DX11TriangleApp::~DX11TriangleApp(){
 }
 
 void DX11TriangleApp::createGemBuffer() {
-    Vertex vecs[] =
-    {
-        {{0.0f, 0.5f, 0.0f}, D3DXCOLOR(1.0f, 0.0f, 0.0f, 1.0f)},
-        {{0.45f, -0.5, 0.0f}, D3DXCOLOR(0.0f, 1.0f, 0.0f, 1.0f)},
-        {{-0.45f, -0.5f, 0.0f}, D3DXCOLOR(0.0f, 0.0f, 1.0f, 1.0f)}
-    };
+    Triangle shape{};
 
     D3D11_BUFFER_DESC vecDesc{};
     vecDesc.Usage = D3D11_USAGE_IMMUTABLE;
-    vecDesc.ByteWidth = sizeof(vecs);
+    vecDesc.ByteWidth = shape.byteSize();
     vecDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
     
     D3D11_SUBRESOURCE_DATA data{};
-    data.pSysMem = vecs;
+    data.pSysMem = shape.data();
     eh::ExitIfFailed(_pd3dDevice->CreateBuffer(&vecDesc, &data, _pvecBuffer.GetAddressOf()), "Failed to create box vectrics buffer");
 }
 
