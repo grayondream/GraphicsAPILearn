@@ -1,6 +1,7 @@
 #pragma once
 #include <string>
 #include <map>
+#include <glm/glm.hpp>
 
 class GLProgram {
 public:
@@ -15,6 +16,10 @@ public:
 	GLProgram& update(const std::string& name, const int value);
 
 	GLProgram& update(const std::string& name, const float value);
+
+	GLProgram& update(const std::string& name, const float* value);
+
+	GLProgram& update(const std::string& name, const glm::mat4 &value);
 
 private:
 	std::pair<unsigned int, unsigned int> compileShader(const std::string vertFile, const std::string fragFile);

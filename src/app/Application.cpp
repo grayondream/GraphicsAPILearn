@@ -86,7 +86,7 @@ void Application::render() {
 
     _timer.tick();
     calcFrameRate();
-    updateScene(_timer.deltaTime());
+    updateScene(_timer.totalTime());
     beginDrawScene();
     drawScene();
     endDrawScene();

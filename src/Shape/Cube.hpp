@@ -6,11 +6,32 @@
 
 class Cube : public Shape {
 public:
-	static constexpr int VertexCount = 8;
+	static constexpr int VertexCount = 36;
 
 public:
 	Cube() {
+		_pts = {
+			// Front face
+		   {{-0.5f, -0.5f,  0.5f, 1.0f}, {1.0f, 0.0f, 0.0f, 1.0f}},
+		   {{ 0.5f, -0.5f,  0.5f, 1.0f}, {0.0f, 1.0f, 0.0f, 1.0f}},
+		   {{ 0.5f,  0.5f,  0.5f, 1.0f}, {0.0f, 0.0f, 1.0f, 1.0f}},
+		   {{-0.5f,  0.5f,  0.5f, 1.0f}, {1.0f, 1.0f, 0.0f, 1.0f}},
 
+		   // Back face
+		   {{-0.5f, -0.5f, -0.5f, 1.0f}, {1.0f, 0.0f, 1.0f, 1.0f}},
+		   {{ 0.5f, -0.5f, -0.5f, 1.0f}, {0.0f, 1.0f, 1.0f, 1.0f}},
+		   {{ 0.5f,  0.5f, -0.5f, 1.0f}, {0.5f, 0.5f, 0.5f, 1.0f}},
+		   {{-0.5f,  0.5f, -0.5f, 1.0f}, {1.0f, 0.5f, 0.5f, 1.0f}},
+		};
+
+		_idx = {
+			0, 1, 2, 2, 3, 0, // Front face
+			4, 5, 6, 6, 7, 4, // Back face
+			0, 1, 5, 5, 4, 0, // Bottom face
+			2, 3, 7, 7, 6, 2, // Top face
+			0, 3, 7, 7, 4, 0, // Left face
+			1, 2, 6, 6, 5, 1  // Right face}
+		};
 	}
 
 };

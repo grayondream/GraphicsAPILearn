@@ -26,7 +26,7 @@ bool GLApp::init(const HINSTANCE hinstance, const WindowDesc& param) {
     ExitIfFailed(initGlad(), "Failed to Load OpenGL Glad!");
     char* version = (char*)glGetString(GL_VERSION);
     LOGI("OpenGL Version: {}", std::string(version));
-    
+    glEnable(GL_DEPTH_TEST);
     return true;
 }
 

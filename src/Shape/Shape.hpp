@@ -47,6 +47,6 @@ public:
 	}
 
 protected:
-	std::vector<Vertex> _pts; // 三个顶点
-	std::vector<unsigned int> _idx; // 索引数组
+	std::vector<Vertex> _pts; 
+	std::vector<unsigned int> _idx; 
 };
