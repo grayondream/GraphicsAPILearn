@@ -21,6 +21,7 @@ bool GLRectApp::init(const HINSTANCE inst, const WindowDesc& param) {
 	auto ret = _program.init(vfile.string(), ffile.string());
 	ErrorHandle::ExitIfFailed(ret, "Create OpenGL program failed!");
 	std::tie(_vao, _vbo, _ebo) = createVertexBuffer();
+	//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 	return true;
 }
 

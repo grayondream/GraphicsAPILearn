@@ -1,6 +1,5 @@
 #pragma once
 
-#include <glm/glm.hpp>
 #include <array>
 #include "Shape.hpp"
 #include "Vertex.hpp"
@@ -12,10 +11,10 @@ public:
 public:
 	Rect() {
 		store(
-			{ 0.5f, 0.5f, 0.0f, 1.0f, 1.0f, 0.0f, 0.0f, 1.0f },
-			{ 0.5f, -0.5f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f, 1.0f },
-			{ -0.5f, -0.5f, 0.0f, 1.0f, 0.0f, 1.0f, 0.0f, 1.0f },
-			{ -0.5f, 0.5f, 0.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f }
+			{ {0.5f, 0.5f, 0.0f, 1.0f}, {1.0f, 0.0f, 0.0f, 1.0f} },
+			{ {0.5f, -0.5f, 0.0f, 1.0f}, {0.0f, 0.0f, 1.0f, 1.0f} },
+			{ {-0.5f, -0.5f, 0.0f, 1.0f}, {0.0f, 1.0f, 0.0f, 1.0f} },
+			{ {-0.5f, 0.5f, 0.0f, 1.0f}, {1.0f, 1.0f, 1.0f, 1.0f} }
 		);
 	}
 
