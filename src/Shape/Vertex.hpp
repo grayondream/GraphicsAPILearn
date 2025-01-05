@@ -1,24 +1,5 @@
 #pragma once
-#include <glm/glm.hpp>
-
-class Position{
-public:
-	using ValueType = float;
-	static constexpr int ElemNo = 4;
-	static constexpr int ByteSize = sizeof(ValueType) * ElemNo;
-public:
-	Position& toGL() {
-		return *this;
-	}
-
-	Position& toDX11() {
-		z = -1 * z;
-		return *this;
-	}
-
-public:
-	ValueType x, y, z, w;
-};
+#include "Position.hpp"
 
 class Color {
 public:
@@ -31,11 +12,11 @@ public:
 
 class Vertex {
 public:
-	static constexpr int ByteSize = Position::ByteSize + Color::ByteSize;
-	static constexpr int ColorOffset = Position::ByteSize;
+	static constexpr int ByteSize = Position4D::ByteSize + Color::ByteSize;
+	static constexpr int ColorOffset = Position4D::ByteSize;
 
 public:
-	Position pos{};
+	Position4D pos{};
 	Color color{};
 
 public:

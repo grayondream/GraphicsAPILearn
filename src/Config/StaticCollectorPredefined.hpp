@@ -4,15 +4,23 @@
 
 #define kResourceRoot "B:\\Code\\DirectX11Learn\\res\\"
 namespace StaticCollector{
+	inline std::filesystem::path getResPath() {
+		return std::string(kResourceRoot);
+	}
+
 	inline std::filesystem::path getGLShaderPath() {
-		return std::string(kResourceRoot) + "GL";
+		return getResPath() / "GL";
 	}
 
 	inline std::filesystem::path getDX11ShaderPath() {
-		return std::string(kResourceRoot) + "DX11";
+		return getResPath() / + "DX11";
 	}
 
 	inline std::filesystem::path getDX12ShaderPath() {
-		return std::string(kResourceRoot) + "DX12";
+		return getResPath() / + "DX12";
+	}
+
+	inline std::filesystem::path getImagePath() {
+		return getResPath() / +"img";
 	}
 };

@@ -6,7 +6,7 @@
 
 class Cube : public Shape {
 public:
-	static constexpr int VertexCount = 4;
+	static constexpr int VertexCount = 8;
 
 public:
 	Cube() {

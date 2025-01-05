@@ -38,6 +38,21 @@ bool GLProgram::init(const std::string vertFile, const std::string fragFile) {
 	return true;
 }
 
+GLProgram& GLProgram::update(const std::string& name, const bool value) {
+	glUniform1i(glGetUniformLocation(_program, name.c_str()), value);
+	return *this;
+}
+
+GLProgram& GLProgram::update(const std::string& name, const int value) {
+	glUniform1i(glGetUniformLocation(_program, name.c_str()), value);
+	return *this;
+}
+
+GLProgram& GLProgram::update(const std::string& name, const float value) {
+	glUniform1f(glGetUniformLocation(_program, name.c_str()), value);
+	return *this;
+}
+
 std::pair<unsigned int, unsigned int> GLProgram::compileShader(const std::string vertFile, const std::string fragFile) {
 	if (vertFile.empty() || fragFile.empty()) {
 		LOGI("Empty input for shader file!\nvertex file is {}\nfragment files is", vertFile, fragFile);
