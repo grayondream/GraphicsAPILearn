@@ -24,7 +24,7 @@ bool GLSimpleTextureApp::init(const HINSTANCE inst, const WindowDesc& param) {
 	const auto ffile = StaticCollector::getGLShaderPath() / "Shape" / "simpleTexture.frag";
 	auto ret = _program.init(vfile.string(), ffile.string());
 	ErrorHandle::ExitIfFailed(ret, "Create OpenGL program failed!");
-	const auto imgFile = StaticCollector::getImagePath() / "container.jpg";
+	const auto imgFile = StaticCollector::getImagePath() / "dog.jpg";
 	_texture = std::make_shared<GLImageTexture2D>(imgFile.string());
 	ExitIfFailed(_texture->load().texture() != GL_INVALID_INDEX, "Failed to load texture from file {}", imgFile.string());
 

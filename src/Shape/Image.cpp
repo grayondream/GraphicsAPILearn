@@ -14,6 +14,7 @@ Image::~Image() {
 }
 
 Image& Image::load() {
+	stbi_set_flip_vertically_on_load(true);
 	_pdata = stbi_load(_file.c_str(), &_size.width, &_size.height, &_size.channel, 0);
 	return *this;
 }

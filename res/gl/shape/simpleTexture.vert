@@ -4,9 +4,9 @@ layout (location = 1) in vec4 color;
 layout (location = 2) in vec2 inTextureCoord;
 
 out vec4 fragColor;
-out vec2 texrtureCoord;
+out vec2 textureCoord;
 void main(){
     gl_Position = pos;
     fragColor = color;
-    texrtureCoord = vec2(inTextureCoord.x, inTextureCoord.y);
+    textureCoord = vec2(inTextureCoord.x, inTextureCoord.y);
 }

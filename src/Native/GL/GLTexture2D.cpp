@@ -15,6 +15,7 @@ GLImageTexture2D::GLImageTexture2D(const std::string& file) {
 unsigned int GLImageTexture2D::generateTextureFrom(const uint8_t* data, const int width, const int height) {
 	unsigned int texture{};
 	glGenTextures(1, &texture);
+	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, texture);
 	// set the texture wrapping parameters
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);	// set texture wrapping to GL_REPEAT (default wrapping method)
