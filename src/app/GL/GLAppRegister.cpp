@@ -10,5 +10,5 @@ void RegisterGLApps(){
 	AppRegister::instance()->push("GL_Triangle", std::make_shared<GLTriangleApp>());
 	AppRegister::instance()->push("GL_Rect", std::make_shared<GLRectApp>());
 	AppRegister::instance()->push("GL_SimpleTexture", std::make_shared<GLSimpleTextureApp>());
-	AppRegister::instance()->push("GL_Box", std::make_shared<GLCubeApp>());
+	AppRegister::instance()->push("GL_Cube", std::make_shared<GLCubeApp>());
 }

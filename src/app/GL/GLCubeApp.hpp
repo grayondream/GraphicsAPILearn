@@ -24,7 +24,7 @@ private:
 private:
 	std::shared_ptr<GLImageTexture2D> _texture{};
 	GLProgram _program{};
-	unsigned int _vbo{};
+	unsigned int _vbo[2]{};
 	unsigned int _vao{};
 	unsigned int _ebo{};
 };

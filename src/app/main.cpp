@@ -31,7 +31,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nShowCmd) {
     ConsoleDebugger consoleDebugger{};
     AppRegister::instance()->run();
 
-    const std::string appName = "GL_Box";
+    const std::string appName = "GL_Cube";
     LOGI("Select {} Application", appName);
     auto app = AppRegister::instance()->get(appName);
     assert(app);

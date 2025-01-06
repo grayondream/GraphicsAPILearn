@@ -16,7 +16,7 @@ using namespace ErrorHandle;
 
 GLCubeApp::~GLCubeApp() {
 	glDeleteVertexArrays(1, &_vao);
-	//glDeleteBuffers(2, _vbos.data());
+	glDeleteBuffers(2, _vbo);
 	glDeleteBuffers(1, &_ebo);
 }
 
@@ -33,7 +33,7 @@ bool GLCubeApp::init(const HINSTANCE inst, const WindowDesc& param) {
 	const auto imgFile = StaticCollector::getImagePath() / "dog.jpg";
 	_texture = std::make_shared<GLImageTexture2D>(imgFile.string());
 	ExitIfFailed(_texture->load().texture() != GL_INVALID_INDEX, "Failed to load texture from file {}", imgFile.string());
-
+	_texture->multiSurface(6);
 	createVertexBuffer();
 	//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 	return true;
@@ -41,28 +41,34 @@ bool GLCubeApp::init(const HINSTANCE inst, const WindowDesc& param) {
 
 void GLCubeApp::createVertexBuffer() {
 	Cube shape{};
-	unsigned int vbo{}, vao{}, ebo{};
+	unsigned int vbo[2]{}, vao{}, ebo{};
 	glGenVertexArrays(1, &vao);
-	glGenBuffers(1, &vbo);
+	glGenBuffers(2, vbo);
 	glGenBuffers(1, &ebo);
 
 	glBindVertexArray(vao);
 	{
-		glBindBuffer(GL_ARRAY_BUFFER, vbo);
+		glBindBuffer(GL_ARRAY_BUFFER, vbo[0]);
 		glBufferData(GL_ARRAY_BUFFER, shape.byteSize(), shape.toGL().data(), GL_STATIC_DRAW);
-
-		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
-		glBufferData(GL_ELEMENT_ARRAY_BUFFER, shape.idxByteSize(), shape.idx(), GL_STATIC_DRAW);
 
 		glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex), nullptr);
 		glEnableVertexAttribArray(0);
 
 		glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)(sizeof(float) * 4));
 		glEnableVertexAttribArray(1);
+
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
+		glBufferData(GL_ELEMENT_ARRAY_BUFFER, shape.idxByteSize(), shape.idx(), GL_STATIC_DRAW);
+
+		glBindBuffer(GL_ARRAY_BUFFER, vbo[1]);
+		glBufferData(GL_ARRAY_BUFFER, _texture->coordSize(), _texture->coord(), GL_STATIC_DRAW);
+
+		glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), nullptr);
+		glEnableVertexAttribArray(2);
 	}
 	glBindVertexArray(0);
 	_vao = vao;
-	_vbo = vbo;
+	_vbo[0] = vbo[0], _vbo[1] = vbo[1];
 	_ebo = ebo;
 }
 
@@ -92,7 +98,7 @@ void GLCubeApp::updateScene(const float dt) {
 		glm::mat4 model = glm::mat4(1.0f); // make sure to initialize matrix to identity matrix first
 		glm::mat4 view = glm::mat4(1.0f);
 		glm::mat4 projection = glm::mat4(1.0f);
-		model = glm::rotate(model, dt, glm::vec3(1.0f, 0.0f, 0.0f));
+		model = glm::rotate(model, dt, glm::vec3(1.0, 1.0f, 0.0f));
 		view = glm::translate(view, glm::vec3(0.0f, 0.0f, -3.0f));
 		projection = glm::perspective(glm::radians(45.0f), aspectRatio(), 0.1f, 100.0f);
 		_program.update("model", model);

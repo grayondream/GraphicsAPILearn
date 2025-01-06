@@ -1,6 +1,7 @@
 #include "Shape/Image.hpp"
 #include "GLTexture2D.hpp"
 #include "glad/glad.h"
+#include <cassert>
 
 GLImageTexture2D::GLImageTexture2D(const std::string& file) {
 	_img = Image(file);
@@ -50,4 +51,52 @@ float* GLImageTexture2D::coord() {
 
 std::size_t GLImageTexture2D::coordSize() {
 	return _coord.size() * Position2D::ByteSize;
+}
+
+GLImageTexture2D& GLImageTexture2D::multiSurface(const int cnt) {
+	if (cnt == 1) {
+		return *this;
+	}
+
+	_coord.clear();
+	//the index is not correct
+	// 正面 Front face
+	_coord.push_back(Position2D{ 0.0f, 0.0f }); // 左下角
+	_coord.push_back(Position2D{ 1.0f, 0.0f }); // 右下角
+	_coord.push_back(Position2D{ 1.0f, 1.0f }); // 右上角
+	_coord.push_back(Position2D{ 0.0f, 1.0f }); // 左上角
+
+	// 背面 Back face
+	_coord.push_back(Position2D{ 1.0f, 1.0f }); // 左下角
+	_coord.push_back(Position2D{ 0.0f, 1.0f }); // 右下角
+	_coord.push_back(Position2D{ 0.0f, 0.0f }); // 右上角
+	_coord.push_back(Position2D{ 1.0f, 0.0f }); // 左上角
+
+	// 底面 Bottom face
+	_coord.push_back(Position2D{ 0.0f, 1.0f }); // 左下角
+	_coord.push_back(Position2D{ 1.0f, 1.0f }); // 右下角
+	_coord.push_back(Position2D{ 1.0f, 0.0f }); // 右上角
+	_coord.push_back(Position2D{ 0.0f, 0.0f }); // 左上角
+
+	// 顶面 Top face
+	_coord.push_back(Position2D{ 1.0f, 0.0f }); // 左下角
+	_coord.push_back(Position2D{ 1.0f, 1.0f }); // 右下角
+	_coord.push_back(Position2D{ 0.0f, 1.0f }); // 右上角
+	_coord.push_back(Position2D{ 0.0f, 0.0f }); // 左上角
+
+	// 左面 Left face
+	_coord.push_back(Position2D{ 0.0f, 1.0f }); // 左下角
+	_coord.push_back(Position2D{ 0.0f, 0.0f }); // 右下角
+	_coord.push_back(Position2D{ 1.0f, 0.0f }); // 右上角
+	_coord.push_back(Position2D{ 1.0f, 1.0f }); // 左上角
+
+	// 右面 Right face
+	_coord.push_back(Position2D{ 1.0f, 0.0f }); // 左下角
+	_coord.push_back(Position2D{ 0.0f, 0.0f }); // 右下角
+	_coord.push_back(Position2D{ 0.0f, 1.0f }); // 右上角
+	_coord.push_back(Position2D{ 1.0f, 1.0f }); // 左上角
+
+
+
+	return *this;
 }
