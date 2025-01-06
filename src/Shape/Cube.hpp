@@ -4,24 +4,21 @@
 #include "Shape.hpp"
 #include "Vertex.hpp"
 
-class Cube : public Shape {
-public:
-	static constexpr int VertexCount = 36;
-
+class Cube : public Shape<Cube, 8, 36> {
 public:
 	Cube() {
 		_pts = {
 			// Front face
-		   {{-0.5f, -0.5f,  0.5f, 1.0f}, {1.0f, 0.0f, 0.0f, 1.0f}},
-		   {{ 0.5f, -0.5f,  0.5f, 1.0f}, {0.0f, 1.0f, 0.0f, 1.0f}},
-		   {{ 0.5f,  0.5f,  0.5f, 1.0f}, {0.0f, 0.0f, 1.0f, 1.0f}},
-		   {{-0.5f,  0.5f,  0.5f, 1.0f}, {1.0f, 1.0f, 0.0f, 1.0f}},
+		   Vertex{{-0.5f, -0.5f,  0.5f, 1.0f}, {1.0f, 0.0f, 0.0f, 1.0f}},
+		   Vertex{{ 0.5f, -0.5f,  0.5f, 1.0f}, {0.0f, 1.0f, 0.0f, 1.0f}},
+		   Vertex{{ 0.5f,  0.5f,  0.5f, 1.0f}, {0.0f, 0.0f, 1.0f, 1.0f}},
+		   Vertex{{-0.5f,  0.5f,  0.5f, 1.0f}, {1.0f, 1.0f, 0.0f, 1.0f}},
 
 		   // Back face
-		   {{-0.5f, -0.5f, -0.5f, 1.0f}, {1.0f, 0.0f, 1.0f, 1.0f}},
-		   {{ 0.5f, -0.5f, -0.5f, 1.0f}, {0.0f, 1.0f, 1.0f, 1.0f}},
-		   {{ 0.5f,  0.5f, -0.5f, 1.0f}, {0.5f, 0.5f, 0.5f, 1.0f}},
-		   {{-0.5f,  0.5f, -0.5f, 1.0f}, {1.0f, 0.5f, 0.5f, 1.0f}},
+		   Vertex{{-0.5f, -0.5f, -0.5f, 1.0f}, {1.0f, 0.0f, 1.0f, 1.0f}},
+		   Vertex{{ 0.5f, -0.5f, -0.5f, 1.0f}, {0.0f, 1.0f, 1.0f, 1.0f}},
+		   Vertex{{ 0.5f,  0.5f, -0.5f, 1.0f}, {0.5f, 0.5f, 0.5f, 1.0f}},
+		   Vertex{{-0.5f,  0.5f, -0.5f, 1.0f}, {1.0f, 0.5f, 0.5f, 1.0f}},
 		};
 
 		_idx = {
