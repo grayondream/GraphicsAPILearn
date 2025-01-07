@@ -6,9 +6,11 @@
 #include "Shape/Rect.hpp"
 
 GLRectApp::~GLRectApp() {
-	glDeleteVertexArrays(1, &_vao);
-	glDeleteBuffers(1, &_vbo);
-	glDeleteBuffers(1, &_ebo);
+	if (_vao != 0) {
+		glDeleteVertexArrays(1, &_vao);
+		glDeleteBuffers(1, &_vbo);
+		glDeleteBuffers(1, &_ebo);
+	}
 }
 
 bool GLRectApp::init(const HINSTANCE inst, const WindowDesc& param) {

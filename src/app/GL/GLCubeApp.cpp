@@ -16,9 +16,11 @@
 using namespace ErrorHandle;
 
 GLCubeApp::~GLCubeApp() {
-	glDeleteVertexArrays(1, &_vao);
-	glDeleteBuffers(2, _vbo);
-	glDeleteBuffers(1, &_ebo);
+	if (_vao != 0) {
+		glDeleteVertexArrays(1, &_vao);
+		glDeleteBuffers(2, _vbo);
+		glDeleteBuffers(1, &_ebo);
+	}
 }
 
 bool GLCubeApp::init(const HINSTANCE inst, const WindowDesc& param) {

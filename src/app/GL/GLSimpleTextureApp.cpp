@@ -9,9 +9,11 @@
 using namespace ErrorHandle;
 
 GLSimpleTextureApp::~GLSimpleTextureApp() {
-	glDeleteVertexArrays(1, &_vao);
-	glDeleteBuffers(2, _vbos.data());
-	glDeleteBuffers(1, &_ebo);
+	if (_vao != 0) {
+		glDeleteVertexArrays(1, &_vao);
+		glDeleteBuffers(2, _vbos.data());
+		glDeleteBuffers(1, &_ebo);
+	}
 }
 
 bool GLSimpleTextureApp::init(const HINSTANCE inst, const WindowDesc& param) {

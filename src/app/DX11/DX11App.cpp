@@ -24,7 +24,10 @@ DX11App::DX11App() {
 }
 
 DX11App::~DX11App() {
-    ImGui_ImplDX11_Shutdown();
+    if (_uiInitialized) {
+        ImGui_ImplDX11_Shutdown();
+    }
+    
     if (_pd3dSwapChain) {
         _pd3dSwapChain->SetFullscreenState(FALSE, 0);
     }

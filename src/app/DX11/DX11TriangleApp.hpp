@@ -18,6 +18,5 @@ private:
 
 private:
     ComPtr<ID3D11Buffer> _pvecBuffer{};
-    ID3DX11EffectMatrixVariable* _pd3dWVP{};
     ComPtr< ID3D11InputLayout> _pd3dLayout{};
 };

@@ -21,7 +21,10 @@ Application::Application() {
 }
 
 Application::~Application() {
-    ImGui::DestroyContext();
+    if (_uiInitialized) {
+        ImGui_ImplWin32_Shutdown();
+        ImGui::DestroyContext();
+    }
 }
 
 LRESULT CALLBACK AppWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
@@ -101,6 +104,7 @@ void Application::initImGUI() {
     ImGuiIO& io = ImGui::GetIO();
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
     ImGui_ImplWin32_Init(winId());
+    _uiInitialized = true;
 }
 
 void Application::calcFrameRate() {

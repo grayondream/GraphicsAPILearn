@@ -6,8 +6,10 @@
 #include "Shape/Triangle.hpp"
 
 GLTriangleApp::~GLTriangleApp() {
-	glDeleteVertexArrays(1, &_vao);
-	glDeleteBuffers(1, &_vbo);
+	if (_vao != 0) {
+		glDeleteVertexArrays(1, &_vao);
+		glDeleteBuffers(1, &_vbo);
+	}
 }
 
 bool GLTriangleApp::init(const HINSTANCE inst, const WindowDesc& param) {

@@ -14,8 +14,8 @@ GLApp::~GLApp() {
         ReleaseDC(winId(), _hdc);
     }
 
-    ImGui_ImplOpenGL3_Shutdown();
     if (_glContext) {
+        ImGui_ImplOpenGL3_Shutdown();
         wglMakeCurrent(NULL, NULL);
         wglDeleteContext(_glContext);
         _glContext = nullptr;

@@ -53,4 +53,5 @@ protected:
     State _state{};
     HWND _winId{};
     GameTimer _timer{};
+    bool _uiInitialized{ false };
 };
