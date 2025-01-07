@@ -41,10 +41,13 @@ protected:
         return _winId;
     }
 
+    void initImGUI();
+
 private:
     void createMainWindow(const HINSTANCE instance);
     void calcFrameRate();
     
+
 protected:
     WindowDesc _attribute{};
     State _state{};

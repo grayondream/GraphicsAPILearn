@@ -36,6 +36,7 @@ add_executable(${PROJECT_NAME} WIN32
 ${ALL_CPP_FILES} 
 ${ALL_HPP_FILES}
 ${GLAD_SRC_FILES}
+${IMGUI_SRC_FILES}
 )
 
 target_link_libraries(${PROJECT_NAME}
@@ -71,6 +72,9 @@ dxguid.lib
 
 find_package(glm CONFIG REQUIRED)
 target_link_libraries(${PROJECT_NAME} glm::glm)
+
+find_package(imgui CONFIG REQUIRED)
+target_link_libraries(${PROJECT_NAME} imgui::imgui)
 
 target_compile_definitions(${PROJECT_NAME} PRIVATE GAME_RES_ROOT="${GAME_RES_ROOT}")
 

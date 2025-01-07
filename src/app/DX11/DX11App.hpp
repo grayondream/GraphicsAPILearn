@@ -23,6 +23,7 @@ protected:
 private:
     void initD3DEnv(const HWND);
     void updateRenderTargetWhileResize();
+    void initImGUI();
 
 protected:
     ComPtr<ID3D11Device> _pd3dDevice{};

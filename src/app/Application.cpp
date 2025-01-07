@@ -10,6 +10,8 @@
 #include "Base/GameTimer.hpp"
 #include "Base/Log.hpp"
 #include <windowsx.h>
+#include <imgui.h>
+#include <backends/imgui_impl_win32.h>
 
 namespace eh = ErrorHandle;
 using namespace base::log;
@@ -19,7 +21,7 @@ Application::Application() {
 }
 
 Application::~Application() {
-    
+    ImGui::DestroyContext();
 }
 
 LRESULT CALLBACK AppWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
@@ -92,6 +94,15 @@ void Application::render() {
     endDrawScene();
 }
 
+void Application::initImGUI() {
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+    ImGui::StyleColorsDark();
+    ImGuiIO& io = ImGui::GetIO();
+    io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
+    ImGui_ImplWin32_Init(winId());
+}
+
 void Application::calcFrameRate() {
     static int frameCount = 0;
     static float timePassed = 0.0f;
@@ -114,7 +125,6 @@ void Application::calcFrameRate() {
 }
 
 void Application::onResize(const UINT msg, const WPARAM wParam, const LPARAM lParam) {
-    return;
     if (LOWORD(lParam) != 0 && HIWORD(lParam) != 0) {
         _attribute.winAttr.width = LOWORD(lParam);
         _attribute.winAttr.height = HIWORD(lParam);
@@ -186,8 +196,11 @@ LRESULT Application::msgProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) 
         return 0;
     case WM_PAINT:
         // 触发重绘
-        
         return 0;
+    case WM_SYSCOMMAND:
+        if ((wParam & 0xfff0) == SC_KEYMENU) // Disable ALT menu
+            return 0;
+        break;
     case WM_ACTIVATE: {
         if (LOWORD(wParam) == WA_INACTIVE) {
             _state.paused = true;

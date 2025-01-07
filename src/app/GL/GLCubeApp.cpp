@@ -77,8 +77,8 @@ void GLCubeApp::clearColor() {
 }
 
 void GLCubeApp::beginDrawScene() {
-	//glActiveTexture(GL_TEXTURE0);
-	//glBindTexture(GL_TEXTURE_2D, _texture->texture());
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, _texture->texture());
 	_program.use();
 	return GLApp::beginDrawScene();
 }
@@ -87,6 +87,7 @@ void GLCubeApp::drawScene() {
 	glBindVertexArray(_vao);
 	glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
 	glBindVertexArray(0);
+	return GLApp::drawScene();
 }
 
 void GLCubeApp::endDrawScene() {

@@ -62,6 +62,7 @@ void GLRectApp::drawScene() {
 	_program.use();
 	glBindVertexArray(_vao);
 	glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+	return GLApp::drawScene();
 }
 
 void GLRectApp::endDrawScene() {
@@ -69,4 +70,5 @@ void GLRectApp::endDrawScene() {
 }
 
 void GLRectApp::updateScene(const float dt) {
+	return GLApp::updateScene(dt);
 }

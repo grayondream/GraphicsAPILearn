@@ -92,7 +92,7 @@ bool DX11RectApp::init(const HINSTANCE ins, const WindowDesc& param) {
 }
 
 void DX11RectApp::updateScene(const float dt) {
-
+    return DX11App::updateScene(dt);
 }
 
 void DX11RectApp::drawScene() {
@@ -103,6 +103,7 @@ void DX11RectApp::drawScene() {
     _pd3dDeviceCtx->IASetIndexBuffer(_pidxBuffer.Get(), DXGI_FORMAT_R32_UINT, 0);
     _pd3dDeviceCtx->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
     _pd3dDeviceCtx->DrawIndexed(6, 0, 0);
+    return DX11App::drawScene();
 }
 
 

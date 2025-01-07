@@ -56,6 +56,7 @@ void GLTriangleApp::drawScene() {
 	_program.use();
 	glBindVertexArray(_vao);
 	glDrawArrays(GL_TRIANGLES, 0, 3);
+	return GLApp::drawScene();
 }
 
 void GLTriangleApp::endDrawScene() {
@@ -63,4 +64,5 @@ void GLTriangleApp::endDrawScene() {
 }
 
 void GLTriangleApp::updateScene(const float dt) {
+	return GLApp::updateScene(dt);
 }

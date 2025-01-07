@@ -2,6 +2,8 @@
 #include "EH/ErrorHandle.hpp"
 #include "Base/Log.hpp"
 #include "glad/glad.h"
+#include <backends/imgui_impl_opengl3.h>
+#include <backends/imgui_impl_win32.h>
 using namespace ErrorHandle;
 
 GLApp::GLApp() {
@@ -12,6 +14,7 @@ GLApp::~GLApp() {
         ReleaseDC(winId(), _hdc);
     }
 
+    ImGui_ImplOpenGL3_Shutdown();
     if (_glContext) {
         wglMakeCurrent(NULL, NULL);
         wglDeleteContext(_glContext);
@@ -26,12 +29,18 @@ bool GLApp::init(const HINSTANCE hinstance, const WindowDesc& param) {
     ExitIfFailed(initGlad(), "Failed to Load OpenGL Glad!");
     char* version = (char*)glGetString(GL_VERSION);
     LOGI("OpenGL Version: {}", std::string(version));
+    initImGUI();
     glEnable(GL_DEPTH_TEST);
     return true;
 }
 
 bool GLApp::initGlad() {
     return  !!gladLoadGL();
+}
+
+void GLApp::initImGUI() {
+    Application::initImGUI();
+    ImGui_ImplOpenGL3_Init();
 }
 
 HGLRC GLApp::CreateOpenGLContext(const HWND hwnd) {
@@ -54,21 +63,44 @@ HGLRC GLApp::CreateOpenGLContext(const HWND hwnd) {
     return hglrc;
 }
 
+void GLApp::onResize(const UINT msg, const WPARAM wParam, const LPARAM lParam) {
+    Application::onResize(msg, wParam, lParam);
+    if (wParam != SIZE_MINIMIZED) {
+        glViewport(0, 0, _attribute.winAttr.width, _attribute.winAttr.height);
+    }
+
+    return;
+}
+
 void GLApp::clearColor() {
     glClearColor(173.0f / 255.0f, 216.0f / 255.0f, 230.0f / 255.0f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 }
 
 void GLApp::beginDrawScene() {
-    Application::beginDrawScene();
+    ImGui_ImplOpenGL3_NewFrame();
+    ImGui_ImplWin32_NewFrame();
+    ImGui::NewFrame();
+    return Application::beginDrawScene();
 }
 
 void GLApp::drawScene() {
+    ImGui::Begin("OpenGL");
+    ImGui::PushTextWrapPos(200.0f);
+    ImGuiIO& io = ImGui::GetIO();
+    ImGui::Text("Hello Graphic! %.1f FPS", io.Framerate);  // Display current FPS
+    ImGui::PopTextWrapPos(); // »Ö¸´Ä¬ÈÏ»»ÐÐÎ»ÖÃ
+    ImGui::End();
+    return Application::drawScene();
 }
 
 void GLApp::endDrawScene() {
+    ImGui::Render();
+    ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
     SwapBuffers(wglGetCurrentDC());
+    return Application::endDrawScene();
 }
 
 void GLApp::updateScene(const float dt) {
+    return Application::updateScene(dt);
 }

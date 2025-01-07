@@ -12,6 +12,9 @@
 #include "Base/Log.hpp"
 #include "Base/Utils.hpp"
 #include <windowsx.h>
+#include <imgui.h>
+#include <backends/imgui_impl_dx11.h>
+#include <backends/imgui_impl_win32.h>
 
 namespace eh = ErrorHandle;
 using namespace base::log;
@@ -21,6 +24,7 @@ DX11App::DX11App() {
 }
 
 DX11App::~DX11App() {
+    ImGui_ImplDX11_Shutdown();
     if (_pd3dSwapChain) {
         _pd3dSwapChain->SetFullscreenState(FALSE, 0);
     }
@@ -32,6 +36,11 @@ DX11App::~DX11App() {
     LOGI("Game End!");
 }
 
+void DX11App::initImGUI() {
+    Application::initImGUI();
+    ImGui_ImplDX11_Init(_pd3dDevice.Get(), _pd3dDeviceCtx.Get());
+}
+
 void DX11App::initD3DEnv(const HWND winId) {
     std::tie(_pd3dDevice, _pd3dDeviceCtx, _pd3dSwapChain) = CreateD3DDeviceAndtSwapChain(winId, _attribute.winAttr.width, _attribute.winAttr.height);
     updateRenderTargetWhileResize();
@@ -41,6 +50,7 @@ bool DX11App::init(const HINSTANCE hInstance, const WindowDesc& param){
     Application::init(hInstance, param);
     initD3DEnv(winId());
     LOGI("Initialize D3D environment successed");
+    initImGUI();
     return true;
 }
 
@@ -63,6 +73,7 @@ void DX11App::updateRenderTargetWhileResize() {
 }
 
 void DX11App::updateScene(const float dt) {
+    return Application::updateScene(dt);
 }
 
 void DX11App::clearColor() {
@@ -70,13 +81,25 @@ void DX11App::clearColor() {
 }
 
 void DX11App::beginDrawScene() {
-    clearColor();
+    ImGui_ImplDX11_NewFrame();
+    ImGui_ImplWin32_NewFrame();
+    ImGui::NewFrame();
+    return Application::beginDrawScene();
 }
 
 void DX11App::drawScene() {
-
+    ImGui::Begin("DirectX11");
+    ImGui::PushTextWrapPos(200.0f);
+    ImGuiIO& io = ImGui::GetIO();
+    ImGui::Text("Hello Graphic! %.1f FPS", io.Framerate);  // Display current FPS
+    ImGui::PopTextWrapPos(); // »Ö¸´Ä¬ÈÏ»»ÐÐÎ»ÖÃ
+    ImGui::End();
+    return Application::drawScene();
 }
 
 void DX11App::endDrawScene() {
+    ImGui::Render();
+    ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
     eh::ExitIfFailed(_pd3dSwapChain->Present(0, 0), "Persent Failed");
+    return Application::endDrawScene();
 }

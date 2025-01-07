@@ -83,6 +83,7 @@ void GLSimpleTextureApp::drawScene() {
 	glBindVertexArray(_vao);
 	glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 	glBindVertexArray(0);
+	return GLApp::drawScene();
 }
 
 void GLSimpleTextureApp::endDrawScene() {
@@ -90,4 +91,5 @@ void GLSimpleTextureApp::endDrawScene() {
 }
 
 void GLSimpleTextureApp::updateScene(const float dt) {
+	return GLApp::updateScene(dt);
 }
