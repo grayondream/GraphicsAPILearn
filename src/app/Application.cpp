@@ -189,7 +189,9 @@ void Application::onMouseDown(WPARAM btnState, int x, int y) { }
 void Application::onMouseUp(WPARAM btnState, int x, int y) { }
 void Application::onMouseMove(WPARAM btnState, int x, int y) { }
 
+extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 LRESULT Application::msgProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
+    ImGui_ImplWin32_WndProcHandler(hwnd, msg, wParam, lParam);
     switch (msg) {
     case WM_DESTROY:
         PostQuitMessage(0);

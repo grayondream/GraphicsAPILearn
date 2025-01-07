@@ -86,11 +86,10 @@ void GLApp::beginDrawScene() {
 
 void GLApp::drawScene() {
     ImGui::Begin("OpenGL");
-    ImGui::PushTextWrapPos(200.0f);
     ImGuiIO& io = ImGui::GetIO();
     ImGui::Text("Hello Graphic! %.1f FPS", io.Framerate);  // Display current FPS
-    ImGui::PopTextWrapPos(); // »Ö¸´Ä¬ÈÏ»»ÐÐÎ»ÖÃ
     ImGui::End();
+
     return Application::drawScene();
 }
 

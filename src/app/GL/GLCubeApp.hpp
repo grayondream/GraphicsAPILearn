@@ -27,4 +27,5 @@ private:
 	unsigned int _vbo[2]{};
 	unsigned int _vao{};
 	unsigned int _ebo{};
+	float _curTime{};
 };
