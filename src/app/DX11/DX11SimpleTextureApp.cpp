@@ -5,6 +5,7 @@
 #include <Base/MathHelper.h>
 #include <filesystem>
 #include "Geometry//Rect.hpp"
+#include "Native/DX11/DX11ImageTexture2D.hpp"
 
 namespace eh = ErrorHandle;
 namespace fs = std::filesystem;
@@ -37,13 +38,18 @@ void DX11SimpleTextureApp::createGemBuffer() {
     D3D11_SUBRESOURCE_DATA idxData{};
     idxData.pSysMem = shape.idx();
     eh::ExitIfFailed(_pd3dDevice->CreateBuffer(&idxDesc, &idxData, _pidxBuffer.GetAddressOf()), "Failed to create box index buffer");
+
+    const auto imgFile = StaticCollector::getImagePath() / "dog.jpg";
+    _texture = std::make_shared< DX11ImageTexture2D>(imgFile.string());
+    _texture->setContext(_pd3dDeviceCtx, _pd3dDevice);
+    eh::ExitIfFailed(_texture->load().texture()->valid(), "Failed to load texture from file");
 }
 
 void DX11SimpleTextureApp::compileShader() {
     DWORD sharedFlags{};
 
     ComPtr<ID3D10Blob> pvsShader{}, pfsShader{}, pErrorBlob{};
-    const fs::path file = StaticCollector::getDX11ShaderPath() / "Shape" / "trangile.hlsl";
+    const fs::path file = StaticCollector::getDX11ShaderPath() / "Shape" / "simpleTexture.hlsl";
     auto hr = D3DX11CompileFromFileW(file.wstring().c_str(), 0, 0, "vs_main", "vs_4_0", sharedFlags, 0, 0, pvsShader.GetAddressOf(), pErrorBlob.GetAddressOf(), 0);
     if (FAILED(hr) && pErrorBlob) {
         OutputDebugStringA(reinterpret_cast<const char*>(pErrorBlob->GetBufferPointer()));

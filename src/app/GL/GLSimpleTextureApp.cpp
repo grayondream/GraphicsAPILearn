@@ -28,9 +28,8 @@ bool GLSimpleTextureApp::init(const HINSTANCE inst, const WindowDesc& param) {
 	ErrorHandle::ExitIfFailed(ret, "Create OpenGL program failed!");
 	const auto imgFile = StaticCollector::getImagePath() / "dog.jpg";
 	_texture = std::make_shared<GLImageTexture2D>(imgFile.string());
-	const auto handle = _texture->load().texture()->handle();
-	const auto textId = static_cast<int>(reinterpret_cast<uintptr_t>(handle));
-	ExitIfFailed(textId != 0, "Failed to load texture from file {}", imgFile.string());
+	const auto valid = _texture->load().texture()->valid();
+	ExitIfFailed(valid, "Failed to load texture from file {}", imgFile.string());
 
 	createVertexBuffer();
 	//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);

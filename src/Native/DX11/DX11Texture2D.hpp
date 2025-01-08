@@ -33,6 +33,8 @@ public:
 
 	virtual void* handle() override;
 
+	virtual bool valid() override;
+
 private:
 	ComPtr<ID3D11DeviceContext> _pContext;
 	ComPtr<ID3D11Device> _pDevice{};

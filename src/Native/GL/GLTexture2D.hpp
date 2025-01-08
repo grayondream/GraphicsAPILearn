@@ -15,6 +15,8 @@ public:
 	virtual void release() override;
 
 	virtual void* handle() override;
+
+	virtual bool valid() override;
 private:
     Texture2DType _textureId{ 0 };
 };

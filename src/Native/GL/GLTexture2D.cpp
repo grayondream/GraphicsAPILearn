@@ -43,3 +43,7 @@ void GLTexture2D::release(){
 void* GLTexture2D::handle() {
     return reinterpret_cast<void*>(static_cast<uintptr_t>(_textureId));
 }
+
+bool GLTexture2D::valid() {
+    return _textureId != 0;
+}

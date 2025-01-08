@@ -16,4 +16,6 @@ public:
 	virtual void release() = 0;
 
 	virtual void* handle() = 0;
+
+	virtual bool valid() = 0;
 };

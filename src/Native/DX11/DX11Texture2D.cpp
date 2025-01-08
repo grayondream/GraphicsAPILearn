@@ -47,3 +47,7 @@ void DX11Texture2D::release() {
 void* DX11Texture2D::handle() {
     return reinterpret_cast<void*>(_ptexture.Get());
 }
+
+bool DX11Texture2D::valid() {
+    return _ptexture || _pshaderView;
+}
