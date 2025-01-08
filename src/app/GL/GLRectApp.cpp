@@ -3,7 +3,7 @@
 #include "Config/StaticCollectorPredefined.hpp"
 #include "EH/ErrorHandle.hpp"
 #include "glad/glad.h"
-#include "Shape/Rect.hpp"
+#include <Geometry/Rect.hpp>
 
 GLRectApp::~GLRectApp() {
 	if (_vao != 0) {

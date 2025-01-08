@@ -1,26 +1,20 @@
-#include "Shape/Image.hpp"
-#include "Shape/Position.hpp"
-#include <vector>
+#pragma once
+#include <Native/TextureBase.hpp>
+#include <Native/TextureDataView.hpp>
 
-class GLImageTexture2D {
+class GLTexture2D : public Texture2DBase {
 public:
-	GLImageTexture2D(const std::string& file);
+    using Texture2DType = unsigned int;
+public:
+	virtual ~GLTexture2D();
 
-	GLImageTexture2D& load();
+	virtual bool init(const Texture2DDataView &data) override;
 
-	unsigned int texture();
+	virtual void bind(const unsigned int unit) override;
 
-	float* coord();
+	virtual void release() override;
 
-	std::size_t coordSize();
-
-	GLImageTexture2D& multiSurface(const int cnt = 1);
-
+	virtual void* handle() override;
 private:
-	unsigned int generateTextureFrom(const uint8_t* data, const int width, const int height);
-
-private:
-	Image _img{};
-	unsigned int _texture{};
-	std::vector<Position2D> _coord{};
+    Texture2DType _textureId{ 0 };
 };

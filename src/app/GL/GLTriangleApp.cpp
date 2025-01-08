@@ -3,7 +3,7 @@
 #include "Config/StaticCollectorPredefined.hpp"
 #include "EH/ErrorHandle.hpp"
 #include "glad/glad.h"
-#include "Shape/Triangle.hpp"
+#include "Geometry/Triangle.hpp"
 
 GLTriangleApp::~GLTriangleApp() {
 	if (_vao != 0) {

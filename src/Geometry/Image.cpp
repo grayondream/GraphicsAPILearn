@@ -23,7 +23,7 @@ uint8_t* Image::data() {
 	return _pdata;
 }
 
-Size2D Image::size() {
+ImageSize Image::size() {
 	return _size;
 }
 

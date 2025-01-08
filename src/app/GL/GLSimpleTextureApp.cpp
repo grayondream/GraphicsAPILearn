@@ -3,8 +3,8 @@
 #include "Config/StaticCollectorPredefined.hpp"
 #include "EH/ErrorHandle.hpp"
 #include "glad/glad.h"
-#include "Shape/Rect.hpp"
-#include "Native/GL/GLTexture2D.hpp"
+#include "Geometry/Rect.hpp"
+#include "Native/GL/GLImageTexture2D.hpp"
 
 using namespace ErrorHandle;
 
@@ -28,7 +28,9 @@ bool GLSimpleTextureApp::init(const HINSTANCE inst, const WindowDesc& param) {
 	ErrorHandle::ExitIfFailed(ret, "Create OpenGL program failed!");
 	const auto imgFile = StaticCollector::getImagePath() / "dog.jpg";
 	_texture = std::make_shared<GLImageTexture2D>(imgFile.string());
-	ExitIfFailed(_texture->load().texture() != GL_INVALID_INDEX, "Failed to load texture from file {}", imgFile.string());
+	const auto handle = _texture->load().texture()->handle();
+	const auto textId = static_cast<int>(reinterpret_cast<uintptr_t>(handle));
+	ExitIfFailed(textId != 0, "Failed to load texture from file {}", imgFile.string());
 
 	createVertexBuffer();
 	//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
@@ -78,9 +80,7 @@ void GLSimpleTextureApp::beginDrawScene() {
 }
 
 void GLSimpleTextureApp::drawScene() {
-
-	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(GL_TEXTURE_2D, _texture->texture());
+	_texture->texture()->bind(0);
 	_program.use();
 	glBindVertexArray(_vao);
 	glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);

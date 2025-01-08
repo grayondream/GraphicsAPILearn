@@ -3,10 +3,8 @@
 #include "Config/StaticCollectorPredefined.hpp"
 #include "EH/ErrorHandle.hpp"
 #include "glad/glad.h"
-#include "Shape/Cube.hpp"
-#include "Shape/Rect.hpp"
-#include "Shape/Triangle.hpp"
-#include "Native/GL/GLTexture2D.hpp"
+#include "Geometry/Cube.hpp"
+#include "Native/GL/GLImageTexture2D.hpp"
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
@@ -35,7 +33,9 @@ bool GLCubeApp::init(const HINSTANCE inst, const WindowDesc& param) {
 	ErrorHandle::ExitIfFailed(ret, "Create OpenGL program failed!");
 	const auto imgFile = StaticCollector::getImagePath() / "dog.jpg";
 	_texture = std::make_shared<GLImageTexture2D>(imgFile.string());
-	ExitIfFailed(_texture->load().texture() != GL_INVALID_INDEX, "Failed to load texture from file {}", imgFile.string());
+	const auto handle = _texture->load().texture()->handle();
+	const auto textId = static_cast<int>(reinterpret_cast<uintptr_t>(handle));
+	ExitIfFailed(textId != 0, "Failed to load texture from file {}", imgFile.string());
 	_texture->multiSurface(6);
 	createVertexBuffer();
 	//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
@@ -80,8 +80,7 @@ void GLCubeApp::clearColor() {
 }
 
 void GLCubeApp::beginDrawScene() {
-	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(GL_TEXTURE_2D, _texture->texture());
+	_texture->texture()->bind(0);
 	_program.use();
 	return GLApp::beginDrawScene();
 }

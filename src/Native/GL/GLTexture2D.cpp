@@ -1,20 +1,15 @@
-#include "Shape/Image.hpp"
 #include "GLTexture2D.hpp"
 #include "glad/glad.h"
 #include <cassert>
 
-GLImageTexture2D::GLImageTexture2D(const std::string& file) {
-	_img = Image(file);
-	_coord = {
-		Position2D{1.0, 1.0},
-		Position2D{1.0, 0.0},
-		Position2D{0.0, 0.0},
-		Position2D{0.0, 1.0},
-	};
+GLTexture2D::~GLTexture2D(){
+    release();
 }
 
-unsigned int GLImageTexture2D::generateTextureFrom(const uint8_t* data, const int width, const int height) {
-	unsigned int texture{};
+bool GLTexture2D::init(const Texture2DDataView &data){
+    assert(data.data() && data.size().length() != 0);
+    _size = data.size();
+    unsigned int texture{};
 	glGenTextures(1, &texture);
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, texture);
@@ -24,79 +19,27 @@ unsigned int GLImageTexture2D::generateTextureFrom(const uint8_t* data, const in
 	// set texture filtering parameters
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, size().width, size().height, 0, GL_RGB, GL_UNSIGNED_BYTE, data.data());
 	glGenerateMipmap(GL_TEXTURE_2D);
-	//glBindTexture(GL_TEXTURE_2D, 0);
-	return texture;
+	glBindTexture(GL_TEXTURE_2D, 0);
+    _textureId = texture;
+    return true;
 }
 
-GLImageTexture2D& GLImageTexture2D::load() {
-	auto pdata = _img.load().data();
-	if (!pdata) {
-		_texture = GL_INVALID_INDEX;
-		return *this;
-	}
-
-	_texture = generateTextureFrom(pdata, _img.size().width, _img.size().height);
-	return *this;
+void GLTexture2D::bind(const unsigned int unit){
+    glActiveTexture(GL_TEXTURE0 + unit);
+    glBindTexture(GL_TEXTURE_2D, _textureId);
 }
 
-unsigned int GLImageTexture2D::texture() {
-	return _texture;
+void GLTexture2D::release(){
+    if (!_textureId) {
+        return;
+    }
+
+    glDeleteTextures(1, &_textureId);
+    _textureId = 0;
 }
 
-float* GLImageTexture2D::coord() {
-	return reinterpret_cast<float*>(_coord.data());
-}
-
-std::size_t GLImageTexture2D::coordSize() {
-	return _coord.size() * Position2D::ByteSize;
-}
-
-GLImageTexture2D& GLImageTexture2D::multiSurface(const int cnt) {
-	if (cnt == 1) {
-		return *this;
-	}
-
-	_coord.clear();
-	//the index is not correct
-	// 正面 Front face
-	_coord.push_back(Position2D{ 0.0f, 0.0f }); // 左下角
-	_coord.push_back(Position2D{ 1.0f, 0.0f }); // 右下角
-	_coord.push_back(Position2D{ 1.0f, 1.0f }); // 右上角
-	_coord.push_back(Position2D{ 0.0f, 1.0f }); // 左上角
-
-	// 背面 Back face
-	_coord.push_back(Position2D{ 1.0f, 1.0f }); // 左下角
-	_coord.push_back(Position2D{ 0.0f, 1.0f }); // 右下角
-	_coord.push_back(Position2D{ 0.0f, 0.0f }); // 右上角
-	_coord.push_back(Position2D{ 1.0f, 0.0f }); // 左上角
-
-	// 底面 Bottom face
-	_coord.push_back(Position2D{ 0.0f, 1.0f }); // 左下角
-	_coord.push_back(Position2D{ 1.0f, 1.0f }); // 右下角
-	_coord.push_back(Position2D{ 1.0f, 0.0f }); // 右上角
-	_coord.push_back(Position2D{ 0.0f, 0.0f }); // 左上角
-
-	// 顶面 Top face
-	_coord.push_back(Position2D{ 1.0f, 0.0f }); // 左下角
-	_coord.push_back(Position2D{ 1.0f, 1.0f }); // 右下角
-	_coord.push_back(Position2D{ 0.0f, 1.0f }); // 右上角
-	_coord.push_back(Position2D{ 0.0f, 0.0f }); // 左上角
-
-	// 左面 Left face
-	_coord.push_back(Position2D{ 0.0f, 1.0f }); // 左下角
-	_coord.push_back(Position2D{ 0.0f, 0.0f }); // 右下角
-	_coord.push_back(Position2D{ 1.0f, 0.0f }); // 右上角
-	_coord.push_back(Position2D{ 1.0f, 1.0f }); // 左上角
-
-	// 右面 Right face
-	_coord.push_back(Position2D{ 1.0f, 0.0f }); // 左下角
-	_coord.push_back(Position2D{ 0.0f, 0.0f }); // 右下角
-	_coord.push_back(Position2D{ 0.0f, 1.0f }); // 右上角
-	_coord.push_back(Position2D{ 1.0f, 1.0f }); // 左上角
-
-
-
-	return *this;
+void* GLTexture2D::handle() {
+    return reinterpret_cast<void*>(static_cast<uintptr_t>(_textureId));
 }

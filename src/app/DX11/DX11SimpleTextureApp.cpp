@@ -1,23 +1,23 @@
-#include "DX11RectApp.hpp"
+#include "DX11SimpleTextureApp.hpp"
 #include "Base/DXBaseConexpr.hpp"
 #include "EH/ErrorHandle.hpp"
 #include "Config/StaticCollectorPredefined.hpp"
 #include <Base/MathHelper.h>
 #include <filesystem>
-#include "Geometry/Rect.hpp"
+#include "Geometry//Rect.hpp"
 
 namespace eh = ErrorHandle;
 namespace fs = std::filesystem;
 namespace sc = StaticCollector;
 
-DX11RectApp::DX11RectApp() {
+DX11SimpleTextureApp::DX11SimpleTextureApp() {
 }
 
-DX11RectApp::~DX11RectApp(){
+DX11SimpleTextureApp::~DX11SimpleTextureApp(){
     
 }
 
-void DX11RectApp::createGemBuffer() {
+void DX11SimpleTextureApp::createGemBuffer() {
     Rect shape{};
 
     D3D11_BUFFER_DESC vecDesc{};
@@ -39,7 +39,7 @@ void DX11RectApp::createGemBuffer() {
     eh::ExitIfFailed(_pd3dDevice->CreateBuffer(&idxDesc, &idxData, _pidxBuffer.GetAddressOf()), "Failed to create box index buffer");
 }
 
-void DX11RectApp::compileShader() {
+void DX11SimpleTextureApp::compileShader() {
     DWORD sharedFlags{};
 
     ComPtr<ID3D10Blob> pvsShader{}, pfsShader{}, pErrorBlob{};
@@ -81,7 +81,7 @@ void DX11RectApp::compileShader() {
     _pd3dDeviceCtx->IASetInputLayout(_pd3dLayout.Get());
 }
 
-bool DX11RectApp::init(const HINSTANCE ins, const WindowDesc& param) {
+bool DX11SimpleTextureApp::init(const HINSTANCE ins, const WindowDesc& param) {
     if (!DX11App::init(ins, param)) {
         return false;
     }
@@ -91,11 +91,11 @@ bool DX11RectApp::init(const HINSTANCE ins, const WindowDesc& param) {
     return true;
 }
 
-void DX11RectApp::updateScene(const float dt) {
+void DX11SimpleTextureApp::updateScene(const float dt) {
     return DX11App::updateScene(dt);
 }
 
-void DX11RectApp::drawScene() {
+void DX11SimpleTextureApp::drawScene() {
     UINT stride = sizeof(Vertex);
     UINT offset = 0;
     auto* buffer = _pvecBuffer.Get();

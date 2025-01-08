@@ -4,7 +4,7 @@
 #include "Config/StaticCollectorPredefined.hpp"
 #include <Base/MathHelper.h>
 #include <filesystem>
-#include "Shape/Triangle.hpp"
+#include "Geometry/Triangle.hpp"
 
 namespace eh = ErrorHandle;
 namespace fs = std::filesystem;
@@ -96,6 +96,3 @@ void DX11TriangleApp::drawScene() {
     _pd3dDeviceCtx->Draw(3, 0);
     return DX11App::drawScene();
 }
-
-
-
