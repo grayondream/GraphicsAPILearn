@@ -29,7 +29,7 @@ bool DX11Texture2D::init(const Texture2DDataView& data) {
 }
 
 void DX11Texture2D::bind(const unsigned int unit) {
-    _pContext->PSSetShaderResources(unit, 0, _pshaderView.GetAddressOf());
+    _pContext->PSSetShaderResources(unit, 1, _pshaderView.GetAddressOf());
 }
 
 bool DX11Texture2D::init(const std::string& file) {

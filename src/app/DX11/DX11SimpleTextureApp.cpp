@@ -45,6 +45,20 @@ void DX11SimpleTextureApp::createGemBuffer() {
     eh::ExitIfFailed(_texture->load().texture()->valid(), "Failed to load texture from file");
 }
 
+void DX11SimpleTextureApp::createSampler() {
+    D3D11_SAMPLER_DESC samplerDesc = {};
+    samplerDesc.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;  // 选择线性过滤
+    samplerDesc.AddressU = D3D11_TEXTURE_ADDRESS_WRAP;      // 设置纹理坐标超出时的处理方式
+    samplerDesc.AddressV = D3D11_TEXTURE_ADDRESS_WRAP;
+    samplerDesc.AddressW = D3D11_TEXTURE_ADDRESS_WRAP;
+    samplerDesc.ComparisonFunc = D3D11_COMPARISON_NEVER;
+    samplerDesc.MinLOD = 0;
+    samplerDesc.MaxLOD = D3D11_FLOAT32_MAX;
+
+    // 创建采样器
+    eh::ExitIfFailed(_pd3dDevice->CreateSamplerState(&samplerDesc, _sampler.GetAddressOf()), "Failed to create sampler");
+}
+
 void DX11SimpleTextureApp::compileShader() {
     DWORD sharedFlags{};
 
@@ -76,14 +90,15 @@ void DX11SimpleTextureApp::compileShader() {
     // Create the vertex input layout.
     D3D11_INPUT_ELEMENT_DESC ied[] =
     {
-        {"POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0},
+        {"POSITION", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0},
         {"COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 16, D3D11_INPUT_PER_VERTEX_DATA, 0},
+        {"TEXCOORD0", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 32, D3D11_INPUT_PER_VERTEX_DATA, 0}
     };
 
     // Create the input layout
-    eh::ExitIfFailed(_pd3dDevice->CreateInputLayout(ied, 2, pvsShader->GetBufferPointer(),
+    eh::ExitIfFailed(_pd3dDevice->CreateInputLayout(ied, ARRAYSIZE(ied), pvsShader->GetBufferPointer(),
         pvsShader->GetBufferSize(), _pd3dLayout.GetAddressOf()),
-        "Can not create layout");
+        "Failed to create layout");
     _pd3dDeviceCtx->IASetInputLayout(_pd3dLayout.Get());
 }
 
@@ -94,6 +109,7 @@ bool DX11SimpleTextureApp::init(const HINSTANCE ins, const WindowDesc& param) {
 
     compileShader();
     createGemBuffer();
+    createSampler();
     return true;
 }
 
@@ -105,6 +121,8 @@ void DX11SimpleTextureApp::drawScene() {
     UINT stride = sizeof(Vertex);
     UINT offset = 0;
     auto* buffer = _pvecBuffer.Get();
+    _pd3dDeviceCtx->PSSetSamplers(0, 1, _sampler.GetAddressOf());
+    _texture->texture()->bind(0);
     _pd3dDeviceCtx->IASetVertexBuffers(0, 1, _pvecBuffer.GetAddressOf(), &stride, &offset);
     _pd3dDeviceCtx->IASetIndexBuffer(_pidxBuffer.Get(), DXGI_FORMAT_R32_UINT, 0);
     _pd3dDeviceCtx->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
