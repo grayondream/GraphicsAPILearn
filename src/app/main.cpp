@@ -24,7 +24,7 @@ static inline constexpr int GAME_ENABLE_MSAA = true;
  *  -   DX11_Triangle       draw a colored triangle by DX11
  *  -   DX11_Rect           draw a colored rect by DX11
  *  -   DX11_SimpleTexture  TODO
- *  -   GL_Cube             TODO
+ *  -   DX11_Cube             TODO
  * DX12:
  */
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nShowCmd) {
