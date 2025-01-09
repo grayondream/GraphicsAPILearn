@@ -11,7 +11,6 @@
 #include <winrt/wrl/client.h>
 #include <xnamath.h>
 #include <D3DX11async.h>
-#include <D3dx11effect.h>
 
 #if defined(DEBUG) || defined(_DEBUG)
 #define DEFAULT_DX_DEVICE_FLAG D3D11_CREATE_DEVICE_DEBUG

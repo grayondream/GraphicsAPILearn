@@ -21,7 +21,6 @@ private:
 private:
     ComPtr<ID3D11Buffer> _pvecBuffer{};
     ComPtr<ID3D11Buffer> _pidxBuffer{};
-    ID3DX11EffectMatrixVariable* _pd3dWVP{};
     ComPtr< ID3D11InputLayout> _pd3dLayout{};
     std::shared_ptr< DX11ImageTexture2D> _texture{};
 };
