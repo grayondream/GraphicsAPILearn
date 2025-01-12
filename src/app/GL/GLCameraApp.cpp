@@ -132,12 +132,11 @@ void GLCameraApp::endDrawScene() {
 void GLCameraApp::onKeyBoardEvent(const UINT msg, const WPARAM wParam, const LPARAM lParam) {
 	switch (msg) {
 	case WM_KEYDOWN:
-		std::cout << "Key Down\n"; break;
+		break;
 	case WM_KEYUP:
-		std::cout << "Key UP\n"; break;
+		break;
 	case WM_CHAR:
 		const char ch = static_cast<char>(wParam);
-		std::cout << "Key " << ch <<"\n"; 
 		switch (wParam) {
 		case 'w':
 			_camera.processKeyboardEvent(Camera::Movement::Forward, 0.5); break;
@@ -155,14 +154,28 @@ void GLCameraApp::onKeyBoardEvent(const UINT msg, const WPARAM wParam, const LPA
 }
 
 void GLCameraApp::onMouseDown(const UINT msg, WPARAM btnState, int x, int y) {
+	switch (msg) {
+	case WM_LBUTTONDOWN:
+		_mouseClicked = true; break;
+	}
+	
 	return GLApp::onMouseDown(msg, btnState, x, y);
 }
 
 void GLCameraApp::onMouseUp(const UINT msg, WPARAM btnState, int x, int y) {
+	switch (msg) {
+	case WM_LBUTTONUP:
+		_mouseClicked = false; break;
+	}
+	
 	return GLApp::onMouseUp(msg, btnState, x, y);
 }
 
 void GLCameraApp::onMouseMove(WPARAM btnState, int x, int y) {
+	if (!_mouseClicked) {
+		return GLApp::onMouseMove(btnState, x, y);
+	}
+
 	if (!_clicked) {
 		_clicked = true;
 		_lastPos = { (float)x, (float)y };
