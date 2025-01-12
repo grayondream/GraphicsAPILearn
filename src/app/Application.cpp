@@ -183,20 +183,6 @@ void Application::beginDrawScene() {
     return;
 }
 
-void Application::endDrawScene() {
-    return;
-}
-
-void Application::drawScene(const float dt) {
-    return;
-}
-
-void Application::onMouseDown(WPARAM btnState, int x, int y) { }
-void Application::onMouseUp(WPARAM btnState, int x, int y) { }
-void Application::onMouseMove(WPARAM btnState, int x, int y) { }
-
-void Application::onMouseScroll(const UINT msg, const WPARAM wParam, const LPARAM lParam) {}
-
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 LRESULT Application::msgProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
     ImGui_ImplWin32_WndProcHandler(hwnd, msg, wParam, lParam);
@@ -250,12 +236,12 @@ LRESULT Application::msgProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) 
     case WM_LBUTTONDOWN:
     case WM_MBUTTONDOWN:
     case WM_RBUTTONDOWN:
-        onMouseDown(wParam, GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
+        onMouseDown(msg, wParam, GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
         return 0;
     case WM_LBUTTONUP:
     case WM_MBUTTONUP:
     case WM_RBUTTONUP:
-        onMouseUp(wParam, GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
+        onMouseUp(msg, wParam, GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
         return 0;
     case WM_MOUSEMOVE:
         onMouseMove(wParam, GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));

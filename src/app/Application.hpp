@@ -27,14 +27,14 @@ protected:
     void render();
     virtual void clearColor() {}
     virtual void beginDrawScene();
-    virtual void drawScene(const float dt);
-    virtual void endDrawScene();
+    virtual void drawScene(const float dt){}
+    virtual void endDrawScene(){}
     
     virtual void onResize(const UINT msg, const WPARAM wParam, const LPARAM lParam);
-    virtual void onMouseDown(WPARAM btnState, int x, int y);
-    virtual void onMouseUp(WPARAM btnState, int x, int y);
-    virtual void onMouseMove(WPARAM btnState, int x, int y);
-    virtual void onMouseScroll(const UINT msg, const WPARAM wParam, const LPARAM lParam);
+    virtual void onMouseDown(const UINT msg, WPARAM btnState, int x, int y){}
+    virtual void onMouseUp(const UINT msg, WPARAM btnState, int x, int y){}
+    virtual void onMouseMove(WPARAM btnState, int x, int y){}
+    virtual void onMouseScroll(const UINT msg, const WPARAM wParam, const LPARAM lParam){}
     virtual void onKeyBoardEvent(const UINT msg, const WPARAM wParam, const LPARAM lParam);
     float aspectRatio() {
         return _attribute.winAttr.width * 1.0 / _attribute.winAttr.height;

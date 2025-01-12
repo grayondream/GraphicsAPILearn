@@ -154,12 +154,12 @@ void GLCameraApp::onKeyBoardEvent(const UINT msg, const WPARAM wParam, const LPA
 	return GLApp::onKeyBoardEvent(msg, wParam, lParam);
 }
 
-void GLCameraApp::onMouseDown(WPARAM btnState, int x, int y) {
-	return GLApp::onMouseDown(btnState, x, y);
+void GLCameraApp::onMouseDown(const UINT msg, WPARAM btnState, int x, int y) {
+	return GLApp::onMouseDown(msg, btnState, x, y);
 }
 
-void GLCameraApp::onMouseUp(WPARAM btnState, int x, int y) {
-	return GLApp::onMouseUp(btnState, x, y);
+void GLCameraApp::onMouseUp(const UINT msg, WPARAM btnState, int x, int y) {
+	return GLApp::onMouseUp(msg, btnState, x, y);
 }
 
 void GLCameraApp::onMouseMove(WPARAM btnState, int x, int y) {
