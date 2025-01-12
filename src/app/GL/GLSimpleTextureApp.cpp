@@ -78,19 +78,15 @@ void GLSimpleTextureApp::beginDrawScene() {
 	return GLApp::beginDrawScene();
 }
 
-void GLSimpleTextureApp::drawScene() {
+void GLSimpleTextureApp::drawScene(const float dt) {
 	_texture->texture()->bind(0);
 	_program.use();
 	glBindVertexArray(_vao);
 	glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 	glBindVertexArray(0);
-	return GLApp::drawScene();
+	return GLApp::drawScene(dt);
 }
 
 void GLSimpleTextureApp::endDrawScene() {
 	return GLApp::endDrawScene();
-}
-
-void GLSimpleTextureApp::updateScene(const float dt) {
-	return GLApp::updateScene(dt);
 }

@@ -13,8 +13,7 @@ private:
     void createGemBuffer();
     void compileShader();
     
-    virtual void updateScene(const float dt) override;
-    virtual void drawScene() override;
+    virtual void drawScene(const float dt) override;
 
 private:
     ComPtr<ID3D11Buffer> _pvecBuffer{};

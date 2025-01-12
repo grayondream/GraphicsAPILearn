@@ -85,8 +85,7 @@ void GLCameraApp::beginDrawScene() {
 	return GLApp::beginDrawScene();
 }
 
-void GLCameraApp::drawScene() {
-	GLApp::drawScene();
+void GLCameraApp::drawScene(const float dt) {
 	glBindVertexArray(_vao);
 	ImGui::Begin("OpenGL");
 	static int count{ 1 };
@@ -106,32 +105,28 @@ void GLCameraApp::drawScene() {
 	  glm::vec3(-1.3f,  1.0f, -1.5f)
 	};
 
-	
+	static float curTime = 0;
+	curTime += dt;
+	const auto projection = glm::perspective(glm::radians(_camera.zoom()), aspectRatio(), 0.1f, 100.0f);
+	_program.update("projection", projection);
+	const auto view = _camera.getViewMatrix();
+	_program.update("view", view);
 	for (int i = 0; i < count; i++) {
 		glm::mat4 model = glm::mat4(1.0f); // make sure to initialize matrix to identity matrix first
-		glm::mat4 view = glm::mat4(1.0f);
-		glm::mat4 projection = glm::mat4(1.0f);
 		model = glm::translate(model, cubePositions[i]);
-		float angle = 20.0f * (i + 1) * _curTime;
+		float angle = 20.0f * (i + 1) * curTime;
 		model = glm::rotate(model, glm::radians(angle), glm::vec3(1.0f, 0.3f, 0.5f));
-		view = glm::translate(view, glm::vec3(0.0f, 0.0f, -3.0f));
-		projection = glm::perspective(glm::radians(45.0f), aspectRatio(), 0.1f, 100.0f);
 		_program.update("model", model);
-		_program.update("view", view);
-		_program.update("projection", projection);
+
 		glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
 	}
-	
+
 	glBindVertexArray(0);
+	return GLApp::drawScene(dt);
 }
 
 void GLCameraApp::endDrawScene() {
 	return GLApp::endDrawScene();
-}
-
-void GLCameraApp::updateScene(const float dt) {
-	_curTime = dt;
-	return GLApp::updateScene(dt);
 }
 
 void GLCameraApp::onKeyBoardEvent(const UINT msg, const WPARAM wParam, const LPARAM lParam) {
@@ -142,7 +137,17 @@ void GLCameraApp::onKeyBoardEvent(const UINT msg, const WPARAM wParam, const LPA
 		std::cout << "Key UP\n"; break;
 	case WM_CHAR:
 		const char ch = static_cast<char>(wParam);
-		std::cout << "Key " << ch <<"\n"; break;
+		std::cout << "Key " << ch <<"\n"; 
+		switch (wParam) {
+		case 'w':
+			_camera.processKeyboardEvent(Camera::Movement::Forward, 0.5); break;
+		case 's':
+			_camera.processKeyboardEvent(Camera::Movement::Backward, 0.5); break;
+		case 'd':
+			_camera.processKeyboardEvent(Camera::Movement::Right, 0.5); break;
+		case 'a':
+			_camera.processKeyboardEvent(Camera::Movement::Left, 0.5); break;
+		}
 		break;
 	}
 
@@ -158,9 +163,21 @@ void GLCameraApp::onMouseUp(WPARAM btnState, int x, int y) {
 }
 
 void GLCameraApp::onMouseMove(WPARAM btnState, int x, int y) {
+	if (!_clicked) {
+		_clicked = true;
+		_lastPos = { (float)x, (float)y };
+		return GLApp::onMouseMove(btnState, x, y);
+	}
+
+	const float offx = x - _lastPos.x;
+	const float offy = y - _lastPos.y;
+	_camera.processMouseMove(offx, offy);
+	_lastPos = { (float)x, (float)y };
 	return GLApp::onMouseMove(btnState, x, y);
 }
 
 void GLCameraApp::onMouseScroll(const UINT msg, const WPARAM wParam, const LPARAM lParam) {
+	int zDelta = GET_WHEEL_DELTA_WPARAM(wParam);
+	_camera.processMouseScrool(zDelta);
 	return GLApp::onMouseScroll(msg, wParam, lParam);
 }

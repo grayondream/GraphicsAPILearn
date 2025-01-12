@@ -57,7 +57,7 @@ HGLRC GLApp::CreateOpenGLContext(const HWND hwnd) {
     int pixelFormat = ChoosePixelFormat(_hdc, &pfd);
     SetPixelFormat(_hdc, pixelFormat, &pfd);
 
-    // ╢╢╫╗ OpenGL иообнд
+    // О©╫О©╫О©╫О©╫ OpenGL О©╫О©╫О©╫О©╫О©╫О©╫
     HGLRC hglrc = wglCreateContext(_hdc);
     wglMakeCurrent(_hdc, hglrc);
     return hglrc;
@@ -84,13 +84,13 @@ void GLApp::beginDrawScene() {
     return Application::beginDrawScene();
 }
 
-void GLApp::drawScene() {
+void GLApp::drawScene(const float dt) {
     ImGui::Begin("OpenGL");
     ImGuiIO& io = ImGui::GetIO();
     ImGui::Text("Hello Graphic! %.1f FPS", io.Framerate);  // Display current FPS
     ImGui::End();
 
-    return Application::drawScene();
+    return Application::drawScene(dt);
 }
 
 void GLApp::endDrawScene() {
@@ -98,8 +98,4 @@ void GLApp::endDrawScene() {
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
     SwapBuffers(wglGetCurrentDC());
     return Application::endDrawScene();
-}
-
-void GLApp::updateScene(const float dt) {
-    return Application::updateScene(dt);
 }

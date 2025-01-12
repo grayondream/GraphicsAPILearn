@@ -96,9 +96,8 @@ void Application::render() {
 
     _timer.tick();
     calcFrameRate();
-    updateScene(_timer.deltaTime());
     beginDrawScene();
-    drawScene();
+    drawScene(_timer.deltaTime());
     endDrawScene();
 }
 
@@ -179,8 +178,6 @@ void Application::onResize(const UINT msg, const WPARAM wParam, const LPARAM lPa
     //updateRenderTargetWhileResize();
 }
 
-void Application::updateScene(const float dt) {}
-
 void Application::beginDrawScene() {
     clearColor();
     return;
@@ -190,7 +187,7 @@ void Application::endDrawScene() {
     return;
 }
 
-void Application::drawScene() {
+void Application::drawScene(const float dt) {
     return;
 }
 

@@ -60,17 +60,13 @@ void GLRectApp::beginDrawScene() {
 	return GLApp::beginDrawScene();
 }
 
-void GLRectApp::drawScene() {
+void GLRectApp::drawScene(const float dt) {
 	_program.use();
 	glBindVertexArray(_vao);
 	glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
-	return GLApp::drawScene();
+	return GLApp::drawScene(dt);
 }
 
 void GLRectApp::endDrawScene() {
 	return GLApp::endDrawScene();
-}
-
-void GLRectApp::updateScene(const float dt) {
-	return GLApp::updateScene(dt);
 }

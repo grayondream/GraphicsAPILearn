@@ -54,17 +54,13 @@ void GLTriangleApp::beginDrawScene() {
 	return GLApp::beginDrawScene();
 }
 
-void GLTriangleApp::drawScene() {
+void GLTriangleApp::drawScene(const float dt) {
 	_program.use();
 	glBindVertexArray(_vao);
 	glDrawArrays(GL_TRIANGLES, 0, 3);
-	return GLApp::drawScene();
+	return GLApp::drawScene(dt);
 }
 
 void GLTriangleApp::endDrawScene() {
 	return GLApp::endDrawScene();
-}
-
-void GLTriangleApp::updateScene(const float dt) {
-	return GLApp::updateScene(dt);
 }

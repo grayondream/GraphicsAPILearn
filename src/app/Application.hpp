@@ -27,9 +27,8 @@ protected:
     void render();
     virtual void clearColor() {}
     virtual void beginDrawScene();
-    virtual void drawScene();
+    virtual void drawScene(const float dt);
     virtual void endDrawScene();
-    virtual void updateScene(const float dt);
     
     virtual void onResize(const UINT msg, const WPARAM wParam, const LPARAM lParam);
     virtual void onMouseDown(WPARAM btnState, int x, int y);

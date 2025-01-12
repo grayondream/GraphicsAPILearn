@@ -75,10 +75,6 @@ void DX11App::updateRenderTargetWhileResize() {
     D3DSetupViewPort(_pd3dDeviceCtx, _attribute.winAttr.width, _attribute.winAttr.height);
 }
 
-void DX11App::updateScene(const float dt) {
-    return Application::updateScene(dt);
-}
-
 void DX11App::clearColor() {
     _pd3dDeviceCtx->ClearRenderTargetView(_pd3dRenderTargetView.Get(), reinterpret_cast<const float*>(&Colors::LightSteelBlue));
 }
@@ -90,14 +86,14 @@ void DX11App::beginDrawScene() {
     return Application::beginDrawScene();
 }
 
-void DX11App::drawScene() {
+void DX11App::drawScene(const float dt) {
     ImGui::Begin("DirectX11");
     ImGui::PushTextWrapPos(200.0f);
     ImGuiIO& io = ImGui::GetIO();
     ImGui::Text("Hello Graphic! %.1f FPS", io.Framerate);  // Display current FPS
-    ImGui::PopTextWrapPos(); // »Ö¸´Ä¬ÈÏ»»ÐÐÎ»ÖÃ
+    ImGui::PopTextWrapPos(); // ï¿½Ö¸ï¿½Ä¬ï¿½Ï»ï¿½ï¿½ï¿½Î»ï¿½ï¿½
     ImGui::End();
-    return Application::drawScene();
+    return Application::drawScene(dt);
 }
 
 void DX11App::endDrawScene() {

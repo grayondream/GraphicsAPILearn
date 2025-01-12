@@ -47,15 +47,15 @@ void DX11SimpleTextureApp::createGemBuffer() {
 
 void DX11SimpleTextureApp::createSampler() {
     D3D11_SAMPLER_DESC samplerDesc = {};
-    samplerDesc.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;  // Ñ¡ÔñÏßÐÔ¹ýÂË
-    samplerDesc.AddressU = D3D11_TEXTURE_ADDRESS_WRAP;      // ÉèÖÃÎÆÀí×ø±ê³¬³öÊ±µÄ´¦Àí·½Ê½
+    samplerDesc.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;  // Ñ¡ï¿½ï¿½ï¿½ï¿½ï¿½Ô¹ï¿½ï¿½ï¿½
+    samplerDesc.AddressU = D3D11_TEXTURE_ADDRESS_WRAP;      // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ê³¬ï¿½ï¿½Ê±ï¿½Ä´ï¿½ï¿½ï¿½ï¿½ï¿½Ê½
     samplerDesc.AddressV = D3D11_TEXTURE_ADDRESS_WRAP;
     samplerDesc.AddressW = D3D11_TEXTURE_ADDRESS_WRAP;
     samplerDesc.ComparisonFunc = D3D11_COMPARISON_NEVER;
     samplerDesc.MinLOD = 0;
     samplerDesc.MaxLOD = D3D11_FLOAT32_MAX;
 
-    // ´´½¨²ÉÑùÆ÷
+    // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
     eh::ExitIfFailed(_pd3dDevice->CreateSamplerState(&samplerDesc, _sampler.GetAddressOf()), "Failed to create sampler");
 }
 
@@ -113,11 +113,7 @@ bool DX11SimpleTextureApp::init(const HINSTANCE ins, const WindowDesc& param) {
     return true;
 }
 
-void DX11SimpleTextureApp::updateScene(const float dt) {
-    return DX11App::updateScene(dt);
-}
-
-void DX11SimpleTextureApp::drawScene() {
+void DX11SimpleTextureApp::drawScene(const float dt) {
     UINT stride = sizeof(Vertex);
     UINT offset = 0;
     auto* buffer = _pvecBuffer.Get();
@@ -127,7 +123,7 @@ void DX11SimpleTextureApp::drawScene() {
     _pd3dDeviceCtx->IASetIndexBuffer(_pidxBuffer.Get(), DXGI_FORMAT_R32_UINT, 0);
     _pd3dDeviceCtx->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
     _pd3dDeviceCtx->DrawIndexed(6, 0, 0);
-    return DX11App::drawScene();
+    return DX11App::drawScene(dt);
 }
 
 

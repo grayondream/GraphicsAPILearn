@@ -4,6 +4,7 @@
 #include <memory>
 #include <array>
 #include "Geometry/Camera.hpp"
+#include "Geometry/Vertex.hpp"
 
 class GLImageTexture2D;
 class GLCameraApp : public GLApp {
@@ -15,9 +16,8 @@ public:
 protected:
 	virtual void clearColor();
 	virtual void beginDrawScene();
-	virtual void drawScene();
+	virtual void drawScene(const float dt);
 	virtual void endDrawScene();
-	virtual void updateScene(const float dt);
 
 	virtual void onMouseDown(WPARAM btnState, int x, int y);
 	virtual void onMouseUp(WPARAM btnState, int x, int y);
@@ -36,4 +36,7 @@ private:
 	unsigned int _ebo{};
 	float _curTime{};
 	Camera _camera{};
+	bool _clicked{};
+	bool _mouseClicked{ false };
+	Position2D _lastPos{0.0, 0.0};
 };

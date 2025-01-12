@@ -14,9 +14,8 @@ public:
 protected:
 	virtual void clearColor();
 	virtual void beginDrawScene();
-	virtual void drawScene();
+	virtual void drawScene(const float dt);
 	virtual void endDrawScene();
-	virtual void updateScene(const float dt);
 
 private:
 	void createVertexBuffer();
@@ -27,5 +26,4 @@ private:
 	unsigned int _vbo[2]{};
 	unsigned int _vao{};
 	unsigned int _ebo{};
-	float _curTime{};
 };

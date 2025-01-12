@@ -82,11 +82,7 @@ bool DX11TriangleApp::init(const HINSTANCE ins, const WindowDesc& param) {
     return true;
 }
 
-void DX11TriangleApp::updateScene(const float dt) {
-    return DX11App::updateScene(dt);
-}
-
-void DX11TriangleApp::drawScene() {
+void DX11TriangleApp::drawScene(const float dt) {
     UINT stride = sizeof(Vertex);
     UINT offset = 0;
     auto* buffer = _pvecBuffer.Get();
@@ -94,5 +90,5 @@ void DX11TriangleApp::drawScene() {
     //_pd3dDeviceCtx->IASetIndexBuffer(_pboxInxBuffer.Get(), DXGI_FORMAT_R32_UINT, 0);
     _pd3dDeviceCtx->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
     _pd3dDeviceCtx->Draw(3, 0);
-    return DX11App::drawScene();
+    return DX11App::drawScene(dt);
 }

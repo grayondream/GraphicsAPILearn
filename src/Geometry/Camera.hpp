@@ -36,13 +36,17 @@ public:
 public:
 	Camera(const Vec3 pos = Vec3(0.0f, 0.0f, 0.0f), const Vec3 up = Vec3(0.0f, 1.0f, 0.0f), const float yam = -90.0f, const float pitch = 0.0f);
 
-	glm::mat4 getViewMatrix() const {
-		return glm::lookAt(_attr.pos, _attr.pos + _attr.front, _attr.up);
-	}
+	glm::mat4 getViewMatrix() const;
 
 	Camera& processKeyboardEvent(const Movement direction, const float delta);
 
+	Camera& processMouseMove(const float xoff, const float yoff);
+
 	Camera& processMouseScrool(const float offset);
+
+	float zoom() {
+		return _opt.zoom;
+	}
 
 private:
 	Camera& update();

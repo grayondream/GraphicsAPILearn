@@ -3,13 +3,18 @@
 Camera::Camera(const Vec3 pos, const Vec3 up, const float yam, const float pitch) {
 	_attr.pos = pos;
 	_attr.front = glm::vec3(0.0f, 0.0f, -1.0f);
-	_attr.up = up;
+	_attr.worldUp = up;
 
-	_opt.speed = 2.5f;
+	_opt.speed = 0.1f;
 	_opt.sensitivity = 0.1f;
-	_opt.zoom = 45.f;
+	_opt.zoom = 60.f;
 	_angle.pitch = pitch;
 	_angle.yaw = yam;
+	update();
+}
+
+glm::mat4 Camera::getViewMatrix() const{
+	return glm::lookAt(_attr.pos, _attr.pos + _attr.front, _attr.up);
 }
 
 Camera& Camera::processKeyboardEvent(const Movement direction, const float delta) {
@@ -34,9 +39,19 @@ Camera& Camera::processKeyboardEvent(const Movement direction, const float delta
 	return *this;
 }
 
+Camera& Camera::processMouseMove(const float xoff, const float yoff) {
+	const auto xoffset = xoff * _opt.sensitivity;
+	const auto yoffset = yoff * _opt.sensitivity;
+	_angle.yaw += xoffset;
+	_angle.pitch += yoffset;
+	_angle.pitch = std::max(-89.0f, std::min(89.0f, _angle.pitch));
+	update();
+	return *this;
+}
+
 Camera& Camera::processMouseScrool(const float offset) {
-	_opt.zoom -= offset;
-	_opt.zoom = std::max(std::min(_opt.zoom, 45.0f), 1.0f);
+	_opt.zoom -= offset / 20.0;
+	_opt.zoom = std::max(std::min(_opt.zoom, 100.0f), 0.1f);
 	return *this;
 }
 
