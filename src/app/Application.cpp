@@ -73,15 +73,20 @@ bool Application::init(const HINSTANCE hInstance, const WindowDesc& param){
 
 int Application::run(const int nShowCmd){
     ShowWindow(_winId, nShowCmd);
+    _running = true;
     MSG msg{};
     _timer.reset();
-    while (GetMessage(&msg, 0, 0, 0)) {
+    while (_running && GetMessage(&msg, 0, 0, 0)) {
         TranslateMessage(&msg);
         DispatchMessage(&msg);
         render();
     }
 
     return 0;
+}
+
+void Application::exit() {
+    _running = false;
 }
 
 void Application::render() {
@@ -91,7 +96,7 @@ void Application::render() {
 
     _timer.tick();
     calcFrameRate();
-    updateScene(_timer.totalTime());
+    updateScene(_timer.deltaTime());
     beginDrawScene();
     drawScene();
     endDrawScene();
@@ -193,6 +198,8 @@ void Application::onMouseDown(WPARAM btnState, int x, int y) { }
 void Application::onMouseUp(WPARAM btnState, int x, int y) { }
 void Application::onMouseMove(WPARAM btnState, int x, int y) { }
 
+void Application::onMouseScroll(const UINT msg, const WPARAM wParam, const LPARAM lParam) {}
+
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 LRESULT Application::msgProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
     ImGui_ImplWin32_WndProcHandler(hwnd, msg, wParam, lParam);
@@ -256,7 +263,26 @@ LRESULT Application::msgProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) 
     case WM_MOUSEMOVE:
         onMouseMove(wParam, GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
         return 0;
+    case WM_KEYDOWN:
+    case WM_KEYUP:
+    case WM_CHAR:
+        onKeyBoardEvent(msg, wParam, lParam); break;
+    case WM_MOUSEWHEEL:
+        onMouseScroll(msg, wParam, lParam);break;
     }
 
     return DefWindowProc(hwnd, msg, wParam, lParam);
+}
+
+void Application::onKeyBoardEvent(const UINT msg, const WPARAM wParam, const LPARAM lParam) {
+    switch (msg) {
+    case WM_KEYDOWN: {
+        if (wParam == VK_ESCAPE) {
+            _running = false;
+            std::cout << "ESC key pressed!" << std::endl;
+            PostQuitMessage(0);  // 退出程序
+        }
+        break;
+    }
+    }
 }
