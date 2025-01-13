@@ -4,7 +4,7 @@
 #include "Shape.hpp"
 #include "Vertex.hpp"
 
-class Rect : public Shape<Rect, 4, 6> {
+class Rect : public Shape {
 public:
 	Rect() {
 		store(

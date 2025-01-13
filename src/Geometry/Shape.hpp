@@ -4,11 +4,8 @@
 #include "Vertex.hpp"
 #include <vector>
 
-template<class T, int VertexCount, int IndexCount>
 class Shape {
 public:
-	static inline constexpr int VertexCount = VertexCount;
-	static inline constexpr int IndexCount = IndexCount;
 	using ValueType = Vertex;
 
 public:
@@ -51,6 +48,6 @@ public:
 	}
 
 protected:
-	std::array<Vertex, VertexCount> _pts; 
-	std::array<unsigned int, IndexCount> _idx; 
+	std::vector<Vertex> _pts; 
+	std::vector<unsigned int> _idx; 
 };

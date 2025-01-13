@@ -5,7 +5,7 @@
 #include "Shape.hpp"
 #include "Vertex.hpp"
 
-class Triangle : public Shape {
+class Sphere : public Shape<Sphere, 3, 3> {
 public:
 	Triangle() {
 		store(

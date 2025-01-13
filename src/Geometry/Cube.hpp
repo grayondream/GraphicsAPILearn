@@ -4,7 +4,7 @@
 #include "Shape.hpp"
 #include "Vertex.hpp"
 
-class Cube : public Shape<Cube, 8, 36> {
+class Cube : public Shape {
 public:
 	Cube() {
 		_pts = {
