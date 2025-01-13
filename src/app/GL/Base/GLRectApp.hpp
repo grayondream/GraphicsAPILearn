@@ -1,10 +1,10 @@
 #pragma once
-#include "GLApp.hpp"
+#include "App/GL/GLApp.hpp"
 #include "Native/GL/GLProgram.hpp"
 
-class GLTriangleApp : public GLApp {
+class GLRectApp : public GLApp {
 public:
-	virtual ~GLTriangleApp();
+	virtual ~GLRectApp();
 public:
 	virtual bool init(const HINSTANCE, const WindowDesc& param) override;
 
@@ -13,12 +13,13 @@ protected:
 	virtual void beginDrawScene();
 	virtual void drawScene(const float dt);
 	virtual void endDrawScene();
-	
+
 private:
-	std::pair<unsigned int, unsigned int> createVertexBuffer();
+	std::tuple<unsigned int, unsigned int, unsigned int> createVertexBuffer();
 
 private:
 	GLProgram _program{};
 	unsigned int _vbo{};
 	unsigned int _vao{};
+	unsigned int _ebo{};
 };

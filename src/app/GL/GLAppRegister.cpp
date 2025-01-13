@@ -1,10 +1,10 @@
 #include "GLAppRegister.hpp"
 #include "App/AppRegister.hpp"
-#include "GLTriangleApp.hpp"
-#include "GLRectApp.hpp"
-#include "GLSimpleTextureApp.hpp"
-#include "GLCubeApp.hpp"
-#include "GLCameraApp.hpp"
+#include "App/GL/Base/GLTriangleApp.hpp"
+#include "App/GL/Base/GLRectApp.hpp"
+#include "App/GL/Base/GLSimpleTextureApp.hpp"
+#include "App/GL/Base/GLCubeApp.hpp"
+#include "App/GL/Base/GLCameraApp.hpp"
 
 void RegisterGLApps(){
 	AppRegister::instance()->push("GL_Base", std::make_shared<GLApp>());

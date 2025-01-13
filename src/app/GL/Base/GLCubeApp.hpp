@@ -1,5 +1,5 @@
 #pragma once
-#include "GLApp.hpp"
+#include "App/GL/GLApp.hpp"
 #include "Native/GL/GLProgram.hpp"
 #include <memory>
 #include <array>
