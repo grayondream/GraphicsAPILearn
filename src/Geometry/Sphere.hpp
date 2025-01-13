@@ -1,27 +1,55 @@
 #pragma once
 
 #include <glm/glm.hpp>
-#include <array>
+#include <vector>
+#include <cmath>
 #include "Shape.hpp"
 #include "Vertex.hpp"
 
-class Sphere : public Shape<Sphere, 3, 3> {
+class Sphere : public Shape {
 public:
-	Triangle() {
-		store(
-			{ {0.0f,  0.5f, 0.0f, 1.0f}, {1.0f, 0.0f, 0.0f, 1.0f} },
-			{ {0.5f, -0.5f, 0.0f, 1.0f}, {0.0f, 0.0f, 1.0f, 1.0f} },
-			{ {-0.5f,-0.5f, 0.0f, 1.0f}, {0.0f, 1.0f, 0.0f, 1.0f} }
-		);
-	}
-
-	Triangle(const Vertex& v1, const Vertex& v2, const Vertex& v3) {
-		store(v1, v2, v3);
-	}
+    Sphere(float radius = 1.0f, int sectorCount = 36, int stackCount = 18) {
+        generate(_pts, _idx, radius, sectorCount, stackCount);
+    }
 
 private:
-	void store(const Vertex& v1, const Vertex& v2, const Vertex& v3) {
-		_pts = { v1, v2, v3 };
-		_idx = { 0, 1, 2 };
-	}
+    static void generate(std::vector<Vertex>& vertices, std::vector<unsigned int>& indices, float radius, int sectorCount, int stackCount) {
+        constexpr float PI = 3.14159265359f;
+
+        vertices.clear();
+        indices.clear();
+
+        // Step 1: Generate vertices
+        for (int i = 0; i <= stackCount; ++i) {
+            float stackAngle = PI / 2 - i * (PI / stackCount); // From PI/2 to -PI/2
+            float xy = radius * cosf(stackAngle);
+            float z = radius * sinf(stackAngle);
+
+            for (int j = 0; j <= sectorCount; ++j) {
+                float sectorAngle = j * (2 * PI / sectorCount);
+
+                float x = xy * cosf(sectorAngle);
+                float y = xy * sinf(sectorAngle);
+
+                Color color = { (x / radius + 1) / 2, (y / radius + 1) / 2, (z / radius + 1) / 2, 1.0f };
+                vertices.emplace_back(Vertex{ {x, y, z, 1.0f}, color });
+            }
+        }
+
+        // Step 2: Generate indices
+        for (int i = 0; i < stackCount; ++i) {
+            for (int j = 0; j < sectorCount; ++j) {
+                int first = i * (sectorCount + 1) + j;
+                int second = first + sectorCount + 1;
+
+                indices.push_back(first);
+                indices.push_back(second);
+                indices.push_back(first + 1);
+
+                indices.push_back(second);
+                indices.push_back(second + 1);
+                indices.push_back(first + 1);
+            }
+        }
+    }
 };

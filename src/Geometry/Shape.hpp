@@ -47,6 +47,9 @@ public:
 		return _pts.size();
 	}
 
+	std::size_t idxSize(){
+		return _idx.size();
+	}
 protected:
 	std::vector<Vertex> _pts; 
 	std::vector<unsigned int> _idx; 
