@@ -82,11 +82,11 @@ void GLSimpleLight::beginDrawScene() {
 }
 
 void GLSimpleLight::drawScene(const float dt) {
+	GLApp::drawScene(dt);
 	glBindVertexArray(_vao);
 	ImGui::Begin("OpenGL");
-	static int count{ 1 };
-	ImGui::SetNextItemWidth(200);
-	ImGui::SliderInt("Cube Count", &count, 1, 10);
+	ImGui::Text("Color Picker with Alpha:");
+	ImGui::ColorEdit4("Color with Alpha", &_lightColor[0]); // Ö§³Ö RGBA
 	ImGui::End();
 
 	static float curTime = 0;
@@ -106,7 +106,7 @@ void GLSimpleLight::drawScene(const float dt) {
 		_targetProgram.update("projection", projection);
 		_targetProgram.update("view", view);
 		_targetProgram.update("model", model);
-		_targetProgram.update("lightColor", glm::vec4(1.0,1.0,1.0,1.0));
+		_targetProgram.update("lightColor", _lightColor);
 		_targetProgram.update("objectColor", glm::vec4(1.0f, 0.5f, 0.31f, 1.0));
 		glDrawElements(GL_TRIANGLES, shape.idxSize(), GL_UNSIGNED_INT, 0);
 	}
@@ -122,12 +122,11 @@ void GLSimpleLight::drawScene(const float dt) {
 		_lightProgram.update("projection", projection);
 		_lightProgram.update("view", view);
 		_lightProgram.update("model", model);
-		_lightProgram.update("lightColor", glm::vec4(1.0, 1.0, 1.0, 1.0));
+		_lightProgram.update("lightColor", _lightColor);
 		glDrawElements(GL_TRIANGLES, shape.idxSize(), GL_UNSIGNED_INT, 0);
 	}
 
 	glBindVertexArray(0);
-	return GLApp::drawScene(dt);
 }
 
 void GLSimpleLight::endDrawScene() {
