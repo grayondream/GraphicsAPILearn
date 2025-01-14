@@ -17,8 +17,8 @@ bool GLTriangleApp::init(const HINSTANCE inst, const WindowDesc& param) {
 		return false;
 	}
 
-	const auto vfile = StaticCollector::getGLShaderPath() / "Shape" / "triangle.vert";
-	const auto ffile = StaticCollector::getGLShaderPath() / "Shape" / "triangle.frag";
+	const auto vfile = StaticCollector::getGLShaderPath() / "Base" / "triangle.vert";
+	const auto ffile = StaticCollector::getGLShaderPath() / "Base" / "triangle.frag";
 	auto ret = _program.init(vfile.string(), ffile.string());
 	ErrorHandle::ExitIfFailed(ret, "Create OpenGL program failed!");
 	std::tie(_vao, _vbo) = createVertexBuffer();

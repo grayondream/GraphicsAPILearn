@@ -34,7 +34,7 @@ void DX11TriangleApp::compileShader() {
     DWORD sharedFlags{};
 
     ComPtr<ID3D10Blob> pvsShader{}, pfsShader{}, pErrorBlob{};
-    const fs::path file = StaticCollector::getDX11ShaderPath() / "Shape" / "trangile.hlsl";
+    const fs::path file = StaticCollector::getDX11ShaderPath() / "Base" / "trangile.hlsl";
     auto hr = D3DX11CompileFromFileW(file.wstring().c_str(), 0, 0, "vs_main", "vs_4_0", sharedFlags, 0, 0, pvsShader.GetAddressOf(), pErrorBlob.GetAddressOf(), 0);
     if (FAILED(hr) && pErrorBlob) {
         OutputDebugStringA(reinterpret_cast<const char*>(pErrorBlob->GetBufferPointer()));

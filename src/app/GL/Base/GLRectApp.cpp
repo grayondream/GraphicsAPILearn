@@ -18,8 +18,8 @@ bool GLRectApp::init(const HINSTANCE inst, const WindowDesc& param) {
 		return false;
 	}
 
-	const auto vfile = StaticCollector::getGLShaderPath() / "Shape" / "rect.vert";
-	const auto ffile = StaticCollector::getGLShaderPath() / "Shape" / "rect.frag";
+	const auto vfile = StaticCollector::getGLShaderPath() / "Base" / "rect.vert";
+	const auto ffile = StaticCollector::getGLShaderPath() / "Base" / "rect.frag";
 	auto ret = _program.init(vfile.string(), ffile.string());
 	ErrorHandle::ExitIfFailed(ret, "Create OpenGL program failed!");
 	std::tie(_vao, _vbo, _ebo) = createVertexBuffer();

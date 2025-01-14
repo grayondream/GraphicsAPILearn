@@ -27,8 +27,8 @@ bool GLCubeApp::init(const HINSTANCE inst, const WindowDesc& param) {
 	}
 	
 	glViewport(0, 0, _attribute.winAttr.width, _attribute.winAttr.height);
-	const auto vfile = StaticCollector::getGLShaderPath() / "Shape" / "cube.vert";
-	const auto ffile = StaticCollector::getGLShaderPath() / "Shape" / "cube.frag";
+	const auto vfile = StaticCollector::getGLShaderPath() / "Base" / "cube.vert";
+	const auto ffile = StaticCollector::getGLShaderPath() / "Base" / "cube.frag";
 	auto ret = _program.init(vfile.string(), ffile.string());
 	ErrorHandle::ExitIfFailed(ret, "Create OpenGL program failed!");
 	const auto imgFile = StaticCollector::getImagePath() / "dog.jpg";

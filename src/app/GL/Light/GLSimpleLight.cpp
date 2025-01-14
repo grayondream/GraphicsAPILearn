@@ -27,8 +27,8 @@ bool GLSimpleLight::init(const HINSTANCE inst, const WindowDesc& param) {
 	
 	_camera = Camera(glm::vec3(0.0f, 0.0f, 3.0f));
 	glViewport(0, 0, _attribute.winAttr.width, _attribute.winAttr.height);
-	const auto vfile = StaticCollector::getGLShaderPath() / "Shape" / "simplelight.vert";
-	const auto ffile = StaticCollector::getGLShaderPath() / "Shape" / "simplelight.frag";
+	const auto vfile = StaticCollector::getGLShaderPath() / "Light" / "simplelight.vert";
+	const auto ffile = StaticCollector::getGLShaderPath() / "Light" / "simplelight.frag";
 	auto ret = _program.init(vfile.string(), ffile.string());
 	ErrorHandle::ExitIfFailed(ret, "Create OpenGL program failed!");
 	const auto imgFile = StaticCollector::getImagePath() / "dog.jpg";
@@ -37,7 +37,7 @@ bool GLSimpleLight::init(const HINSTANCE inst, const WindowDesc& param) {
 	ExitIfFailed(valid, "Failed to load texture from file {}", imgFile.string());
 	_texture->multiSurface(6);
 	createVertexBuffer();
-	glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+	//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 	return true;
 }
 
@@ -90,18 +90,6 @@ void GLSimpleLight::drawScene(const float dt) {
 	ImGui::SetNextItemWidth(200);
 	ImGui::SliderInt("Cube Count", &count, 1, 10);
 	ImGui::End();
-	glm::vec3 cubePositions[] = {
-	  glm::vec3(0.0f,  0.0f,  0.0f),
-	  glm::vec3(2.0f,  5.0f, -15.0f),
-	  glm::vec3(-1.5f, -2.2f, -2.5f),
-	  glm::vec3(-3.8f, -2.0f, -12.3f),
-	  glm::vec3(2.4f, -0.4f, -3.5f),
-	  glm::vec3(-1.7f,  3.0f, -7.5f),
-	  glm::vec3(1.3f, -2.0f, -2.5f),
-	  glm::vec3(1.5f,  2.0f, -2.5f),
-	  glm::vec3(1.5f,  0.2f, -1.5f),
-	  glm::vec3(-1.3f,  1.0f, -1.5f)
-	};
 
 	static float curTime = 0;
 	curTime += dt;
@@ -109,13 +97,23 @@ void GLSimpleLight::drawScene(const float dt) {
 	_program.update("projection", projection);
 	const auto view = _camera.getViewMatrix();
 	_program.update("view", view);
-	for (int i = 0; i < count; i++) {
-		glm::mat4 model = glm::mat4(1.0f); // make sure to initialize matrix to identity matrix first
-		model = glm::translate(model, cubePositions[i]);
-		float angle = 20.0f * (i + 1) * curTime;
-		model = glm::rotate(model, glm::radians(angle), glm::vec3(1.0f, 0.3f, 0.5f));
-		_program.update("model", model);
 
+	//draw object
+	{
+		glm::mat4 model = glm::mat4(1.0f); // make sure to initialize matrix to identity matrix first
+		model = glm::translate(model, glm::vec3(0.0f, 0.0f, 0.0f));
+		model = glm::rotate(model, glm::radians(0.0f), glm::vec3(1.0f, 0.3f, 0.5f));
+		_program.update("model", model);
+		glDrawElements(GL_TRIANGLES, shape.idxSize(), GL_UNSIGNED_INT, 0);
+	}
+
+	//draw light source
+	{
+		glm::mat4 model = glm::mat4(1.0f); // make sure to initialize matrix to identity matrix first
+		model = glm::translate(model, glm::vec3(1.0f, 1.0f, 1.0f));
+		model = glm::rotate(model, glm::radians(0.0f), glm::vec3(1.0f, 0.3f, 0.5f));
+		model = glm::scale(model, glm::vec3(0.2, 0.2, 0.2));
+		_program.update("model", model);
 		glDrawElements(GL_TRIANGLES, shape.idxSize(), GL_UNSIGNED_INT, 0);
 	}
 
