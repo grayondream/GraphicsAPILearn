@@ -21,6 +21,8 @@ public:
 
 	GLProgram& update(const std::string& name, const glm::mat4 &value);
 
+	GLProgram& update(const std::string& name, const glm::vec4& value);
+
 private:
 	std::pair<unsigned int, unsigned int> compileShader(const std::string vertFile, const std::string fragFile);
 	unsigned int createProgram(const std::string vertFile, const std::string fragFile);

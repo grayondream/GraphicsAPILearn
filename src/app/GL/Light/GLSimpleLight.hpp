@@ -31,8 +31,8 @@ private:
 
 private:
 	Sphere shape{};
-	std::shared_ptr<GLImageTexture2D> _texture{};
-	GLProgram _program{};
+	GLProgram _targetProgram{};
+	GLProgram _lightProgram{};
 	unsigned int _vbo[2]{};
 	unsigned int _vao{};
 	unsigned int _ebo{};

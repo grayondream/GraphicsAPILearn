@@ -65,6 +65,11 @@ GLProgram& GLProgram::update(const std::string& name, const glm::mat4& value) {
 	return *this;
 }
 
+GLProgram& GLProgram::update(const std::string& name, const glm::vec4& value) {
+	glUniform4fv(glGetUniformLocation(_program, name.c_str()), 1, &value[0]);
+	return *this;
+}
+
 std::pair<unsigned int, unsigned int> GLProgram::compileShader(const std::string vertFile, const std::string fragFile) {
 	if (vertFile.empty() || fragFile.empty()) {
 		LOGI("Empty input for shader file!\nvertex file is {}\nfragment files is", vertFile, fragFile);

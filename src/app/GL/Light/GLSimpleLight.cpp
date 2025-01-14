@@ -27,15 +27,21 @@ bool GLSimpleLight::init(const HINSTANCE inst, const WindowDesc& param) {
 	
 	_camera = Camera(glm::vec3(0.0f, 0.0f, 3.0f));
 	glViewport(0, 0, _attribute.winAttr.width, _attribute.winAttr.height);
-	const auto vfile = StaticCollector::getGLShaderPath() / "Light" / "simplelight.vert";
-	const auto ffile = StaticCollector::getGLShaderPath() / "Light" / "simplelight.frag";
-	auto ret = _program.init(vfile.string(), ffile.string());
-	ErrorHandle::ExitIfFailed(ret, "Create OpenGL program failed!");
-	const auto imgFile = StaticCollector::getImagePath() / "dog.jpg";
-	_texture = std::make_shared<GLImageTexture2D>(imgFile.string());
-	const auto valid = _texture->load().texture()->valid();
-	ExitIfFailed(valid, "Failed to load texture from file {}", imgFile.string());
-	_texture->multiSurface(6);
+	const auto shaderDir = StaticCollector::getGLShaderPath() / "Light";
+	{
+		const auto vfile = shaderDir / "sl_source.vert";
+		const auto ffile = shaderDir / "sl_source.frag";
+		auto ret = _lightProgram.init(vfile.string(), ffile.string());
+		ErrorHandle::ExitIfFailed(ret, "Create OpenGL program failed!");
+	}
+
+	{
+		const auto vfile = shaderDir / "sl_target.vert";
+		const auto ffile = shaderDir / "sl_target.frag";
+		auto ret = _targetProgram.init(vfile.string(), ffile.string());
+		ErrorHandle::ExitIfFailed(ret, "Create OpenGL program failed!");
+	}
+	
 	createVertexBuffer();
 	//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 	return true;
@@ -60,12 +66,6 @@ void GLSimpleLight::createVertexBuffer() {
 
 		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
 		glBufferData(GL_ELEMENT_ARRAY_BUFFER, shape.idxByteSize(), shape.idx(), GL_STATIC_DRAW);
-
-		glBindBuffer(GL_ARRAY_BUFFER, vbo[1]);
-		glBufferData(GL_ARRAY_BUFFER, _texture->coordSize(), _texture->coord(), GL_STATIC_DRAW);
-
-		glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), nullptr);
-		glEnableVertexAttribArray(2);
 	}
 	glBindVertexArray(0);
 	_vao = vao;
@@ -78,8 +78,6 @@ void GLSimpleLight::clearColor() {
 }
 
 void GLSimpleLight::beginDrawScene() {
-	//_texture->texture()->bind(0);
-	_program.use();
 	return GLApp::beginDrawScene();
 }
 
@@ -94,16 +92,22 @@ void GLSimpleLight::drawScene(const float dt) {
 	static float curTime = 0;
 	curTime += dt;
 	const auto projection = glm::perspective(glm::radians(_camera.zoom()), aspectRatio(), 0.1f, 100.0f);
-	_program.update("projection", projection);
+	
 	const auto view = _camera.getViewMatrix();
-	_program.update("view", view);
+	
 
 	//draw object
 	{
 		glm::mat4 model = glm::mat4(1.0f); // make sure to initialize matrix to identity matrix first
 		model = glm::translate(model, glm::vec3(0.0f, 0.0f, 0.0f));
 		model = glm::rotate(model, glm::radians(0.0f), glm::vec3(1.0f, 0.3f, 0.5f));
-		_program.update("model", model);
+
+		_targetProgram.use();
+		_targetProgram.update("projection", projection);
+		_targetProgram.update("view", view);
+		_targetProgram.update("model", model);
+		_targetProgram.update("lightColor", glm::vec4(1.0,1.0,1.0,1.0));
+		_targetProgram.update("objectColor", glm::vec4(1.0f, 0.5f, 0.31f, 1.0));
 		glDrawElements(GL_TRIANGLES, shape.idxSize(), GL_UNSIGNED_INT, 0);
 	}
 
@@ -113,7 +117,12 @@ void GLSimpleLight::drawScene(const float dt) {
 		model = glm::translate(model, glm::vec3(1.0f, 1.0f, 1.0f));
 		model = glm::rotate(model, glm::radians(0.0f), glm::vec3(1.0f, 0.3f, 0.5f));
 		model = glm::scale(model, glm::vec3(0.2, 0.2, 0.2));
-		_program.update("model", model);
+
+		_lightProgram.use();
+		_lightProgram.update("projection", projection);
+		_lightProgram.update("view", view);
+		_lightProgram.update("model", model);
+		_lightProgram.update("lightColor", glm::vec4(1.0, 1.0, 1.0, 1.0));
 		glDrawElements(GL_TRIANGLES, shape.idxSize(), GL_UNSIGNED_INT, 0);
 	}
 
