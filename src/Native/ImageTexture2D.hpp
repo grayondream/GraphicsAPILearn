@@ -25,7 +25,7 @@ public:
 	}
 private:
 	Image _img{};
-	std::vector<Position2D> _coord{};
+	std::vector<Point2D> _coord{};
 
 protected:
 	std::shared_ptr<ITexture2D> _texture{};

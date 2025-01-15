@@ -38,5 +38,5 @@ private:
 	Camera _camera{};
 	bool _clicked{};
 	bool _mouseClicked{ false };
-	Position2D _lastPos{0.0, 0.0};
+	Point2D _lastPos{0.0, 0.0};
 };

@@ -7,10 +7,10 @@
 ImageTexture2D::ImageTexture2D(const std::string& file) {
 	_img = Image(file);
 	_coord = {
-		Position2D{1.0, 1.0},
-		Position2D{1.0, 0.0},
-		Position2D{0.0, 0.0},
-		Position2D{0.0, 1.0},
+		Point2D{1.0, 1.0},
+		Point2D{1.0, 0.0},
+		Point2D{0.0, 0.0},
+		Point2D{0.0, 1.0},
 	};
 }
 
@@ -26,7 +26,7 @@ float* ImageTexture2D::coord() {
 }
 
 std::size_t ImageTexture2D::coordSize() {
-	return _coord.size() * sizeof(Position2D);
+	return _coord.size() * sizeof(Point2D);
 }
 
 ImageTexture2D& ImageTexture2D::multiSurface(const int cnt) {
@@ -37,40 +37,40 @@ ImageTexture2D& ImageTexture2D::multiSurface(const int cnt) {
 	_coord.clear();
 	//the index is not correct
 	// ���� Front face
-	_coord.push_back(Position2D{ 0.0f, 0.0f }); // ���½�
-	_coord.push_back(Position2D{ 1.0f, 0.0f }); // ���½�
-	_coord.push_back(Position2D{ 1.0f, 1.0f }); // ���Ͻ�
-	_coord.push_back(Position2D{ 0.0f, 1.0f }); // ���Ͻ�
+	_coord.push_back(Point2D{ 0.0f, 0.0f }); // ���½�
+	_coord.push_back(Point2D{ 1.0f, 0.0f }); // ���½�
+	_coord.push_back(Point2D{ 1.0f, 1.0f }); // ���Ͻ�
+	_coord.push_back(Point2D{ 0.0f, 1.0f }); // ���Ͻ�
 
 	// ���� Back face
-	_coord.push_back(Position2D{ 1.0f, 1.0f }); // ���½�
-	_coord.push_back(Position2D{ 0.0f, 1.0f }); // ���½�
-	_coord.push_back(Position2D{ 0.0f, 0.0f }); // ���Ͻ�
-	_coord.push_back(Position2D{ 1.0f, 0.0f }); // ���Ͻ�
+	_coord.push_back(Point2D{ 1.0f, 1.0f }); // ���½�
+	_coord.push_back(Point2D{ 0.0f, 1.0f }); // ���½�
+	_coord.push_back(Point2D{ 0.0f, 0.0f }); // ���Ͻ�
+	_coord.push_back(Point2D{ 1.0f, 0.0f }); // ���Ͻ�
 
 	// ���� Bottom face
-	_coord.push_back(Position2D{ 0.0f, 1.0f }); // ���½�
-	_coord.push_back(Position2D{ 1.0f, 1.0f }); // ���½�
-	_coord.push_back(Position2D{ 1.0f, 0.0f }); // ���Ͻ�
-	_coord.push_back(Position2D{ 0.0f, 0.0f }); // ���Ͻ�
+	_coord.push_back(Point2D{ 0.0f, 1.0f }); // ���½�
+	_coord.push_back(Point2D{ 1.0f, 1.0f }); // ���½�
+	_coord.push_back(Point2D{ 1.0f, 0.0f }); // ���Ͻ�
+	_coord.push_back(Point2D{ 0.0f, 0.0f }); // ���Ͻ�
 
 	// ���� Top face
-	_coord.push_back(Position2D{ 1.0f, 0.0f }); // ���½�
-	_coord.push_back(Position2D{ 1.0f, 1.0f }); // ���½�
-	_coord.push_back(Position2D{ 0.0f, 1.0f }); // ���Ͻ�
-	_coord.push_back(Position2D{ 0.0f, 0.0f }); // ���Ͻ�
+	_coord.push_back(Point2D{ 1.0f, 0.0f }); // ���½�
+	_coord.push_back(Point2D{ 1.0f, 1.0f }); // ���½�
+	_coord.push_back(Point2D{ 0.0f, 1.0f }); // ���Ͻ�
+	_coord.push_back(Point2D{ 0.0f, 0.0f }); // ���Ͻ�
 
 	// ���� Left face
-	_coord.push_back(Position2D{ 0.0f, 1.0f }); // ���½�
-	_coord.push_back(Position2D{ 0.0f, 0.0f }); // ���½�
-	_coord.push_back(Position2D{ 1.0f, 0.0f }); // ���Ͻ�
-	_coord.push_back(Position2D{ 1.0f, 1.0f }); // ���Ͻ�
+	_coord.push_back(Point2D{ 0.0f, 1.0f }); // ���½�
+	_coord.push_back(Point2D{ 0.0f, 0.0f }); // ���½�
+	_coord.push_back(Point2D{ 1.0f, 0.0f }); // ���Ͻ�
+	_coord.push_back(Point2D{ 1.0f, 1.0f }); // ���Ͻ�
 
 	// ���� Right face
-	_coord.push_back(Position2D{ 1.0f, 0.0f }); // ���½�
-	_coord.push_back(Position2D{ 0.0f, 0.0f }); // ���½�
-	_coord.push_back(Position2D{ 0.0f, 1.0f }); // ���Ͻ�
-	_coord.push_back(Position2D{ 1.0f, 1.0f }); // ���Ͻ�
+	_coord.push_back(Point2D{ 1.0f, 0.0f }); // ���½�
+	_coord.push_back(Point2D{ 0.0f, 0.0f }); // ���½�
+	_coord.push_back(Point2D{ 0.0f, 1.0f }); // ���Ͻ�
+	_coord.push_back(Point2D{ 1.0f, 1.0f }); // ���Ͻ�
 
 	return *this;
 }

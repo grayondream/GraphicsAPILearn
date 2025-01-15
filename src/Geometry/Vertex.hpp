@@ -10,22 +10,20 @@ public:
 	ValueType r, g, b, a;
 };
 
-using Position2D = Vector2D;
-
-class Position4D : public Vector4D {
+class Vector4D : public Vector4DBase<float> {
 public:
 	using ValueType = float;
 	static constexpr int ElemNo = 4;
 	static constexpr int ByteSize = sizeof(ValueType) * ElemNo;
 public:
-	Position4D(const std::initializer_list<ValueType>& ls)
-		: Vector4D(ls){}
+	Vector4D(const std::initializer_list<ValueType>& ls)
+		: Vector4DBase(ls){}
 
-	Position4D& toGL() {
+	Vector4D& toGL() {
 		return *this;
 	}
 
-	Position4D& toDX11() {
+	Vector4D& toDX11() {
 		z = -1 * z;
 		return *this;
 	}
@@ -33,8 +31,8 @@ public:
 
 class Vertex {
 public:
-	static constexpr int ByteSize = Position4D::ByteSize + Color::ByteSize;
-	static constexpr int ColorOffset = Position4D::ByteSize;
+	static constexpr int ByteSize = Vector4D::ByteSize + Color::ByteSize;
+	static constexpr int ColorOffset = Vector4D::ByteSize;
 
 public:
 	Vertex() {
@@ -42,7 +40,7 @@ public:
 		color = { 0.0, 0.0, 0.0, 0.0 };
 	}
 
-	Vertex(const Position4D& pos, const Color& color) {
+	Vertex(const Vector4D& pos, const Color& color) {
 		this->pos = pos;
 		this->color = color;
 	}
@@ -60,6 +58,6 @@ public:
 	}
 
 public:
-	Position4D pos{ 0.0, 0.0, 0.0, 0.0 };
+	Vector4D pos{ 0.0, 0.0, 0.0, 0.0 };
 	Color color{ 0.0, 0.0, 0.0, 0.0 };
 };
