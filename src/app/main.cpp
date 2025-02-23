@@ -20,6 +20,7 @@ static inline constexpr int GAME_ENABLE_MSAA = true;
  *  -   GL_SimpleTexture    read a image into texture and draw it on a rect by OpenGL
  *  -   GL_Cube             draw a cube by OpenGL
  *  -   GL_Camera           create a virtual camera
+ *  -   GL_SimpleLight
  * DX11:
  *  -   DX11_Base:          clear window's color into one color by DX11
  *  -   DX11_Triangle       draw a colored triangle by DX11

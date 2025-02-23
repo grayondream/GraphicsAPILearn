@@ -55,25 +55,28 @@ void GLSimpleLight::createVertexBuffer() {
 
 	glBindVertexArray(vao);
 	{
+		// 绑定第一个 VBO，设置顶点位置
 		glBindBuffer(GL_ARRAY_BUFFER, vbo[0]);
 		glBufferData(GL_ARRAY_BUFFER, shape.byteSize(), shape.toGL().data(), GL_STATIC_DRAW);
-
 		glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex), nullptr);
 		glEnableVertexAttribArray(0);
 
 		glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)(sizeof(float) * 4));
 		glEnableVertexAttribArray(1);
 
+		// 绑定第二个 VBO，设置顶点法线
 		glBindBuffer(GL_ARRAY_BUFFER, vbo[1]);
 		glBufferData(GL_ARRAY_BUFFER, shape.normalSize(), shape.normal(), GL_STATIC_DRAW);
+		glVertexAttribPointer(2, 4, GL_FLOAT, GL_FALSE, sizeof(Vector4DBase<float>), nullptr);
+		glEnableVertexAttribArray(2); // 法线
 
-		glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, sizeof(Vector4DBase<float>), nullptr);
-		glEnableVertexAttribArray(2);
-
+		// 绑定索引缓冲区
 		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
 		glBufferData(GL_ELEMENT_ARRAY_BUFFER, shape.idxByteSize(), shape.idx(), GL_STATIC_DRAW);
 	}
 	glBindVertexArray(0);
+
+	// 记录 VBO 和 EBO
 	_vao = vao;
 	_vbo[0] = vbo[0], _vbo[1] = vbo[1];
 	_ebo = ebo;
