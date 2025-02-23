@@ -1,4 +1,4 @@
-#include "GLSimpleLight.hpp"
+#include "GLSimpleLightGlobalIllum.hpp"
 #include "Native/GL/GLProgram.hpp"
 #include "Config/StaticCollectorPredefined.hpp"
 #include "EH/ErrorHandle.hpp"
@@ -12,7 +12,7 @@
 
 using namespace ErrorHandle;
 
-GLSimpleLight::~GLSimpleLight() {
+GLSimpleLightGlobalIllum::~GLSimpleLightGlobalIllum() {
 	if (_vao != 0) {
 		glDeleteVertexArrays(1, &_vao);
 		glDeleteBuffers(2, _vbo);
@@ -20,7 +20,7 @@ GLSimpleLight::~GLSimpleLight() {
 	}
 }
 
-bool GLSimpleLight::init(const HINSTANCE inst, const WindowDesc& param) {
+bool GLSimpleLightGlobalIllum::init(const HINSTANCE inst, const WindowDesc& param) {
 	if (!GLApp::init(inst, param)) {
 		return false;
 	}
@@ -29,15 +29,15 @@ bool GLSimpleLight::init(const HINSTANCE inst, const WindowDesc& param) {
 	glViewport(0, 0, _attribute.winAttr.width, _attribute.winAttr.height);
 	const auto shaderDir = StaticCollector::getGLShaderPath() / "Light";
 	{
-		const auto vfile = shaderDir / "sl_source.vert";
-		const auto ffile = shaderDir / "sl_source.frag";
+		const auto vfile = shaderDir / "gl" / "simple_light_gl_source.vert";
+		const auto ffile = shaderDir / "gl" / "simple_light_gl_source.frag";
 		auto ret = _lightProgram.init(vfile.string(), ffile.string());
 		ErrorHandle::ExitIfFailed(ret, "Create OpenGL program failed!");
 	}
 
 	{
-		const auto vfile = shaderDir / "sl_target.vert";
-		const auto ffile = shaderDir / "sl_target.frag";
+		const auto vfile = shaderDir / "gl" / "simple_light_gl_target.vert";
+		const auto ffile = shaderDir / "gl" / "simple_light_gl_target.frag";
 		auto ret = _targetProgram.init(vfile.string(), ffile.string());
 		ErrorHandle::ExitIfFailed(ret, "Create OpenGL program failed!");
 	}
@@ -47,7 +47,7 @@ bool GLSimpleLight::init(const HINSTANCE inst, const WindowDesc& param) {
 	return true;
 }
 
-void GLSimpleLight::createVertexBuffer() {
+void GLSimpleLightGlobalIllum::createVertexBuffer() {
 	unsigned int vbo[2]{}, vao{}, ebo{};
 	glGenVertexArrays(1, &vao);
 	glGenBuffers(2, vbo);
@@ -82,15 +82,15 @@ void GLSimpleLight::createVertexBuffer() {
 	_ebo = ebo;
 }
 
-void GLSimpleLight::clearColor() {
+void GLSimpleLightGlobalIllum::clearColor() {
 	return GLApp::clearColor();
 }
 
-void GLSimpleLight::beginDrawScene() {
+void GLSimpleLightGlobalIllum::beginDrawScene() {
 	return GLApp::beginDrawScene();
 }
 
-void GLSimpleLight::drawScene(const float dt) {
+void GLSimpleLightGlobalIllum::drawScene(const float dt) {
 	GLApp::drawScene(dt);
 	glBindVertexArray(_vao);
 	ImGui::Begin("OpenGL");
@@ -138,11 +138,11 @@ void GLSimpleLight::drawScene(const float dt) {
 	glBindVertexArray(0);
 }
 
-void GLSimpleLight::endDrawScene() {
+void GLSimpleLightGlobalIllum::endDrawScene() {
 	return GLApp::endDrawScene();
 }
 
-void GLSimpleLight::onKeyBoardEvent(const UINT msg, const WPARAM wParam, const LPARAM lParam) {
+void GLSimpleLightGlobalIllum::onKeyBoardEvent(const UINT msg, const WPARAM wParam, const LPARAM lParam) {
 	switch (msg) {
 	case WM_KEYDOWN:
 		break;
@@ -166,7 +166,7 @@ void GLSimpleLight::onKeyBoardEvent(const UINT msg, const WPARAM wParam, const L
 	return GLApp::onKeyBoardEvent(msg, wParam, lParam);
 }
 
-void GLSimpleLight::onMouseDown(const UINT msg, WPARAM btnState, int x, int y) {
+void GLSimpleLightGlobalIllum::onMouseDown(const UINT msg, WPARAM btnState, int x, int y) {
 	switch (msg) {
 	case WM_LBUTTONDOWN:
 		_mouseClicked = true; break;
@@ -175,7 +175,7 @@ void GLSimpleLight::onMouseDown(const UINT msg, WPARAM btnState, int x, int y) {
 	return GLApp::onMouseDown(msg, btnState, x, y);
 }
 
-void GLSimpleLight::onMouseUp(const UINT msg, WPARAM btnState, int x, int y) {
+void GLSimpleLightGlobalIllum::onMouseUp(const UINT msg, WPARAM btnState, int x, int y) {
 	switch (msg) {
 	case WM_LBUTTONUP:
 		_mouseClicked = false; break;
@@ -184,7 +184,7 @@ void GLSimpleLight::onMouseUp(const UINT msg, WPARAM btnState, int x, int y) {
 	return GLApp::onMouseUp(msg, btnState, x, y);
 }
 
-void GLSimpleLight::onMouseMove(WPARAM btnState, int x, int y) {
+void GLSimpleLightGlobalIllum::onMouseMove(WPARAM btnState, int x, int y) {
 	if (!_mouseClicked) {
 		return GLApp::onMouseMove(btnState, x, y);
 	}
@@ -202,7 +202,7 @@ void GLSimpleLight::onMouseMove(WPARAM btnState, int x, int y) {
 	return GLApp::onMouseMove(btnState, x, y);
 }
 
-void GLSimpleLight::onMouseScroll(const UINT msg, const WPARAM wParam, const LPARAM lParam) {
+void GLSimpleLightGlobalIllum::onMouseScroll(const UINT msg, const WPARAM wParam, const LPARAM lParam) {
 	int zDelta = GET_WHEEL_DELTA_WPARAM(wParam);
 	_camera.processMouseScrool(zDelta);
 	return GLApp::onMouseScroll(msg, wParam, lParam);
