@@ -38,7 +38,8 @@ private:
                 vertices.emplace_back(Vertex{ {x, y, z, 1.0f}, color });
 
                 // Calculate the normal for this vertex and normalize it
-                glm::vec3 normalVec = glm::normalize(glm::vec3(x, y, z));
+                //glm::vec3 normalVec = glm::normalize(glm::vec3(x, y, z));
+                glm::vec3 normalVec = glm::vec3(x, y, z);
                 normals.push_back(Vector3DBase<float>{normalVec.x, normalVec.y, normalVec.z});
             }
         }
