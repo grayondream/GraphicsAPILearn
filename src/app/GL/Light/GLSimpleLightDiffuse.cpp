@@ -55,7 +55,6 @@ void GLSimpleLightDiffuse::createVertexBuffer() {
 
 	glBindVertexArray(vao);
 	{
-		// �󶨵�һ�� VBO�����ö���λ��
 		glBindBuffer(GL_ARRAY_BUFFER, vbo[0]);
 		glBufferData(GL_ARRAY_BUFFER, shape.byteSize(), shape.toGL().data(), GL_STATIC_DRAW);
 		glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex), nullptr);
