@@ -9,7 +9,7 @@ in vec4 normal;
 in vec4 fragPos;
 void main(){
     // ambient
-    float ambientStrength = 0.1;
+    float ambientStrength = 0.3;
     vec4 ambient = ambientStrength * lightColor;
   	
     // diffuse 

@@ -114,6 +114,7 @@ void GLSimpleLightDiffuse::drawScene(const float dt) {
 		_lightProgram.use();
 		_lightProgram.update("projection", projection);
 		_lightProgram.update("view", view);
+		_lightProgram.update("lightColor", _lightColor);
 		_lightProgram.update("model", model);
 		glDrawElements(GL_TRIANGLES, shape.idxSize(), GL_UNSIGNED_INT, 0);
 	}

@@ -13,7 +13,7 @@ public:
     }
 
 private:
-    static void generate(std::vector<Vertex>& vertices, std::vector<unsigned int>& indices, std::vector<Vector3DBase<float>>& normals,
+    static void generate(std::vector<Vertex>& vertices, std::vector<unsigned int>& indices, std::vector<Vector4DBase<float>>& normals,
         float radius, int sectorCount, int stackCount) {
         constexpr float PI = 3.14159265359f;
 
@@ -40,7 +40,7 @@ private:
                 // Calculate the normal for this vertex and normalize it
                 //glm::vec3 normalVec = glm::normalize(glm::vec3(x, y, z));
                 glm::vec3 normalVec = glm::vec3(x, y, z);
-                normals.push_back(Vector3DBase<float>{normalVec.x, normalVec.y, normalVec.z});
+                normals.push_back(Vector4DBase<float>{normalVec.x, normalVec.y, normalVec.z, 1.0});
             }
         }
 

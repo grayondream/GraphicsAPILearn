@@ -22,7 +22,7 @@ public:
 	}
 
 	const float* normal() const {
-		return reinterpret_cast<float*>(const_cast<Vector3DBase<float>*>(_normal.data()));
+		return reinterpret_cast<float*>(const_cast<Vector4DBase<float>*>(_normal.data()));
 	}
 
 	Shape& toGL() {
@@ -61,5 +61,5 @@ public:
 protected:
 	std::vector<Vertex> _pts; 
 	std::vector<unsigned int> _idx; 
-	std::vector<Vector3DBase<float>> _normal;
+	std::vector<Vector4DBase<float>> _normal;
 };
