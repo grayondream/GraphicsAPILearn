@@ -7,6 +7,7 @@ uniform vec4 lightPos;
 
 in vec4 normal;
 in vec4 fragPos;
+in vec4 objOriginColor;
 void main(){
     // ambient
     float ambientStrength = 0.3;
