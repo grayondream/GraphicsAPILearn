@@ -25,7 +25,7 @@ bool GLSimpleLightSpecular::init(const HINSTANCE inst, const WindowDesc& param) 
 		return false;
 	}
 	
-	_camera = Camera(glm::vec3(0.0f, 0.0f, 3.0f));
+	_camera = Camera(glm::vec3(0.0f, 0.0f, 6.0f));
 	glViewport(0, 0, _attribute.winAttr.width, _attribute.winAttr.height);
 	const auto shaderDir = StaticCollector::getGLShaderPath() / "Light";
 	{
@@ -98,6 +98,7 @@ void GLSimpleLightSpecular::drawScene(const float dt) {
 	ImGui::SliderFloat("Ambient Slider", &_ambientStrength, 0.0f, 1.0f);
 	ImGui::SliderFloat("Specular Slider", &_specularStrength, 0.0f, 1.0f);
 	ImGui::SliderFloat("diffuseStrength Slider", &_diffuseStrength, 0.0f, 1.0f);
+	ImGui::SliderInt("Times Slider", &_powTimes, 0.0f, 512);
 	ImGui::End();
 
 	static float curTime = 0;
@@ -106,12 +107,17 @@ void GLSimpleLightSpecular::drawScene(const float dt) {
 	
 	const auto view = _camera.getViewMatrix();
 	
-	auto lightPos = glm::vec3(1.0f, 1.0f, 1.50f);
+	float radius = 5.0f; // 旋转半径
+	glm::vec3 lightPos = glm::vec3(
+		radius * sin(curTime),
+		0.0f,
+		radius * cos(curTime)
+	);
 	//draw light source
 	{
 		glm::mat4 model = glm::mat4(1.0f); // make sure to initialize matrix to identity matrix first
 		model = glm::translate(model, lightPos);
-		model = glm::rotate(model, glm::radians(0.0f), glm::vec3(1.0f, 0.3f, 0.5f));
+		model = glm::rotate(model, 0.f, glm::vec3(1.0f, 0.f, 0.f));
 		model = glm::scale(model, glm::vec3(0.2, 0.2, 0.2));
 
 		_lightProgram.use();
@@ -140,6 +146,7 @@ void GLSimpleLightSpecular::drawScene(const float dt) {
 		_targetProgram.update("ambientStrength", _ambientStrength);
 		_targetProgram.update("specularStrength", _specularStrength);
 		_targetProgram.update("diffuseStrength", _diffuseStrength);
+		_targetProgram.update("times", _powTimes);
 		
 		glDrawElements(GL_TRIANGLES, shape.idxSize(), GL_UNSIGNED_INT, 0);
 	}

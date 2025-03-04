@@ -45,4 +45,5 @@ private:
 	float _ambientStrength{0.0};
 	float _specularStrength{0.0};
 	float _diffuseStrength{ 0.0 };
+	int _powTimes{ 1 };
 };

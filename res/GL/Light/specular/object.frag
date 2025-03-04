@@ -8,6 +8,7 @@ uniform vec4 viewPos;
 uniform float ambientStrength;
 uniform float specularStrength;
 uniform float diffuseStrength;
+uniform int times;
 
 in vec4 normal;
 in vec4 fragPos;
@@ -25,7 +26,8 @@ void main(){
     //specular
     vec4 viewDir = normalize(viewPos - fragPos);
     vec4 reflectDir = reflect(-lightDir, norm);
-    float spec = pow(max(dot(viewDir, reflectDir), 0.0), 128);
+    float viewValue = max(dot(viewDir, reflectDir), 0.0);
+    float spec = pow(max(dot(viewDir, reflectDir), 0.0), times);
     vec4 specular = specularStrength * spec * lightColor;
 
     //combination
