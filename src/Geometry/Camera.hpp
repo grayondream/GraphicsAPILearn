@@ -48,6 +48,7 @@ public:
 		return _opt.zoom;
 	}
 
+	Attribute& getAttr() { return _attr; }
 private:
 	Camera& update();
 
