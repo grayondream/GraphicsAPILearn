@@ -105,9 +105,9 @@ void GLSimpleLightMaterial::drawScene(const float dt) {
 	
 	float radius = 5.0f; // 旋转半径
 	glm::vec3 lightPos = glm::vec3(
-		1.f,
-		1.0f,
-		2.f
+		radius * sin(curTime),
+		0.0f,
+		radius * cos(curTime)
 	);
 	//draw light source
 	{
@@ -126,30 +126,33 @@ void GLSimpleLightMaterial::drawScene(const float dt) {
 
 	//draw object
 	{
-		glm::mat4 model = glm::mat4(1.0f); // make sure to initialize matrix to identity matrix first
-		model = glm::translate(model, glm::vec3(0.0f, 0.0f, 0.0f));
-		model = glm::rotate(model, glm::radians(0.0f), glm::vec3(1.0f, 0.3f, 0.5f));
+		int count = 5;
+		for (int i = 0; i < count; i++) {
+			glm::mat4 model = glm::mat4(1.0f); // make sure to initialize matrix to identity matrix first
+			model = glm::translate(model, glm::vec3((i - count / 2) * 2.5, 0.0, 0.0f));
+			model = glm::rotate(model, glm::radians(0.0f), glm::vec3(1.0f, 0.3f, 0.5f));
 
-		_targetProgram.use();
-		_targetProgram.update("projection", projection);
-		_targetProgram.update("view", view);
-		_targetProgram.update("model", model);
-		_targetProgram.update("lightColor", _lightColor);
-		_targetProgram.update("objectColor", glm::vec4(1.0f, 0.5f, 0.31f, 1.0));
-		_targetProgram.update("light.position", glm::vec4(lightPos.x, lightPos.y, lightPos.z, 1.0));
-		const auto camPos = _camera.getAttr().pos;
-		_targetProgram.update("viewPos", glm::vec4(camPos.x, camPos.y, camPos.z, 1.0));
-		_targetProgram.update("material.ambient", glm::vec4(1.0f, 0.5f, 0.31f, 1.0f));
-		_targetProgram.update("material.diffuse", glm::vec4(1.0f, 0.5f, 0.31f, 1.0f));
-		_targetProgram.update("material.specular", glm::vec4(1, 1, 1, 1.0f));
-		_targetProgram.update("material.shininess", 1.0f);
-		glm::vec4 diffuseColor = _lightColor * glm::vec4(0.5f); // 降低影响
-		glm::vec4 ambientColor = diffuseColor * glm::vec4(0.2f); // 很低的影响
-
-		_targetProgram.update("light.ambient", ambientColor);
-		_targetProgram.update("light.diffuse", diffuseColor);
-		_targetProgram.update("light.specular", glm::vec4(1.0f, 1.0f, 1.0f, 1.0f));
-		glDrawElements(GL_TRIANGLES, shape.idxSize(), GL_UNSIGNED_INT, 0);
+			_targetProgram.use();
+			_targetProgram.update("projection", projection);
+			_targetProgram.update("view", view);
+			_targetProgram.update("model", model);
+			_targetProgram.update("lightColor", _lightColor);
+			_targetProgram.update("objectColor", glm::vec4(1.0f, 0.5f, 0.31f, 1.0));
+			_targetProgram.update("light.position", glm::vec4(lightPos.x, lightPos.y, lightPos.z, 1.0));
+			const auto camPos = _camera.getAttr().pos;
+			_targetProgram.update("viewPos", glm::vec4(camPos.x, camPos.y, camPos.z, 1.0));
+			_targetProgram.update("material.ambient", glm::vec4(1.0f, 0.5f, 0.31f, 1.0f));
+			_targetProgram.update("material.diffuse", glm::vec4(1.0f, 0.5f, 0.31f, 1.0f));
+			_targetProgram.update("material.specular", glm::vec4(1, 1, 1, 1.0f));
+			_targetProgram.update("material.shininess", 1.0f);
+			float v = (i * 1.0 + 1.0) / count;
+			glm::vec4 diffuseColor = _lightColor * glm::vec4(v * 3); // 降低影响
+			glm::vec4 ambientColor = diffuseColor * glm::vec4(v); // 很低的影响
+			_targetProgram.update("light.ambient", ambientColor);
+			_targetProgram.update("light.diffuse", diffuseColor);
+			_targetProgram.update("light.specular", glm::vec4(v * 3));
+			glDrawElements(GL_TRIANGLES, shape.idxSize(), GL_UNSIGNED_INT, 0);
+		}
 	}
 
 	glBindVertexArray(0);
