@@ -73,7 +73,7 @@ void GLApp::onResize(const UINT msg, const WPARAM wParam, const LPARAM lParam) {
 }
 
 void GLApp::clearColor() {
-    glClearColor(173.0f / 255.0f, 216.0f / 255.0f, 230.0f / 255.0f, 1.0f);
+    glClearColor(0.0, 0.0, 0.0, 1.0);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 }
 
