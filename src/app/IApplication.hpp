@@ -1,6 +1,7 @@
 #pragma once
 #include "Base/Define.hpp"
 #include <string>
+#include <Windows.h>
 
 class IApplication {
 public:
