@@ -136,14 +136,19 @@ void GLSimpleLightMaterial::drawScene(const float dt) {
 		_targetProgram.update("model", model);
 		_targetProgram.update("lightColor", _lightColor);
 		_targetProgram.update("objectColor", glm::vec4(1.0f, 0.5f, 0.31f, 1.0));
-		_targetProgram.update("lightPos", glm::vec4(lightPos.x, lightPos.y, lightPos.z, 1.0));
+		_targetProgram.update("light.position", glm::vec4(lightPos.x, lightPos.y, lightPos.z, 1.0));
 		const auto camPos = _camera.getAttr().pos;
 		_targetProgram.update("viewPos", glm::vec4(camPos.x, camPos.y, camPos.z, 1.0));
 		_targetProgram.update("material.ambient", glm::vec4(1.0f, 0.5f, 0.31f, 1.0f));
 		_targetProgram.update("material.diffuse", glm::vec4(1.0f, 0.5f, 0.31f, 1.0f));
 		_targetProgram.update("material.specular", glm::vec4(1, 1, 1, 1.0f));
 		_targetProgram.update("material.shininess", 1.0f);
-		
+		glm::vec4 diffuseColor = _lightColor * glm::vec4(0.5f); // 降低影响
+		glm::vec4 ambientColor = diffuseColor * glm::vec4(0.2f); // 很低的影响
+
+		_targetProgram.update("light.ambient", ambientColor);
+		_targetProgram.update("light.diffuse", diffuseColor);
+		_targetProgram.update("light.specular", glm::vec4(1.0f, 1.0f, 1.0f, 1.0f));
 		glDrawElements(GL_TRIANGLES, shape.idxSize(), GL_UNSIGNED_INT, 0);
 	}
 
