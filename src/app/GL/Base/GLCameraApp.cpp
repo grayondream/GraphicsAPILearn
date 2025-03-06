@@ -17,7 +17,6 @@ GLCameraApp::~GLCameraApp() {
 	if (_vao != 0) {
 		glDeleteVertexArrays(1, &_vao);
 		glDeleteBuffers(2, _vbo);
-		glDeleteBuffers(1, &_ebo);
 	}
 }
 
@@ -47,8 +46,6 @@ void GLCameraApp::createVertexBuffer() {
 	unsigned int vbo[2]{}, vao{}, ebo{};
 	glGenVertexArrays(1, &vao);
 	glGenBuffers(2, vbo);
-	glGenBuffers(1, &ebo);
-
 	glBindVertexArray(vao);
 	{
 		glBindBuffer(GL_ARRAY_BUFFER, vbo[0]);
@@ -64,7 +61,7 @@ void GLCameraApp::createVertexBuffer() {
 		glBufferData(GL_ELEMENT_ARRAY_BUFFER, shape.idxByteSize(), shape.idx(), GL_STATIC_DRAW);
 
 		glBindBuffer(GL_ARRAY_BUFFER, vbo[1]);
-		glBufferData(GL_ARRAY_BUFFER, _texture->coordSize(), _texture->coord(), GL_STATIC_DRAW);
+		glBufferData(GL_ARRAY_BUFFER, shape.uvSize(), shape.uv(), GL_STATIC_DRAW);
 
 		glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), nullptr);
 		glEnableVertexAttribArray(2);
@@ -72,7 +69,6 @@ void GLCameraApp::createVertexBuffer() {
 	glBindVertexArray(0);
 	_vao = vao;
 	_vbo[0] = vbo[0], _vbo[1] = vbo[1];
-	_ebo = ebo;
 }
 
 void GLCameraApp::clearColor() {
@@ -118,7 +114,7 @@ void GLCameraApp::drawScene(const float dt) {
 		model = glm::rotate(model, glm::radians(angle), glm::vec3(1.0f, 0.3f, 0.5f));
 		_program.update("model", model);
 
-		glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
+		glDrawArrays(GL_TRIANGLES, 0, 36);
 	}
 
 	glBindVertexArray(0);

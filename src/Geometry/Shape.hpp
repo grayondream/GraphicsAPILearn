@@ -58,8 +58,18 @@ public:
 	std::size_t idxSize(){
 		return _idx.size();
 	}
+
+	std::size_t uvSize(){
+		return _uv.size() * sizeof(Vector2DBase<float>);
+	}
+
+	const float* uv() const {
+		return reinterpret_cast<float*>(const_cast<Vector2DBase<float>*>(_uv.data()));
+	}
+	
 protected:
 	std::vector<Vertex> _pts; 
 	std::vector<unsigned int> _idx; 
 	std::vector<Vector4DBase<float>> _normal;
+	std::vector<Vector2DBase<float>> _uv{};
 };

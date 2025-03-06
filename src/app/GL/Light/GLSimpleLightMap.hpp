@@ -5,11 +5,13 @@
 #include <array>
 #include "Geometry/Camera.hpp"
 #include "Geometry/Vertex.hpp"
+#include "Geometry/Sphere.hpp"
+#include "Geometry/Cube.hpp"
 
 class GLImageTexture2D;
-class GLCameraApp : public GLApp {
+class GLSimpleLightMap : public GLApp {
 public:
-	virtual ~GLCameraApp();
+	virtual ~GLSimpleLightMap();
 public:
 	virtual bool init(const HINSTANCE, const WindowDesc& param) override;
 
@@ -29,13 +31,16 @@ private:
 	void createVertexBuffer();
 
 private:
-	std::shared_ptr<GLImageTexture2D> _texture{};
-	GLProgram _program{};
+	Cube _object{};
+	GLProgram _targetProgram{};
+	GLProgram _lightProgram{};
 	unsigned int _vbo[2]{};
 	unsigned int _vao{};
+	unsigned int _ebo{};
 	float _curTime{};
 	Camera _camera{};
 	bool _clicked{};
 	bool _mouseClicked{ false };
 	Point2D _lastPos{0.0, 0.0};
+	glm::vec4 _lightColor{1.0, 1.0, 1.0, 1.0};
 };

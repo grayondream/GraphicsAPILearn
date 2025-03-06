@@ -19,6 +19,7 @@ enum class AppType : int{
     SimpleLight_Ambination,
     SimpleLight_Diffuse,
     SimpleLight_Specular,
-    SimpleLight_Material
+    SimpleLight_Material,
+    SimpleLight_Map,
 };
 

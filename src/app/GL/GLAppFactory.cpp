@@ -8,6 +8,7 @@
 #include "App/GL/Light/GLSimpleLightDiffuse.hpp"
 #include "App/GL/Light/GLSimpleLightSpecular.hpp"
 #include "App/GL/Light/GLSimpleLightMaterial.hpp"
+#include "App/GL/Light/GLSimpleLightMap.hpp"
 
 std::shared_ptr<GLApp> GLAppFactory::create(const AppType type){
 	switch(type){
@@ -31,6 +32,8 @@ std::shared_ptr<GLApp> GLAppFactory::create(const AppType type){
 			return std::make_shared<GLSimpleLightSpecular>();
 		case AppType::SimpleLight_Material:
 			return std::make_shared<GLSimpleLightMaterial>();
+		case AppType::SimpleLight_Map:
+			return std::make_shared<GLSimpleLightMap>();
 	}
 
 	return nullptr;
