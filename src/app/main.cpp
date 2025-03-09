@@ -28,7 +28,7 @@ static inline constexpr int GAME_ENABLE_MSAA = true;
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nShowCmd) {
     ConsoleDebugger consoleDebugger{};
     
-    auto app = AppFactory::create(GraphicsType::GL, AppType::SimpleLight_Material);
+    auto app = AppFactory::create(GraphicsType::GL, AppType::SimpleLight_Map);
     assert(app);
     app->init(hInstance, { {GAME_WIN_WIDTH, GAME_WIN_HEIGHT, "Hello Grapgic!"}, GAME_ENABLE_MSAA});
     return app->run(nShowCmd);

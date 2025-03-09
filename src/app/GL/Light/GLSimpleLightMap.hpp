@@ -34,7 +34,7 @@ private:
 	Cube _object{};
 	GLProgram _targetProgram{};
 	GLProgram _lightProgram{};
-	unsigned int _vbo[2]{};
+	unsigned int _vbo[3]{};
 	unsigned int _vao{};
 	unsigned int _ebo{};
 	float _curTime{};
@@ -43,4 +43,5 @@ private:
 	bool _mouseClicked{ false };
 	Point2D _lastPos{0.0, 0.0};
 	glm::vec4 _lightColor{1.0, 1.0, 1.0, 1.0};
+	std::shared_ptr<GLImageTexture2D> _objTex{};
 };

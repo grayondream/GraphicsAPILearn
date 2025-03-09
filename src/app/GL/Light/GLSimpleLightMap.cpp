@@ -42,15 +42,22 @@ bool GLSimpleLightMap::init(const HINSTANCE inst, const WindowDesc& param) {
 		ErrorHandle::ExitIfFailed(ret, "Create OpenGL program failed!");
 	}
 	
+	{
+		const auto objImg = StaticCollector::getImagePath() / "dog.jpg";
+		_objTex = std::make_shared<GLImageTexture2D>(objImg.string());
+		const auto valid = _objTex->load().texture()->valid();
+		ExitIfFailed(valid, "Failed to load texture from file {}", objImg.string());
+	}
+
 	createVertexBuffer();
 	//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 	return true;
 }
 
 void GLSimpleLightMap::createVertexBuffer() {
-	unsigned int vbo[2]{}, vao{}, ebo{};
+	unsigned int vbo[3]{}, vao{}, ebo{};
 	glGenVertexArrays(1, &vao);
-	glGenBuffers(2, vbo);
+	glGenBuffers(3, vbo);
 	glGenBuffers(1, &ebo);
 
 	glBindVertexArray(vao);
@@ -69,6 +76,11 @@ void GLSimpleLightMap::createVertexBuffer() {
 		glVertexAttribPointer(2, 4, GL_FLOAT, GL_FALSE, sizeof(Vector4DBase<float>), nullptr);
 		glEnableVertexAttribArray(2); // ����
 
+		glBindBuffer(GL_ARRAY_BUFFER, vbo[2]);
+		glBufferData(GL_ARRAY_BUFFER, _object.uvSize(), _object.uv(), GL_STATIC_DRAW);
+		glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(Vector2DBase<float>), nullptr);
+		glEnableVertexAttribArray(3); // ����
+
 		// ������������
 		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
 		glBufferData(GL_ELEMENT_ARRAY_BUFFER, _object.idxByteSize(), _object.idx(), GL_STATIC_DRAW);
@@ -77,7 +89,7 @@ void GLSimpleLightMap::createVertexBuffer() {
 
 	// ��¼ VBO �� EBO
 	_vao = vao;
-	_vbo[0] = vbo[0], _vbo[1] = vbo[1];
+	_vbo[0] = vbo[0], _vbo[1] = vbo[1], _vbo[2] = vbo[2];
 	_ebo = ebo;
 }
 
@@ -111,6 +123,7 @@ void GLSimpleLightMap::drawScene(const float dt) {
 	);
 	//draw light source
 	{
+		_objTex->texture()->bind(0);
 		glm::mat4 model = glm::mat4(1.0f); // make sure to initialize matrix to identity matrix first
 		model = glm::translate(model, lightPos);
 		model = glm::rotate(model, 0.f, glm::vec3(1.0f, 0.f, 0.f));
