@@ -43,7 +43,7 @@ bool GLSimpleLightMap::init(const HINSTANCE inst, const WindowDesc& param) {
 	}
 	
 	{
-		const auto objImg = StaticCollector::getImagePath() / "dog.jpg";
+		const auto objImg = StaticCollector::getImagePath() / "container2.jpg";
 		_objTex = std::make_shared<GLImageTexture2D>(objImg.string());
 		const auto valid = _objTex->load().texture()->valid();
 		ExitIfFailed(valid, "Failed to load texture from file {}", objImg.string());
@@ -78,8 +78,8 @@ void GLSimpleLightMap::createVertexBuffer() {
 
 		glBindBuffer(GL_ARRAY_BUFFER, vbo[2]);
 		glBufferData(GL_ARRAY_BUFFER, _object.uvSize(), _object.uv(), GL_STATIC_DRAW);
-		glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(Vector2DBase<float>), nullptr);
-		glEnableVertexAttribArray(3); // ����
+		glVertexAttribPointer(3, 2, GL_FLOAT, GL_FALSE, sizeof(Vector2DBase<float>), nullptr);
+		glEnableVertexAttribArray(3);
 
 		// ������������
 		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
@@ -103,6 +103,7 @@ void GLSimpleLightMap::beginDrawScene() {
 
 void GLSimpleLightMap::drawScene(const float dt) {
 	GLApp::drawScene(dt);
+	_objTex->texture()->bind(0);
 	glBindVertexArray(_vao);
 	ImGui::Begin("OpenGL");
 	ImGui::Text("Color Picker with Alpha:");
@@ -123,7 +124,6 @@ void GLSimpleLightMap::drawScene(const float dt) {
 	);
 	//draw light source
 	{
-		_objTex->texture()->bind(0);
 		glm::mat4 model = glm::mat4(1.0f); // make sure to initialize matrix to identity matrix first
 		model = glm::translate(model, lightPos);
 		model = glm::rotate(model, 0.f, glm::vec3(1.0f, 0.f, 0.f));
