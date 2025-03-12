@@ -24,11 +24,14 @@ static inline constexpr int GAME_ENABLE_MSAA = true;
  *  SimpleLight_Specular        Specular light
  *  SimpleLight_Material        Material
  *  SimpleLight_Map             Light Map
+ *  SimpleLight_Source_Direction Direction Light Source
+ *  SimpleLight_Source_Point    Point Light Source
+ *  SimpleLight_Source_Spot     Spot Light Source
  */
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nShowCmd) {
     ConsoleDebugger consoleDebugger{};
     
-    auto app = AppFactory::create(GraphicsType::GL, AppType::SimpleLight_Map);
+    auto app = AppFactory::create(GraphicsType::GL, AppType::SimpleLight_Source_Direction);
     assert(app);
     app->init(hInstance, { {GAME_WIN_WIDTH, GAME_WIN_HEIGHT, "Hello Grapgic!"}, GAME_ENABLE_MSAA});
     return app->run(nShowCmd);

@@ -21,5 +21,9 @@ enum class AppType : int{
     SimpleLight_Specular,
     SimpleLight_Material,
     SimpleLight_Map,
+    SimpleLight_Source_Direction,
+    SimpleLight_Source_Point,
+    SimpleLight_Source_Spot,
+    SimpleLight_Source_Flash,
 };
 

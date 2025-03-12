@@ -1,0 +1,268 @@
+#include "GLLightSourceDirection.hpp"
+#include "Native/GL/GLProgram.hpp"
+#include "Config/StaticCollectorPredefined.hpp"
+#include "EH/ErrorHandle.hpp"
+#include "glad/glad.h"
+#include "Native/GL/GLImageTexture2D.hpp"
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/type_ptr.hpp>
+#include "Base/Log.hpp"
+#include "imgui.h"
+
+using namespace ErrorHandle;
+
+GLLightSourceDirection::~GLLightSourceDirection() {
+	if (_vao != 0) {
+		glDeleteVertexArrays(1, &_vao);
+		glDeleteBuffers(2, _vbo);
+		glDeleteBuffers(1, &_ebo);
+	}
+}
+
+bool GLLightSourceDirection::init(const HINSTANCE inst, const WindowDesc& param) {
+	if (!GLApp::init(inst, param)) {
+		return false;
+	}
+	
+	_camera = Camera(glm::vec3(0.0f, 0.0f, 6.0f));
+	glViewport(0, 0, _attribute.winAttr.width, _attribute.winAttr.height);
+	const auto shaderDir = StaticCollector::getGLShaderPath() / "Light";
+	{
+		const auto vfile = shaderDir / "LightSource" / "light.vert";
+		const auto ffile = shaderDir / "LightSource" / "light.frag";
+		auto ret = _lightProgram.init(vfile.string(), ffile.string());
+		ErrorHandle::ExitIfFailed(ret, "Create OpenGL program failed!");
+	}
+
+	{
+		const auto vfile = shaderDir / "LightSource" / "object.vert";
+		const auto ffile = shaderDir / "LightSource" / "object.frag";
+		auto ret = _targetProgram.init(vfile.string(), ffile.string());
+		ErrorHandle::ExitIfFailed(ret, "Create OpenGL program failed!");
+	}
+	
+	{
+		const auto objImg = StaticCollector::getImagePath() / "container2.jpg";
+		_objTex = std::make_shared<GLImageTexture2D>(objImg.string());
+		const auto valid = _objTex->load().texture()->valid();
+		ExitIfFailed(valid, "Failed to load texture from file {}", objImg.string());
+	}
+
+	{
+		const auto objImg = StaticCollector::getImagePath() / "container2_specular.jpg";
+		_objBorderTex = std::make_shared<GLImageTexture2D>(objImg.string());
+		const auto valid = _objBorderTex->load().texture()->valid();
+		ExitIfFailed(valid, "Failed to load texture from file {}", objImg.string());
+	}
+
+	createVertexBuffer();
+	//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+	return true;
+}
+
+void GLLightSourceDirection::createVertexBuffer() {
+	unsigned int vbo[3]{}, vao{}, ebo{};
+	glGenVertexArrays(1, &vao);
+	glGenBuffers(3, vbo);
+	glGenBuffers(1, &ebo);
+
+	glBindVertexArray(vao);
+	{
+		glBindBuffer(GL_ARRAY_BUFFER, vbo[0]);
+		glBufferData(GL_ARRAY_BUFFER, _object.byteSize(), _object.toGL().data(), GL_STATIC_DRAW);
+		glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex), nullptr);
+		glEnableVertexAttribArray(0);
+
+		glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)(sizeof(float) * 4));
+		glEnableVertexAttribArray(1);
+
+		// �󶨵ڶ��� VBO�����ö��㷨��
+		glBindBuffer(GL_ARRAY_BUFFER, vbo[1]);
+		glBufferData(GL_ARRAY_BUFFER, _object.normalSize(), _object.normal(), GL_STATIC_DRAW);
+		glVertexAttribPointer(2, 4, GL_FLOAT, GL_FALSE, sizeof(Vector4DBase<float>), nullptr);
+		glEnableVertexAttribArray(2); // ����
+
+		glBindBuffer(GL_ARRAY_BUFFER, vbo[2]);
+		glBufferData(GL_ARRAY_BUFFER, _object.uvSize(), _object.uv(), GL_STATIC_DRAW);
+		glVertexAttribPointer(3, 2, GL_FLOAT, GL_FALSE, sizeof(Vector2DBase<float>), nullptr);
+		glEnableVertexAttribArray(3);
+
+		// ������������
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
+		glBufferData(GL_ELEMENT_ARRAY_BUFFER, _object.idxByteSize(), _object.idx(), GL_STATIC_DRAW);
+	}
+	glBindVertexArray(0);
+
+	// ��¼ VBO �� EBO
+	_vao = vao;
+	_vbo[0] = vbo[0], _vbo[1] = vbo[1], _vbo[2] = vbo[2];
+	_ebo = ebo;
+}
+
+void GLLightSourceDirection::clearColor() {
+	return GLApp::clearColor();
+}
+
+void GLLightSourceDirection::beginDrawScene() {
+	return GLApp::beginDrawScene();
+}
+
+void GLLightSourceDirection::drawScene(const float dt) {
+	GLApp::drawScene(dt);
+	glBindVertexArray(_vao);
+	ImGui::Begin("OpenGL");
+	ImGui::Text("Color Picker with Alpha:");
+	ImGui::ColorEdit4("Color with Alpha", &_lightColor[0]); // ֧�� RGBA
+
+	static int count{ 1 };
+	ImGui::SetNextItemWidth(200);
+	ImGui::SliderInt("Cube Count", &count, 1, 10);
+	ImGui::End();
+	glm::vec3 cubePositions[] = {
+	  glm::vec3(0.0f,  0.0f,  0.0f),
+	  glm::vec3(2.0f,  5.0f, -15.0f),
+	  glm::vec3(-1.5f, -2.2f, -2.5f),
+	  glm::vec3(-3.8f, -2.0f, -12.3f),
+	  glm::vec3(2.4f, -0.4f, -3.5f),
+	  glm::vec3(-1.7f,  3.0f, -7.5f),
+	  glm::vec3(1.3f, -2.0f, -2.5f),
+	  glm::vec3(1.5f,  2.0f, -2.5f),
+	  glm::vec3(1.5f,  0.2f, -1.5f),
+	  glm::vec3(-1.3f,  1.0f, -1.5f)
+	};
+
+	static float curTime = 0;
+	curTime += dt;
+	const auto projection = glm::perspective(glm::radians(_camera.zoom()), aspectRatio(), 0.1f, 100.0f);
+	
+	const auto view = _camera.getViewMatrix();
+	
+	float radius = 5.0f; // 旋转半径
+	glm::vec3 lightPos = glm::vec3(
+		radius * sin(curTime),
+		0.0f,
+		radius * cos(curTime)
+	);
+	//draw light source
+	{
+		glm::mat4 model = glm::mat4(1.0f); // make sure to initialize matrix to identity matrix first
+		model = glm::translate(model, lightPos);
+		model = glm::rotate(model, 0.f, glm::vec3(1.0f, 0.f, 0.f));
+		model = glm::scale(model, glm::vec3(0.2, 0.2, 0.2));
+
+		_lightProgram.use();
+		_lightProgram.update("projection", projection);
+		_lightProgram.update("view", view);
+		_lightProgram.update("lightColor", _lightColor);
+		_lightProgram.update("model", model);
+		glDrawElements(GL_TRIANGLES, _object.idxSize(), GL_UNSIGNED_INT, 0);
+	}
+
+	//draw object
+	{
+
+		for (int i = 0; i < count; i++) {
+			glm::mat4 model = glm::mat4(1.0f); // make sure to initialize matrix to identity matrix first
+			model = glm::translate(model, cubePositions[i]);
+			float angle = 20.0f * (i + 1) * curTime;
+			model = glm::rotate(model, glm::radians(angle), glm::vec3(1.0f, 0.3f, 0.5f));
+
+			_targetProgram.use();
+			_targetProgram.update("projection", projection);
+			_targetProgram.update("view", view);
+			_targetProgram.update("model", model);
+			_targetProgram.update("lightColor", _lightColor);
+			_targetProgram.update("objectColor", glm::vec4(1.0f, 0.5f, 0.31f, 1.0));
+			_targetProgram.update("light.position", glm::vec4(lightPos.x, lightPos.y, lightPos.z, 1.0));
+			const auto camPos = _camera.getAttr().pos;
+			_targetProgram.update("viewPos", glm::vec4(camPos.x, camPos.y, camPos.z, 1.0));
+			_targetProgram.update("material.shininess", 1);
+
+			_objTex->texture()->bind(0);
+			_targetProgram.update("material.diffuse", 0);
+			_objBorderTex->texture()->bind(1);
+			_targetProgram.update("material.specular", 1);
+
+			float v = 0.2f;
+			glm::vec4 diffuseColor = _lightColor * glm::vec4(v * 3); // 降低影响
+			glm::vec4 ambientColor = diffuseColor * glm::vec4(v); // 很低的影响
+			_targetProgram.update("light.ambient", ambientColor);
+			_targetProgram.update("light.diffuse", diffuseColor);
+			_targetProgram.update("light.specular", glm::vec4(v * 3));
+			glDrawElements(GL_TRIANGLES, _object.idxSize(), GL_UNSIGNED_INT, 0);
+		}
+	}
+
+	glBindVertexArray(0);
+}
+
+void GLLightSourceDirection::endDrawScene() {
+	return GLApp::endDrawScene();
+}
+
+void GLLightSourceDirection::onKeyBoardEvent(const UINT msg, const WPARAM wParam, const LPARAM lParam) {
+	switch (msg) {
+	case WM_KEYDOWN:
+		break;
+	case WM_KEYUP:
+		break;
+	case WM_CHAR:
+		const char ch = static_cast<char>(wParam);
+		switch (wParam) {
+		case 'w':
+			_camera.processKeyboardEvent(Camera::Movement::Forward, 0.5); break;
+		case 's':
+			_camera.processKeyboardEvent(Camera::Movement::Backward, 0.5); break;
+		case 'd':
+			_camera.processKeyboardEvent(Camera::Movement::Right, 0.5); break;
+		case 'a':
+			_camera.processKeyboardEvent(Camera::Movement::Left, 0.5); break;
+		}
+		break;
+	}
+
+	return GLApp::onKeyBoardEvent(msg, wParam, lParam);
+}
+
+void GLLightSourceDirection::onMouseDown(const UINT msg, WPARAM btnState, int x, int y) {
+	switch (msg) {
+	case WM_LBUTTONDOWN:
+		_mouseClicked = true; break;
+	}
+	
+	return GLApp::onMouseDown(msg, btnState, x, y);
+}
+
+void GLLightSourceDirection::onMouseUp(const UINT msg, WPARAM btnState, int x, int y) {
+	switch (msg) {
+	case WM_LBUTTONUP:
+		_mouseClicked = false; break;
+	}
+	
+	return GLApp::onMouseUp(msg, btnState, x, y);
+}
+
+void GLLightSourceDirection::onMouseMove(WPARAM btnState, int x, int y) {
+	if (!_mouseClicked) {
+		return GLApp::onMouseMove(btnState, x, y);
+	}
+
+	if (!_clicked) {
+		_clicked = true;
+		_lastPos = { (float)x, (float)y };
+		return GLApp::onMouseMove(btnState, x, y);
+	}
+
+	const float offx = x - _lastPos.x;
+	const float offy = y - _lastPos.y;
+	_camera.processMouseMove(offx, offy);
+	_lastPos = { (float)x, (float)y };
+	return GLApp::onMouseMove(btnState, x, y);
+}
+
+void GLLightSourceDirection::onMouseScroll(const UINT msg, const WPARAM wParam, const LPARAM lParam) {
+	int zDelta = GET_WHEEL_DELTA_WPARAM(wParam);
+	_camera.processMouseScrool(zDelta);
+	return GLApp::onMouseScroll(msg, wParam, lParam);
+}

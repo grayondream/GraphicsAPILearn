@@ -9,6 +9,7 @@
 #include "App/GL/Light/GLSimpleLightSpecular.hpp"
 #include "App/GL/Light/GLSimpleLightMaterial.hpp"
 #include "App/GL/Light/GLSimpleLightMap.hpp"
+#include "App/GL/Light/LightSource/GLLightSourceDirection.hpp"
 
 std::shared_ptr<GLApp> GLAppFactory::create(const AppType type){
 	switch(type){
@@ -34,6 +35,10 @@ std::shared_ptr<GLApp> GLAppFactory::create(const AppType type){
 			return std::make_shared<GLSimpleLightMaterial>();
 		case AppType::SimpleLight_Map:
 			return std::make_shared<GLSimpleLightMap>();
+		case AppType::SimpleLight_Source_Direction:
+			return std::make_shared<GLLightSourceDirection>();
+		default:
+			break;	
 	}
 
 	return nullptr;
