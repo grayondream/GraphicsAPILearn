@@ -9,7 +9,7 @@ uniform int times;
 
 struct Material{
     sampler2D diffuse;
-    vec4 specular;
+    sampler2D specular;
     float shininess;
 };
 
@@ -22,7 +22,7 @@ struct Light{
 
 uniform Light light;
 uniform Material material;
-uniform sampler2D textureSampler;
+
 in vec4 normal;
 in vec4 fragPos;
 in vec4 objOriginColor;
@@ -43,7 +43,7 @@ void main(){
     vec4 reflectDir = reflect(-lightDir, norm);
     float viewValue = max(dot(viewDir, reflectDir), 0.0);
     float spec = pow(max(dot(viewDir, reflectDir), 0.0), material.shininess);
-    vec4 specular = light.specular * (spec * material.specular);
+    vec4 specular = light.specular * spec * vec4(texture(material.specular, textureCoord).rgb, 1.0);
 
     //combination
     vec4 result = ambient + diffuse + specular;

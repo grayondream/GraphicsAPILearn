@@ -44,4 +44,5 @@ private:
 	Point2D _lastPos{0.0, 0.0};
 	glm::vec4 _lightColor{1.0, 1.0, 1.0, 1.0};
 	std::shared_ptr<GLImageTexture2D> _objTex{};
+	std::shared_ptr<GLImageTexture2D> _objBorderTex{};
 };

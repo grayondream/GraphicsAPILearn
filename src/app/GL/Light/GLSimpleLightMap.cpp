@@ -49,6 +49,13 @@ bool GLSimpleLightMap::init(const HINSTANCE inst, const WindowDesc& param) {
 		ExitIfFailed(valid, "Failed to load texture from file {}", objImg.string());
 	}
 
+	{
+		const auto objImg = StaticCollector::getImagePath() / "container2_specular.jpg";
+		_objBorderTex = std::make_shared<GLImageTexture2D>(objImg.string());
+		const auto valid = _objBorderTex->load().texture()->valid();
+		ExitIfFailed(valid, "Failed to load texture from file {}", objImg.string());
+	}
+
 	createVertexBuffer();
 	//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 	return true;
@@ -103,7 +110,6 @@ void GLSimpleLightMap::beginDrawScene() {
 
 void GLSimpleLightMap::drawScene(const float dt) {
 	GLApp::drawScene(dt);
-	_objTex->texture()->bind(0);
 	glBindVertexArray(_vao);
 	ImGui::Begin("OpenGL");
 	ImGui::Text("Color Picker with Alpha:");
@@ -153,10 +159,13 @@ void GLSimpleLightMap::drawScene(const float dt) {
 		_targetProgram.update("light.position", glm::vec4(lightPos.x, lightPos.y, lightPos.z, 1.0));
 		const auto camPos = _camera.getAttr().pos;
 		_targetProgram.update("viewPos", glm::vec4(camPos.x, camPos.y, camPos.z, 1.0));
-		_targetProgram.update("material.ambient", glm::vec4(1.0f, 0.5f, 0.31f, 1.0f));
-		_targetProgram.update("material.diffuse", glm::vec4(1.0f, 0.5f, 0.31f, 1.0f));
-		_targetProgram.update("material.specular", glm::vec4(1, 1, 1, 1.0f));
-		_targetProgram.update("material.shininess", 1.0f);
+		_targetProgram.update("material.shininess", 1);
+
+		_objTex->texture()->bind(0);
+		_targetProgram.update("material.diffuse", 0);
+		_objBorderTex->texture()->bind(1);
+		_targetProgram.update("material.specular", 1);
+
 		float v = 0.2f;
 		glm::vec4 diffuseColor = _lightColor * glm::vec4(v * 3); // 降低影响
 		glm::vec4 ambientColor = diffuseColor * glm::vec4(v); // 很低的影响
