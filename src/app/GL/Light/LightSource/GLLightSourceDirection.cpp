@@ -29,15 +29,15 @@ bool GLLightSourceDirection::init(const HINSTANCE inst, const WindowDesc& param)
 	glViewport(0, 0, _attribute.winAttr.width, _attribute.winAttr.height);
 	const auto shaderDir = StaticCollector::getGLShaderPath() / "Light";
 	{
-		const auto vfile = shaderDir / "LightSource" / "light.vert";
-		const auto ffile = shaderDir / "LightSource" / "light.frag";
+		const auto vfile = shaderDir / "LightSource" / "direction" / "light.vert";
+		const auto ffile = shaderDir / "LightSource" / "direction" / "light.frag";
 		auto ret = _lightProgram.init(vfile.string(), ffile.string());
 		ErrorHandle::ExitIfFailed(ret, "Create OpenGL program failed!");
 	}
 
 	{
-		const auto vfile = shaderDir / "LightSource" / "object.vert";
-		const auto ffile = shaderDir / "LightSource" / "object.frag";
+		const auto vfile = shaderDir / "LightSource" / "direction" / "object.vert";
+		const auto ffile = shaderDir / "LightSource" / "direction" / "object.frag";
 		auto ret = _targetProgram.init(vfile.string(), ffile.string());
 		ErrorHandle::ExitIfFailed(ret, "Create OpenGL program failed!");
 	}
@@ -165,7 +165,7 @@ void GLLightSourceDirection::drawScene(const float dt) {
 		for (int i = 0; i < count; i++) {
 			glm::mat4 model = glm::mat4(1.0f); // make sure to initialize matrix to identity matrix first
 			model = glm::translate(model, cubePositions[i]);
-			float angle = 20.0f * (i + 1) * curTime;
+			float angle = 0;// 20.0f * (i + 1) * curTime;
 			model = glm::rotate(model, glm::radians(angle), glm::vec3(1.0f, 0.3f, 0.5f));
 
 			_targetProgram.use();
@@ -174,7 +174,7 @@ void GLLightSourceDirection::drawScene(const float dt) {
 			_targetProgram.update("model", model);
 			_targetProgram.update("lightColor", _lightColor);
 			_targetProgram.update("objectColor", glm::vec4(1.0f, 0.5f, 0.31f, 1.0));
-			_targetProgram.update("light.position", glm::vec4(lightPos.x, lightPos.y, lightPos.z, 1.0));
+			_targetProgram.update("light.direction", glm::vec4(10, 10, 10, 1.0));
 			const auto camPos = _camera.getAttr().pos;
 			_targetProgram.update("viewPos", glm::vec4(camPos.x, camPos.y, camPos.z, 1.0));
 			_targetProgram.update("material.shininess", 1);

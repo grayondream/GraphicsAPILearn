@@ -14,7 +14,7 @@ struct Material{
 };
 
 struct Light{
-    vec4 position;
+    vec4 direction;
     vec4 ambient;
     vec4 diffuse;
     vec4 specular;
@@ -34,7 +34,7 @@ void main(){
 
     // diffuse 
     vec4 norm = normalize(normal);
-    vec4 lightDir = normalize(light.position - fragPos);
+    vec4 lightDir = normalize(-light.direction);
     float diff = max(dot(norm, lightDir), 0.0);
     vec4 diffuse = light.diffuse * diff * vec4(texture(material.diffuse, textureCoord).rgb, 1.0);
     
