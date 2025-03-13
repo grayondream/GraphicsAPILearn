@@ -1,6 +1,6 @@
 #include "GLSimpleLightGlobalIllum.hpp"
 #include "Native/GL/GLProgram.hpp"
-#include "Config/StaticCollectorPredefined.hpp"
+#include "Config/StaticCollector.hpp"
 #include "EH/ErrorHandle.hpp"
 #include "glad/glad.h"
 #include "Native/GL/GLImageTexture2D.hpp"
@@ -55,7 +55,7 @@ void GLSimpleLightGlobalIllum::createVertexBuffer() {
 
 	glBindVertexArray(vao);
 	{
-		// °ó¶¨µÚÒ»¸ö VBO£¬ÉèÖÃ¶¥µãÎ»ÖÃ
+		// ï¿½ó¶¨µï¿½Ò»ï¿½ï¿½ VBOï¿½ï¿½ï¿½ï¿½ï¿½Ã¶ï¿½ï¿½ï¿½Î»ï¿½ï¿½
 		glBindBuffer(GL_ARRAY_BUFFER, vbo[0]);
 		glBufferData(GL_ARRAY_BUFFER, shape.byteSize(), shape.toGL().data(), GL_STATIC_DRAW);
 		glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex), nullptr);
@@ -64,19 +64,19 @@ void GLSimpleLightGlobalIllum::createVertexBuffer() {
 		glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)(sizeof(float) * 4));
 		glEnableVertexAttribArray(1);
 
-		// °ó¶¨µÚ¶þ¸ö VBO£¬ÉèÖÃ¶¥µã·¨Ïß
+		// ï¿½ó¶¨µÚ¶ï¿½ï¿½ï¿½ VBOï¿½ï¿½ï¿½ï¿½ï¿½Ã¶ï¿½ï¿½ã·¨ï¿½ï¿½
 		glBindBuffer(GL_ARRAY_BUFFER, vbo[1]);
 		glBufferData(GL_ARRAY_BUFFER, shape.normalSize(), shape.normal(), GL_STATIC_DRAW);
 		glVertexAttribPointer(2, 4, GL_FLOAT, GL_FALSE, sizeof(Vector4DBase<float>), nullptr);
-		glEnableVertexAttribArray(2); // ·¨Ïß
+		glEnableVertexAttribArray(2); // ï¿½ï¿½ï¿½ï¿½
 
-		// °ó¶¨Ë÷Òý»º³åÇø
+		// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
 		glBufferData(GL_ELEMENT_ARRAY_BUFFER, shape.idxByteSize(), shape.idx(), GL_STATIC_DRAW);
 	}
 	glBindVertexArray(0);
 
-	// ¼ÇÂ¼ VBO ºÍ EBO
+	// ï¿½ï¿½Â¼ VBO ï¿½ï¿½ EBO
 	_vao = vao;
 	_vbo[0] = vbo[0], _vbo[1] = vbo[1];
 	_ebo = ebo;
@@ -95,7 +95,7 @@ void GLSimpleLightGlobalIllum::drawScene(const float dt) {
 	glBindVertexArray(_vao);
 	ImGui::Begin("OpenGL");
 	ImGui::Text("Color Picker with Alpha:");
-	ImGui::ColorEdit4("Color with Alpha", &_lightColor[0]); // Ö§³Ö RGBA
+	ImGui::ColorEdit4("Color with Alpha", &_lightColor[0]); // Ö§ï¿½ï¿½ RGBA
 	ImGui::End();
 
 	static float curTime = 0;

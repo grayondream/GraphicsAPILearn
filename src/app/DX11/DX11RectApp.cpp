@@ -1,7 +1,7 @@
 #include "DX11RectApp.hpp"
 #include "Base/DXBaseConexpr.hpp"
 #include "EH/ErrorHandle.hpp"
-#include "Config/StaticCollectorPredefined.hpp"
+#include "Config/StaticCollector.hpp"
 #include <Base/MathHelper.h>
 #include <filesystem>
 #include "Geometry/Rect.hpp"

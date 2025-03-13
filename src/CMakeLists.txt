@@ -96,3 +96,5 @@ endif()
 find_package(spdlog CONFIG REQUIRED)
 target_link_libraries(${PROJECT_NAME} spdlog::spdlog_header_only)
 target_include_directories(${PROJECT_NAME} PRIVATE ${SPDLOG_INCLUDE_DIR})
+
+include(${RENDER_SOURCE_PATH}/build_post.cmake)

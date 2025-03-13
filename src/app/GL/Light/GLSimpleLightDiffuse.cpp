@@ -1,6 +1,6 @@
 #include "GLSimpleLightDiffuse.hpp"
 #include "Native/GL/GLProgram.hpp"
-#include "Config/StaticCollectorPredefined.hpp"
+#include "Config/StaticCollector.hpp"
 #include "EH/ErrorHandle.hpp"
 #include "glad/glad.h"
 #include "Native/GL/GLImageTexture2D.hpp"
