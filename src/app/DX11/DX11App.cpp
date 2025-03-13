@@ -17,7 +17,6 @@
 #include <backends/imgui_impl_win32.h>
 
 namespace eh = ErrorHandle;
-using namespace base::log;
 using namespace Utils;
 
 DX11App::DX11App() {

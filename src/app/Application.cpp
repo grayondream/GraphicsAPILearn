@@ -14,7 +14,6 @@
 #include <backends/imgui_impl_win32.h>
 
 namespace eh = ErrorHandle;
-using namespace base::log;
 
 Application::Application() {
     

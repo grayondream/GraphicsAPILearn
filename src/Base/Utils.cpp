@@ -3,8 +3,7 @@
 #include "Base/GameTimer.hpp"
 #include "Base/Log.hpp"
 namespace Utils{
-    namespace eh = ErrorHandle;
-    using namespace base::log;
+namespace eh = ErrorHandle;
 std::tuple<ComPtr<ID3D11Device>, ComPtr<ID3D11DeviceContext>, ComPtr<IDXGISwapChain>> CreateD3DDeviceAndtSwapChain(const HWND winId, const int width, const int height) {
     ComPtr<ID3D11Device> pdevice{};
     ComPtr<ID3D11DeviceContext> pcontext{}; 

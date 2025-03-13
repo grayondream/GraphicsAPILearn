@@ -92,3 +92,7 @@ if(${ENABLE_DX12})
     message("Graphic API Enabel D3D12")
     target_compile_definitions(${PROJECT_NAME} PRIVATE ENABLE_DX12=1)
 endif()
+
+find_package(spdlog CONFIG REQUIRED)
+target_link_libraries(${PROJECT_NAME} spdlog::spdlog_header_only)
+target_include_directories(${PROJECT_NAME} PRIVATE ${SPDLOG_INCLUDE_DIR})
