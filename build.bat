@@ -7,6 +7,6 @@ set "rootDir=%scriptPath:~0,-1%"
 echo 当前脚本的根目录是: %rootDir%
 
 cmake -S %rootDir% -B build ^
--DCMAKE_TOOLCHAIN_FILE="B:/Application/vcpkg/vcpkg/scripts/buildsystems/vcpkg.cmake" ^
--DDX_SDK_ROOT="C:\Program Files (x86)\Microsoft DirectX SDK (June 2010)" ^
--DWINDOWS_SDK_ROOT="C:\Program Files (x86)\Windows Kits\10\Include\10.0.22621.0" 
+-DCMAKE_TOOLCHAIN_FILE="%VCPKG_ROOT%/scripts/buildsystems/vcpkg.cmake" ^
+-DDX_SDK_ROOT="%DIRECTX_SDK_ROOT%" ^
+-DWINDOWS_SDK_ROOT="%WINDOWS_SDK_ROOT%"
