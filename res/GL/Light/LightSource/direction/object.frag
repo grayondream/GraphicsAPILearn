@@ -30,22 +30,22 @@ in vec2 textureCoord;
 
 void main(){
     // ambient
-    vec4 ambient = light.ambient * vec4(texture(material.diffuse, textureCoord).rgb, 1.0);
+    vec3 ambient = light.ambient.rgb * texture(material.diffuse, textureCoord).rgb;
 
     // diffuse 
-    vec4 norm = normalize(normal);
-    vec4 lightDir = normalize(-light.direction);
+    vec3 norm = normalize(normal.rgb);
+    vec3 lightDir = normalize(-light.direction.rgb);
     float diff = max(dot(norm, lightDir), 0.0);
-    vec4 diffuse = light.diffuse * diff * vec4(texture(material.diffuse, textureCoord).rgb, 1.0);
+    vec3 diffuse = light.diffuse.rgb * diff * texture(material.diffuse, textureCoord).rgb;
     
     //specular
-    vec4 viewDir = normalize(viewPos - fragPos);
-    vec4 reflectDir = reflect(-lightDir, norm);
+    vec3 viewDir = normalize(viewPos.rgb - fragPos.rgb);
+    vec3 reflectDir = reflect(-lightDir, norm);
     float viewValue = max(dot(viewDir, reflectDir), 0.0);
     float spec = pow(max(dot(viewDir, reflectDir), 0.0), material.shininess);
-    vec4 specular = light.specular * spec * vec4(texture(material.specular, textureCoord).rgb, 1.0);
+    vec3 specular = light.specular.rgb * spec * texture(material.specular, textureCoord).rgb;
 
     //combination
-    vec4 result = ambient + diffuse + specular;
-    FragColor = result;
+    vec3 result = ambient + diffuse + specular;
+    FragColor = vec4(result, 1.0);
 }

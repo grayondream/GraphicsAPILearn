@@ -25,7 +25,7 @@ bool GLLightSourceDirection::init(const HINSTANCE inst, const WindowDesc& param)
 		return false;
 	}
 	
-	_camera = Camera(glm::vec3(0.0f, 0.0f, 6.0f));
+	_camera = Camera(glm::vec3(0.0f, 0.0f, 5.0f));
 	glViewport(0, 0, _attribute.winAttr.width, _attribute.winAttr.height);
 	const auto shaderDir = StaticCollector::getGLShaderPath() / "Light";
 	{
@@ -117,20 +117,27 @@ void GLLightSourceDirection::drawScene(const float dt) {
 
 	static int count{ 1 };
 	ImGui::SetNextItemWidth(200);
-	ImGui::SliderInt("Cube Count", &count, 1, 10);
+	int cnt = 125;
+	ImGui::SliderInt("Cube Count", &count, 1, cnt);
 	ImGui::End();
-	glm::vec3 cubePositions[] = {
-	  glm::vec3(0.0f,  0.0f,  0.0f),
-	  glm::vec3(2.0f,  5.0f, -15.0f),
-	  glm::vec3(-1.5f, -2.2f, -2.5f),
-	  glm::vec3(-3.8f, -2.0f, -12.3f),
-	  glm::vec3(2.4f, -0.4f, -3.5f),
-	  glm::vec3(-1.7f,  3.0f, -7.5f),
-	  glm::vec3(1.3f, -2.0f, -2.5f),
-	  glm::vec3(1.5f,  2.0f, -2.5f),
-	  glm::vec3(1.5f,  0.2f, -1.5f),
-	  glm::vec3(-1.3f,  1.0f, -1.5f)
-	};
+	std::vector<glm::vec3> cubePositions;
+	cubePositions.reserve(cnt);
+	int gridSize = 5; // 5x5x5 = 125
+	float spacing = 2.0f;
+	glm::vec3 center(0.0f, 0.0f, 0.0f);
+
+	for (int i = 0; i < gridSize; i++) {
+		for (int j = 0; j < gridSize; j++) {
+			for (int k = 0; k < gridSize; k++) {
+				glm::vec3 position(
+					center.x + (i - gridSize / 2) * spacing,
+					center.y + (j - gridSize / 2) * spacing,
+					center.z + (k - gridSize / 2) * spacing - 10
+				);
+				cubePositions.push_back(position);
+			}
+		}
+	}
 
 	static float curTime = 0;
 	curTime += dt;
@@ -161,20 +168,13 @@ void GLLightSourceDirection::drawScene(const float dt) {
 
 	//draw object
 	{
-
-		for (int i = 0; i < count; i++) {
-			glm::mat4 model = glm::mat4(1.0f); // make sure to initialize matrix to identity matrix first
-			model = glm::translate(model, cubePositions[i]);
-			float angle = 0;// 20.0f * (i + 1) * curTime;
-			model = glm::rotate(model, glm::radians(angle), glm::vec3(1.0f, 0.3f, 0.5f));
-
+		{
 			_targetProgram.use();
 			_targetProgram.update("projection", projection);
 			_targetProgram.update("view", view);
-			_targetProgram.update("model", model);
 			_targetProgram.update("lightColor", _lightColor);
 			_targetProgram.update("objectColor", glm::vec4(1.0f, 0.5f, 0.31f, 1.0));
-			_targetProgram.update("light.direction", glm::vec4(10, 10, 10, 1.0));
+			_targetProgram.update("light.direction", glm::vec4(-0.2f, -1.0f, -0.3f, 1.0f));
 			const auto camPos = _camera.getAttr().pos;
 			_targetProgram.update("viewPos", glm::vec4(camPos.x, camPos.y, camPos.z, 1.0));
 			_targetProgram.update("material.shininess", 1);
@@ -184,12 +184,20 @@ void GLLightSourceDirection::drawScene(const float dt) {
 			_objBorderTex->texture()->bind(1);
 			_targetProgram.update("material.specular", 1);
 
-			float v = 0.2f;
-			glm::vec4 diffuseColor = _lightColor * glm::vec4(v * 3); // 降低影响
-			glm::vec4 ambientColor = diffuseColor * glm::vec4(v); // 很低的影响
+			glm::vec4 diffuseColor = glm::vec4(0.5); // 降低影响
+			glm::vec4 ambientColor = glm::vec4(0.2f);
 			_targetProgram.update("light.ambient", ambientColor);
 			_targetProgram.update("light.diffuse", diffuseColor);
-			_targetProgram.update("light.specular", glm::vec4(v * 3));
+			_targetProgram.update("light.specular", glm::vec4(1.0f));
+		}
+
+		for (int i = 0; i < count; i++) {
+			glm::mat4 model = glm::mat4(1.0f); // make sure to initialize matrix to identity matrix first
+			model = glm::translate(model, cubePositions[i]);
+			float angle =  20.0f * curTime;
+			model = glm::rotate(model, glm::radians(angle), glm::vec3(1.0f, 0.3f, 0.5f));
+			_targetProgram.update("model", model);
+
 			glDrawElements(GL_TRIANGLES, _object.idxSize(), GL_UNSIGNED_INT, 0);
 		}
 	}
