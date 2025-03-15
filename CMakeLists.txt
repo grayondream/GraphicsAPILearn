@@ -15,8 +15,8 @@ endif()
 
 message(STATUS "Windows SDK ROOT: ${WINDOWS_SDK_ROOT}")
 
-set(RENDER_SOURCE_PATH "${CMAKE_SOURCE_DIR}/src" CACHE STRING "all source file's path")
-set(RENDER_CMAKE_PATH "${CMAKE_SOURCE_DIR}/cmake" CACHE STRING "all cmake tool file's path")
+set(RENDER_SOURCE_PATH "${CMAKE_SOURCE_DIR}/Src" CACHE STRING "all source file's path")
+set(RENDER_CMAKE_PATH "${CMAKE_SOURCE_DIR}/Cmake" CACHE STRING "all cmake tool file's path")
 set(RENDER_3PARTY_PATH "${CMAKE_SOURCE_DIR}/3party" CACHE STRING "all 3party tool file's path")
 
 
@@ -34,7 +34,7 @@ if(ENABLE_DX11 OR ENABLE_DX12)
 endif()
 
 
-include(${RENDER_CMAKE_PATH}/init.cmake)
+include(${RENDER_CMAKE_PATH}/Init.cmake)
 
 set(PROJECT_NAME renderLearn)
 

@@ -97,5 +97,5 @@ find_package(spdlog CONFIG REQUIRED)
 target_link_libraries(${PROJECT_NAME} spdlog::spdlog_header_only)
 target_include_directories(${PROJECT_NAME} PRIVATE ${SPDLOG_INCLUDE_DIR})
 
-target_compile_definitions(${PROJECT_NAME} PRIVATE RESOURCE_DIR="${CMAKE_SOURCE_DIR}/res")
-include(${RENDER_SOURCE_PATH}/build_post.cmake)
+target_compile_definitions(${PROJECT_NAME} PRIVATE RESOURCE_DIR="${CMAKE_SOURCE_DIR}/Res")
+include(${RENDER_SOURCE_PATH}/BuildPost.cmake)

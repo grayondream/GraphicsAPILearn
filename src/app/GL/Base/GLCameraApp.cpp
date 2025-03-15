@@ -27,8 +27,8 @@ bool GLCameraApp::init(const HINSTANCE inst, const WindowDesc& param) {
 	
 	_camera = Camera(glm::vec3(0.0f, 0.0f, 3.0f));
 	glViewport(0, 0, _attribute.winAttr.width, _attribute.winAttr.height);
-	const auto vfile = StaticCollector::getGLShaderPath() / "Base" / "cube.vert";
-	const auto ffile = StaticCollector::getGLShaderPath() / "Base" / "cube.frag";
+	const auto vfile = StaticCollector::getGLShaderPath() / "Base" / "Cube.vert";
+	const auto ffile = StaticCollector::getGLShaderPath() / "Base" / "Cube.frag";
 	auto ret = _program.init(vfile.string(), ffile.string());
 	ErrorHandle::ExitIfFailed(ret, "Create OpenGL program failed!");
 	const auto imgFile = StaticCollector::getImagePath() / "dog.jpg";

@@ -8,9 +8,9 @@
 #include "Geometry/Sphere.hpp"
 
 class GLImageTexture2D;
-class GLSimpleLightGlobalIllum : public GLApp {
+class GLSimpleLightAmbination : public GLApp {
 public:
-	virtual ~GLSimpleLightGlobalIllum();
+	virtual ~GLSimpleLightAmbination();
 public:
 	virtual bool init(const HINSTANCE, const WindowDesc& param) override;
 

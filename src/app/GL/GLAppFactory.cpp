@@ -4,7 +4,7 @@
 #include "App/GL/Base/GLSimpleTextureApp.hpp"
 #include "App/GL/Base/GLCubeApp.hpp"
 #include "App/GL/Base/GLCameraApp.hpp"
-#include "App/GL/Light/GLSimpleLightGlobalIllum.hpp"
+#include "App/GL/Light/GLSimpleLightAmbination.hpp"
 #include "App/GL/Light/GLSimpleLightDiffuse.hpp"
 #include "App/GL/Light/GLSimpleLightSpecular.hpp"
 #include "App/GL/Light/GLSimpleLightMaterial.hpp"
@@ -28,7 +28,7 @@ std::shared_ptr<GLApp> GLAppFactory::create(const AppType type){
 		case AppType::Camera:
 			return std::make_shared<GLCameraApp>();
 		case AppType::SimpleLight_Ambination:
-			return std::make_shared<GLSimpleLightGlobalIllum>();
+			return std::make_shared<GLSimpleLightAmbination>();
 		case AppType::SimpleLight_Diffuse:
 			return std::make_shared<GLSimpleLightDiffuse>();
 		case AppType::SimpleLight_Specular:

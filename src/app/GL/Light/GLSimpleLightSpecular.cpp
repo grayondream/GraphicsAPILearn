@@ -29,15 +29,15 @@ bool GLSimpleLightSpecular::init(const HINSTANCE inst, const WindowDesc& param) 
 	glViewport(0, 0, _attribute.winAttr.width, _attribute.winAttr.height);
 	const auto shaderDir = StaticCollector::getGLShaderPath() / "Light";
 	{
-		const auto vfile = shaderDir / "specular" / "light.vert";
-		const auto ffile = shaderDir / "specular" / "light.frag";
+		const auto vfile = shaderDir / "Specular" / "Light.vert";
+		const auto ffile = shaderDir / "Specular" / "Light.frag";
 		auto ret = _lightProgram.init(vfile.string(), ffile.string());
 		ErrorHandle::ExitIfFailed(ret, "Create OpenGL program failed!");
 	}
 
 	{
-		const auto vfile = shaderDir / "specular" / "object.vert";
-		const auto ffile = shaderDir / "specular" / "object.frag";
+		const auto vfile = shaderDir / "Specular" / "Object.vert";
+		const auto ffile = shaderDir / "Specular" / "Object.frag";
 		auto ret = _targetProgram.init(vfile.string(), ffile.string());
 		ErrorHandle::ExitIfFailed(ret, "Create OpenGL program failed!");
 	}

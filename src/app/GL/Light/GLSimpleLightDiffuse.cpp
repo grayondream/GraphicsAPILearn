@@ -29,15 +29,15 @@ bool GLSimpleLightDiffuse::init(const HINSTANCE inst, const WindowDesc& param) {
 	glViewport(0, 0, _attribute.winAttr.width, _attribute.winAttr.height);
 	const auto shaderDir = StaticCollector::getGLShaderPath() / "Light";
 	{
-		const auto vfile = shaderDir / "diffuse" / "light.vert";
-		const auto ffile = shaderDir / "diffuse" / "light.frag";
+		const auto vfile = shaderDir / "Diffuse" / "Light.vert";
+		const auto ffile = shaderDir / "Diffuse" / "Light.frag";
 		auto ret = _lightProgram.init(vfile.string(), ffile.string());
 		ErrorHandle::ExitIfFailed(ret, "Create OpenGL program failed!");
 	}
 
 	{
-		const auto vfile = shaderDir / "diffuse" / "object.vert";
-		const auto ffile = shaderDir / "diffuse" / "object.frag";
+		const auto vfile = shaderDir / "Diffuse" / "Object.vert";
+		const auto ffile = shaderDir / "Diffuse" / "Object.frag";
 		auto ret = _targetProgram.init(vfile.string(), ffile.string());
 		ErrorHandle::ExitIfFailed(ret, "Create OpenGL program failed!");
 	}

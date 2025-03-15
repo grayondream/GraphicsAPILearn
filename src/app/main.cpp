@@ -19,7 +19,7 @@ static inline constexpr int GAME_ENABLE_MSAA = true;
  *  SimpleTexture                   read a image into texture and draw it on a rect by OpenGL
  *  Cube                            draw a cube by OpenGL
  *  Camera                          create a virtual camera
- *  SimpleLight_Ambinatioin         Global Illumination
+ *  SimpleLight_Ambination          Global Illumination
  *  SimpleLight_Diffuse             diffuse light
  *  SimpleLight_Specular            Specular light
  *  SimpleLight_Material            Material

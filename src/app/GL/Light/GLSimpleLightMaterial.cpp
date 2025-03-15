@@ -29,15 +29,15 @@ bool GLSimpleLightMaterial::init(const HINSTANCE inst, const WindowDesc& param) 
 	glViewport(0, 0, _attribute.winAttr.width, _attribute.winAttr.height);
 	const auto shaderDir = StaticCollector::getGLShaderPath() / "Light";
 	{
-		const auto vfile = shaderDir / "material" / "light.vert";
-		const auto ffile = shaderDir / "material" / "light.frag";
+		const auto vfile = shaderDir / "Material" / "Light.vert";
+		const auto ffile = shaderDir / "Material" / "Light.frag";
 		auto ret = _lightProgram.init(vfile.string(), ffile.string());
 		ErrorHandle::ExitIfFailed(ret, "Create OpenGL program failed!");
 	}
 
 	{
-		const auto vfile = shaderDir / "material" / "object.vert";
-		const auto ffile = shaderDir / "material" / "object.frag";
+		const auto vfile = shaderDir / "Material" / "Object.vert";
+		const auto ffile = shaderDir / "Material" / "Object.frag";
 		auto ret = _targetProgram.init(vfile.string(), ffile.string());
 		ErrorHandle::ExitIfFailed(ret, "Create OpenGL program failed!");
 	}

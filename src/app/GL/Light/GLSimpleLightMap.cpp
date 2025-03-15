@@ -29,15 +29,15 @@ bool GLSimpleLightMap::init(const HINSTANCE inst, const WindowDesc& param) {
 	glViewport(0, 0, _attribute.winAttr.width, _attribute.winAttr.height);
 	const auto shaderDir = StaticCollector::getGLShaderPath() / "Light";
 	{
-		const auto vfile = shaderDir / "light_map" / "light.vert";
-		const auto ffile = shaderDir / "light_map" / "light.frag";
+		const auto vfile = shaderDir / "LightMap" / "Light.vert";
+		const auto ffile = shaderDir / "LightMap" / "Light.frag";
 		auto ret = _lightProgram.init(vfile.string(), ffile.string());
 		ErrorHandle::ExitIfFailed(ret, "Create OpenGL program failed!");
 	}
 
 	{
-		const auto vfile = shaderDir / "light_map" / "object.vert";
-		const auto ffile = shaderDir / "light_map" / "object.frag";
+		const auto vfile = shaderDir / "LightMap" / "Object.vert";
+		const auto ffile = shaderDir / "LightMap" / "Object.frag";
 		auto ret = _targetProgram.init(vfile.string(), ffile.string());
 		ErrorHandle::ExitIfFailed(ret, "Create OpenGL program failed!");
 	}
