@@ -11,6 +11,7 @@
 #include "App/GL/Light/GLSimpleLightMap.hpp"
 #include "App/GL/Light/LightSource/GLLightSourceDirection.hpp"
 #include "App/GL/Light/LightSource/GLLightSourcePoint.hpp"
+#include "App/GL/Light/LightSource/GLLightSourceSpot.hpp"
 
 std::shared_ptr<GLApp> GLAppFactory::create(const AppType type){
 	switch(type){
@@ -40,6 +41,8 @@ std::shared_ptr<GLApp> GLAppFactory::create(const AppType type){
 			return std::make_shared<GLLightSourceDirection>();
 		case AppType::SimpleLight_Source_Point:
 			return std::make_shared<GLLightSourcePoint>();
+		case AppType::SimpleLight_Source_Spot:
+			return std::make_shared<GLLightSourceSpot>();
 		default:
 			break;	
 	}
