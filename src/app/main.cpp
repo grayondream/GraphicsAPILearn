@@ -5,6 +5,7 @@
 #include "Base/Log.hpp"
 #include "App/AppFactory.hpp"
 #include "App/IApplication.hpp"
+#include "Util/EnumUtil.hpp"
 
 static inline constexpr int GAME_WIN_WIDTH = 720;
 static inline constexpr int GAME_WIN_HEIGHT = 480;
@@ -29,10 +30,17 @@ static inline constexpr int GAME_ENABLE_MSAA = true;
  *  SimpleLight_Source_Spot         Spot Light Source
  *  SimpleLight_Source_Mult         Multiple Light Source
  */
+
+namespace EnumUtil = Utils::Enum;
+
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nShowCmd) {
     ConsoleDebugger consoleDebugger{};
     
-    auto app = AppFactory::create(GraphicsType::GL, AppType::SimpleLight_Source_Mult);
+    auto type = AppType::SimpleLight_Source_Mult;
+    auto api = GraphicsType::GL;
+    LOGI("Start Graphics Learn!!!");
+    LOGI("Select {} Application, Render App With {} API", EnumUtil::EnumName(type), EnumUtil::EnumName(api));
+    auto app = AppFactory::create(api, type);
     assert(app);
     app->init(hInstance, { {GAME_WIN_WIDTH, GAME_WIN_HEIGHT, "Hello Grapgic!"}, GAME_ENABLE_MSAA});
     return app->run(nShowCmd);
