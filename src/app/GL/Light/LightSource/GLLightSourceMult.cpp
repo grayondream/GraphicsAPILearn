@@ -137,77 +137,74 @@ void GLLightSourceMult::drawUI() {
 	ImGui::End();
 }
 
-void GLLightSourceMult::drawScene(const float dt) {
-	GLApp::drawScene(dt);
-	drawUI();
-	glBindVertexArray(_vao);
+void GLLightSourceMult::drawLight(const glm::mat4& proj, const glm::vec3& pos) {
+	auto view = _camera.getViewMatrix();
+	glm::mat4 model = glm::mat4(1.0f); // make sure to initialize matrix to identity matrix first
+	model = glm::translate(model, pos);
+	model = glm::rotate(model, 0.f, glm::vec3(1.0f, 0.f, 0.f));
+	model = glm::scale(model, glm::vec3(0.2, 0.2, 0.2));
+
+	_lightProgram.use();
+	_lightProgram.update("projection", proj);
+	_lightProgram.update("view", view);
+	_lightProgram.update("lightColor", _lightColor);
+	_lightProgram.update("model", model);
+	glDrawElements(GL_TRIANGLES, _object.idxSize(), GL_UNSIGNED_INT, 0);
+}
+
+void GLLightSourceMult::drawObjects(const glm::mat4& proj, const float curTime, const glm::vec3& pos) {
+	auto view = _camera.getViewMatrix();
 	int gridSize = 5; // 5x5x5 = 125
 	float spacing = 2.0f;
 	glm::vec3 center(0.0f, 0.0f, 0.0f);
 	std::vector<glm::vec3> cubePositions = GenerateCubePositions(center, gridSize, spacing);
+	_targetProgram.use();
+	_targetProgram.update("projection", proj);
+	_targetProgram.update("view", view);
+	const auto camPos = _camera.getAttr().pos;
+	_targetProgram.update("viewPos", glm::vec4(camPos.x, camPos.y, camPos.z, 1.0));
+	_targetProgram.update("material.shininess", 1);
 
+	_objTex->texture()->bind(0);
+	_targetProgram.update("material.diffuse", 0);
+	_objBorderTex->texture()->bind(1);
+	_targetProgram.update("material.specular", 1);
+
+	glm::vec4 diffuseColor = glm::vec4(0.5); // 降低影响
+	glm::vec4 ambientColor = glm::vec4(0.2f);
+	_targetProgram.update("light.ambient", ambientColor);
+	_targetProgram.update("light.diffuse", diffuseColor);
+	_targetProgram.update("light.specular", glm::vec4(1.0f));
+	_targetProgram.update("light.constant", 1.0f);
+	_targetProgram.update("light.linear", 0.09f);
+	_targetProgram.update("light.quadratic", 0.032f);
+	_targetProgram.update("light.cutOff", glm::cos(glm::radians(12.5f)));
+	auto attr = _camera.getAttr();
+	_targetProgram.update("light.direction", glm::vec4(attr.front, 1.0));
+	_targetProgram.update("light.position", glm::vec4(pos, 1.0));
+	_targetProgram.update("light.outerCutOff", glm::cos(glm::radians(17.5f)));
+
+	for (int i = 0; i < count; i++) {
+		glm::mat4 model = glm::mat4(1.0f); // make sure to initialize matrix to identity matrix first
+		model = glm::translate(model, cubePositions[i]);
+		float angle = 20.0f * curTime;
+		model = glm::rotate(model, glm::radians(angle), glm::vec3(1.0f, 0.3f, 0.5f));
+		_targetProgram.update("model", model);
+
+		glDrawElements(GL_TRIANGLES, _object.idxSize(), GL_UNSIGNED_INT, 0);
+	}
+}
+
+void GLLightSourceMult::drawScene(const float dt) {
+	GLApp::drawScene(dt);
+	drawUI();
+	glBindVertexArray(_vao);
 	static float curTime = 0;
 	curTime += dt;
 	const auto projection = glm::perspective(glm::radians(_camera.zoom()), aspectRatio(), 0.1f, 100.0f);
-	const auto view = _camera.getViewMatrix();
-	float radius = 5.0f; // 旋转半径
-	glm::vec3 lightPos = glm::vec3(radius * sin(curTime),0.0f,radius * cos(curTime));
-	//draw light source
-	{
-		glm::mat4 model = glm::mat4(1.0f); // make sure to initialize matrix to identity matrix first
-		model = glm::translate(model, lightPos);
-		model = glm::rotate(model, 0.f, glm::vec3(1.0f, 0.f, 0.f));
-		model = glm::scale(model, glm::vec3(0.2, 0.2, 0.2));
-
-		_lightProgram.use();
-		_lightProgram.update("projection", projection);
-		_lightProgram.update("view", view);
-		_lightProgram.update("lightColor", _lightColor);
-		_lightProgram.update("model", model);
-		glDrawElements(GL_TRIANGLES, _object.idxSize(), GL_UNSIGNED_INT, 0);
-	}
-
-	//draw object
-	{
-		{
-			_targetProgram.use();
-			_targetProgram.update("projection", projection);
-			_targetProgram.update("view", view);
-			const auto camPos = _camera.getAttr().pos;
-			_targetProgram.update("viewPos", glm::vec4(camPos.x, camPos.y, camPos.z, 1.0));
-			_targetProgram.update("material.shininess", 1);
-
-			_objTex->texture()->bind(0);
-			_targetProgram.update("material.diffuse", 0);
-			_objBorderTex->texture()->bind(1);
-			_targetProgram.update("material.specular", 1);
-
-			glm::vec4 diffuseColor = glm::vec4(0.5); // 降低影响
-			glm::vec4 ambientColor = glm::vec4(0.2f);
-			_targetProgram.update("light.ambient", ambientColor);
-			_targetProgram.update("light.diffuse", diffuseColor);
-			_targetProgram.update("light.specular", glm::vec4(1.0f));
-			_targetProgram.update("light.constant", 1.0f);
-			_targetProgram.update("light.linear", 0.09f);
-			_targetProgram.update("light.quadratic", 0.032f);
-			_targetProgram.update("light.cutOff", glm::cos(glm::radians(12.5f)));
-			auto attr = _camera.getAttr();
-			_targetProgram.update("light.direction", glm::vec4(attr.front, 1.0));
-			_targetProgram.update("light.position", glm::vec4(lightPos, 1.0));
-			_targetProgram.update("light.outerCutOff", glm::cos(glm::radians(17.5f)));
-		}
-
-		for (int i = 0; i < count; i++) {
-			glm::mat4 model = glm::mat4(1.0f); // make sure to initialize matrix to identity matrix first
-			model = glm::translate(model, cubePositions[i]);
-			float angle =  20.0f * curTime;
-			model = glm::rotate(model, glm::radians(angle), glm::vec3(1.0f, 0.3f, 0.5f));
-			_targetProgram.update("model", model);
-
-			glDrawElements(GL_TRIANGLES, _object.idxSize(), GL_UNSIGNED_INT, 0);
-		}
-	}
-
+	glm::vec3 lightPos = glm::vec3(5.0f * sin(curTime),0.0f, 5.0f * cos(curTime));
+	drawLight(projection, lightPos);
+	drawObjects(projection, curTime, lightPos);
 	glBindVertexArray(0);
 }
 
