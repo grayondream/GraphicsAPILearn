@@ -1,6 +1,6 @@
 #include "DX11App.hpp"
 #include <iostream>
-#include <format>
+
 #include <cassert>
 #include <sstream>
 #include <chrono>

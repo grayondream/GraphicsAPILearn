@@ -1,6 +1,6 @@
 #pragma once
 #include <windows.h>
-#include <format>
+
 #include <string>
 #include <cassert>
 #include "Base/Log.hpp"

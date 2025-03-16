@@ -2,6 +2,7 @@
 #include "Base/Log.hpp"
 #include "Utils/FileUtils.hpp"
 #include "glad/glad.h"
+#include <Base/Assert.hpp>
 
 static unsigned int GLCompileShader(const std::string file, const GLenum type) {
 	std::string content = FileUtils::readFile2String(file);
@@ -40,33 +41,43 @@ bool GLProgram::init(const std::string vertFile, const std::string fragFile) {
 	return true;
 }
 
+GLint GLProgram::locate(const std::string& name) {
+	const auto loc = glGetUniformLocation(_program, name.c_str());
+	ASSERT(loc != -1, "Failed to locate {}", name);
+	return loc;
+}
+
+GLuint GLProgram::id() const {
+	return _program;
+}
+
 GLProgram& GLProgram::update(const std::string& name, const bool value) {
-	glUniform1i(glGetUniformLocation(_program, name.c_str()), value);
+	glUniform1i(locate(name), value);
 	return *this;
 }
 
 GLProgram& GLProgram::update(const std::string& name, const int value) {
-	glUniform1i(glGetUniformLocation(_program, name.c_str()), value);
+	glUniform1i(locate(name), value);
 	return *this;
 }
 
 GLProgram& GLProgram::update(const std::string& name, const float value) {
-	glUniform1f(glGetUniformLocation(_program, name.c_str()), value);
+	glUniform1f(locate(name), value);
 	return *this;
 }
 
 GLProgram& GLProgram::update(const std::string& name, const float* value) {
-	glUniformMatrix4fv(glGetUniformLocation(_program, name.c_str()), 1, GL_FALSE, value);
+	glUniformMatrix4fv(locate(name), 1, GL_FALSE, value);
 	return *this;
 }
 
 GLProgram& GLProgram::update(const std::string& name, const glm::mat4& value) {
-	glUniformMatrix4fv(glGetUniformLocation(_program, name.c_str()), 1, GL_FALSE, &value[0][0]);
+	glUniformMatrix4fv(locate(name), 1, GL_FALSE, &value[0][0]);
 	return *this;
 }
 
 GLProgram& GLProgram::update(const std::string& name, const glm::vec4& value) {
-	glUniform4fv(glGetUniformLocation(_program, name.c_str()), 1, &value[0]);
+	glUniform4fv(locate(name), 1, &value[0]);
 	return *this;
 }
 

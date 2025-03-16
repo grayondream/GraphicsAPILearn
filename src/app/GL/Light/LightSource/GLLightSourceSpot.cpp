@@ -172,8 +172,6 @@ void GLLightSourceSpot::drawScene(const float dt) {
 			_targetProgram.use();
 			_targetProgram.update("projection", projection);
 			_targetProgram.update("view", view);
-			_targetProgram.update("lightColor", _lightColor);
-			_targetProgram.update("objectColor", glm::vec4(1.0f, 0.5f, 0.31f, 1.0));
 			const auto camPos = _camera.getAttr().pos;
 			_targetProgram.update("viewPos", glm::vec4(camPos.x, camPos.y, camPos.z, 1.0));
 			_targetProgram.update("material.shininess", 1);
