@@ -43,7 +43,7 @@ bool GLProgram::init(const std::string vertFile, const std::string fragFile) {
 
 GLint GLProgram::locate(const std::string& name) {
 	const auto loc = glGetUniformLocation(_program, name.c_str());
-	ASSERT(loc != -1, "Failed to locate {}", name);
+	//ASSERT(loc != -1, "Failed to locate {}", name);
 	return loc;
 }
 
@@ -73,6 +73,11 @@ GLProgram& GLProgram::update(const std::string& name, const float* value) {
 
 GLProgram& GLProgram::update(const std::string& name, const glm::mat4& value) {
 	glUniformMatrix4fv(locate(name), 1, GL_FALSE, &value[0][0]);
+	return *this;
+}
+
+GLProgram& GLProgram::update(const std::string& name, const glm::vec3& value) {
+	glUniform3fv(locate(name), 1, &value[0]);
 	return *this;
 }
 

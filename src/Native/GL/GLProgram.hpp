@@ -23,6 +23,8 @@ public:
 
 	GLProgram& update(const std::string& name, const float* value);
 
+	GLProgram& update(const std::string& name, const glm::vec3& value);
+	
 	GLProgram& update(const std::string& name, const glm::mat4 &value);
 
 	GLProgram& update(const std::string& name, const glm::vec4& value);

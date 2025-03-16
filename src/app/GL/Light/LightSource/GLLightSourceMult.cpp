@@ -125,6 +125,17 @@ static std::vector<glm::vec3> GenerateCubePositions(const glm::vec3& center, int
 	return cubePositions;
 }
 
+static std::vector<glm::vec3> GenerateLightPosition() {
+	return {
+		{0, 0, -7},
+		{2, 2, -10},
+		{-2, -2, -8},
+		{1, 0, -9},
+		{1, 3, -7},
+		{0, 0, -5}
+	};
+}
+
 static int count{ 1 };
 void GLLightSourceMult::drawUI() {
 	ImGui::Begin("OpenGL");
@@ -152,7 +163,41 @@ void GLLightSourceMult::drawLight(const glm::mat4& proj, const glm::vec3& pos) {
 	glDrawElements(GL_TRIANGLES, _object.idxSize(), GL_UNSIGNED_INT, 0);
 }
 
-void GLLightSourceMult::drawObjects(const glm::mat4& proj, const float curTime, const glm::vec3& pos) {
+// 设置方向光参数（简化版）
+void SetDirectionalLight(GLProgram& program) {
+	program.update("dirLight.direction", glm::vec3(-0.2f, -1.0f, -0.3f));
+	program.update("dirLight.ambient", glm::vec3(0.05f, 0.05f, 0.05f));
+	program.update("dirLight.diffuse", glm::vec3(0.4f, 0.4f, 0.4f));
+	program.update("dirLight.specular", glm::vec3(0.5f, 0.5f, 0.5f));
+}
+
+// 设置点光源参数（简化版）
+void SetPointLight(GLProgram& program, int index, const glm::vec3& position) {
+	std::string prefix = "pointLights[" + std::to_string(index) + "]";
+	program.update(prefix + ".position", position);
+	program.update(prefix + ".ambient", glm::vec3(0.05f, 0.05f, 0.05f));
+	program.update(prefix + ".diffuse", glm::vec3(0.8f, 0.8f, 0.8f));
+	program.update(prefix + ".specular", glm::vec3(1.0f, 1.0f, 1.0f));
+	program.update(prefix + ".constant", 1.0f);
+	program.update(prefix + ".linear", 0.09f);
+	program.update(prefix + ".quadratic", 0.032f);
+}
+
+// 设置聚光灯参数（简化版）
+void SetSpotLight(GLProgram& program, const glm::vec3& position) {
+	program.update("spotLight.position", position);
+	program.update("spotLight.direction", glm::vec3(0.0f, 0.0f, -1.0f));
+	program.update("spotLight.ambient", glm::vec3(0.0f, 0.0f, 0.0f));
+	program.update("spotLight.diffuse", glm::vec3(1.0f, 1.0f, 1.0f));
+	program.update("spotLight.specular", glm::vec3(1.0f, 1.0f, 1.0f));
+	program.update("spotLight.constant", 1.0f);
+	program.update("spotLight.linear", 0.09f);
+	program.update("spotLight.quadratic", 0.032f);
+	program.update("spotLight.cutOff", glm::cos(glm::radians(12.5f)));
+	program.update("spotLight.outerCutOff", glm::cos(glm::radians(15.0f)));
+}
+
+void GLLightSourceMult::drawObjects(const glm::mat4& proj, const float curTime, const std::vector<glm::vec3>& lightPoses) {
 	auto view = _camera.getViewMatrix();
 	int gridSize = 5; // 5x5x5 = 125
 	float spacing = 2.0f;
@@ -169,21 +214,13 @@ void GLLightSourceMult::drawObjects(const glm::mat4& proj, const float curTime, 
 	_targetProgram.update("material.diffuse", 0);
 	_objBorderTex->texture()->bind(1);
 	_targetProgram.update("material.specular", 1);
+	SetDirectionalLight(_targetProgram);
+	for (auto i = 0; i < lightPoses.size() - 1; i++) {
+		SetPointLight(_targetProgram, i, lightPoses[i]);
+	}
 
-	glm::vec4 diffuseColor = glm::vec4(0.5); // 降低影响
-	glm::vec4 ambientColor = glm::vec4(0.2f);
-	_targetProgram.update("light.ambient", ambientColor);
-	_targetProgram.update("light.diffuse", diffuseColor);
-	_targetProgram.update("light.specular", glm::vec4(1.0f));
-	_targetProgram.update("light.constant", 1.0f);
-	_targetProgram.update("light.linear", 0.09f);
-	_targetProgram.update("light.quadratic", 0.032f);
-	_targetProgram.update("light.cutOff", glm::cos(glm::radians(12.5f)));
+	SetSpotLight(_targetProgram, lightPoses[lightPoses.size() - 1]);
 	auto attr = _camera.getAttr();
-	_targetProgram.update("light.direction", glm::vec4(attr.front, 1.0));
-	_targetProgram.update("light.position", glm::vec4(pos, 1.0));
-	_targetProgram.update("light.outerCutOff", glm::cos(glm::radians(17.5f)));
-
 	for (int i = 0; i < count; i++) {
 		glm::mat4 model = glm::mat4(1.0f); // make sure to initialize matrix to identity matrix first
 		model = glm::translate(model, cubePositions[i]);
@@ -203,8 +240,12 @@ void GLLightSourceMult::drawScene(const float dt) {
 	curTime += dt;
 	const auto projection = glm::perspective(glm::radians(_camera.zoom()), aspectRatio(), 0.1f, 100.0f);
 	glm::vec3 lightPos = glm::vec3(5.0f * sin(curTime),0.0f, 5.0f * cos(curTime));
-	drawLight(projection, lightPos);
-	drawObjects(projection, curTime, lightPos);
+	auto lightPoses = GenerateLightPosition();
+	for (auto pos : lightPoses) {
+		drawLight(projection, pos);
+	}
+	
+	drawObjects(projection, curTime, lightPoses);
 	glBindVertexArray(0);
 }
 

@@ -30,7 +30,7 @@ protected:
 private:
 	void drawUI();
 	void drawLight(const glm::mat4& proj, const glm::vec3& pos);
-	void drawObjects(const glm::mat4& proj, const float curTime, const glm::vec3& pos);
+	void drawObjects(const glm::mat4& proj, const float curTime, const std::vector<glm::vec3>& pos);
 	void createVertexBuffer();
 	void initProgram(const std::string name, GLProgram& program);
 	std::shared_ptr<GLImageTexture2D> initTexture(const std::string img);
