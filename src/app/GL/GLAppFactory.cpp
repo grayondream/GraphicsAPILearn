@@ -13,6 +13,7 @@
 #include "App/GL/Light/LightSource/GLLightSourcePoint.hpp"
 #include "App/GL/Light/LightSource/GLLightSourceSpot.hpp"
 #include "App/GL/Light/LightSource/GLLightSourceMult.hpp"
+#include "App/GL/Model/GLLoadModelApp.hpp"
 
 std::shared_ptr<GLApp> GLAppFactory::create(const AppType type){
 	switch(type){
@@ -46,6 +47,8 @@ std::shared_ptr<GLApp> GLAppFactory::create(const AppType type){
 			return std::make_shared<GLLightSourceSpot>();
 		case AppType::SimpleLight_Source_Mult:
 			return std::make_shared<GLLightSourceMult>();
+		case AppType::LoadModel:
+			return std::make_shared<GLLoadModelApp>();
 		default:
 			break;	
 	}

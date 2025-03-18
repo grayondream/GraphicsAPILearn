@@ -13,21 +13,21 @@ public:
 	
 	GLuint id() const;
 
-	GLint locate(const std::string &name);
+	GLint locate(const std::string &name) const;
 
-	GLProgram& update(const std::string& name, const bool value);
+	const GLProgram& update(const std::string& name, const bool value) const;
 
-	GLProgram& update(const std::string& name, const int value);
+	const GLProgram& update(const std::string& name, const int value) const;
 
-	GLProgram& update(const std::string& name, const float value);
+	const GLProgram& update(const std::string& name, const float value) const;
 
-	GLProgram& update(const std::string& name, const float* value);
+	const GLProgram& update(const std::string& name, const float* value) const;
 
-	GLProgram& update(const std::string& name, const glm::vec3& value);
+	const GLProgram& update(const std::string& name, const glm::vec3& value) const;
 	
-	GLProgram& update(const std::string& name, const glm::mat4 &value);
+	const GLProgram& update(const std::string& name, const glm::mat4 &value) const;
 
-	GLProgram& update(const std::string& name, const glm::vec4& value);
+	const GLProgram& update(const std::string& name, const glm::vec4& value) const;
 
 private:
 	std::pair<unsigned int, unsigned int> compileShader(const std::string vertFile, const std::string fragFile);

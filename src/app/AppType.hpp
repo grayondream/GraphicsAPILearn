@@ -25,5 +25,6 @@ enum class AppType : int{
     SimpleLight_Source_Point,
     SimpleLight_Source_Spot,
     SimpleLight_Source_Mult,
+    LoadModel,
 };
 

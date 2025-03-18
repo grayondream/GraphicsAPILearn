@@ -41,9 +41,9 @@ bool GLProgram::init(const std::string vertFile, const std::string fragFile) {
 	return true;
 }
 
-GLint GLProgram::locate(const std::string& name) {
+GLint GLProgram::locate(const std::string& name) const {
 	const auto loc = glGetUniformLocation(_program, name.c_str());
-	//ASSERT(loc != -1, "Failed to locate {}", name);
+	ASSERT(loc != -1, "Failed to locate {}", name);
 	return loc;
 }
 
@@ -51,37 +51,37 @@ GLuint GLProgram::id() const {
 	return _program;
 }
 
-GLProgram& GLProgram::update(const std::string& name, const bool value) {
+const GLProgram& GLProgram::update(const std::string& name, const bool value) const {
 	glUniform1i(locate(name), value);
 	return *this;
 }
 
-GLProgram& GLProgram::update(const std::string& name, const int value) {
+const GLProgram& GLProgram::update(const std::string& name, const int value)  const {
 	glUniform1i(locate(name), value);
 	return *this;
 }
 
-GLProgram& GLProgram::update(const std::string& name, const float value) {
+const GLProgram& GLProgram::update(const std::string& name, const float value) const {
 	glUniform1f(locate(name), value);
 	return *this;
 }
 
-GLProgram& GLProgram::update(const std::string& name, const float* value) {
+const GLProgram& GLProgram::update(const std::string& name, const float* value) const {
 	glUniformMatrix4fv(locate(name), 1, GL_FALSE, value);
 	return *this;
 }
 
-GLProgram& GLProgram::update(const std::string& name, const glm::mat4& value) {
+const GLProgram& GLProgram::update(const std::string& name, const glm::mat4& value) const {
 	glUniformMatrix4fv(locate(name), 1, GL_FALSE, &value[0][0]);
 	return *this;
 }
 
-GLProgram& GLProgram::update(const std::string& name, const glm::vec3& value) {
+const GLProgram& GLProgram::update(const std::string& name, const glm::vec3& value) const {
 	glUniform3fv(locate(name), 1, &value[0]);
 	return *this;
 }
 
-GLProgram& GLProgram::update(const std::string& name, const glm::vec4& value) {
+const GLProgram& GLProgram::update(const std::string& name, const glm::vec4& value) const {
 	glUniform4fv(locate(name), 1, &value[0]);
 	return *this;
 }

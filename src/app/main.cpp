@@ -29,6 +29,7 @@ static inline constexpr int GAME_ENABLE_MSAA = true;
  *  SimpleLight_Source_Point        Point Light Source
  *  SimpleLight_Source_Spot         Spot Light Source
  *  SimpleLight_Source_Mult         Multiple Light Source
+ *  LoadModel                       Load Model
  */
 
 namespace EnumUtil = Utils::Enum;
@@ -36,7 +37,7 @@ namespace EnumUtil = Utils::Enum;
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nShowCmd) {
     ConsoleDebugger consoleDebugger{};
     
-    auto type = AppType::SimpleLight_Source_Mult;
+    auto type = AppType::LoadModel;
     auto api = GraphicsType::GL;
     LOGI("Start Graphics Learn!!!");
     LOGI("Select {} Application, Render App With {} API", EnumUtil::EnumName(type), EnumUtil::EnumName(api));

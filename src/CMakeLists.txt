@@ -97,5 +97,9 @@ find_package(spdlog CONFIG REQUIRED)
 target_link_libraries(${PROJECT_NAME} spdlog::spdlog_header_only)
 target_include_directories(${PROJECT_NAME} PRIVATE ${SPDLOG_INCLUDE_DIR})
 
+find_package(assimp CONFIG REQUIRED)
+target_link_libraries(${PROJECT_NAME} assimp::assimp)
+target_include_directories(${PROJECT_NAME} PRIVATE ${ASSIMP_INCLUDE_DIR})
+
 target_compile_definitions(${PROJECT_NAME} PRIVATE RESOURCE_DIR="${CMAKE_SOURCE_DIR}/Res")
 include(${RENDER_SOURCE_PATH}/BuildPost.cmake)

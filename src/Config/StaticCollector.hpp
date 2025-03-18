@@ -20,4 +20,8 @@ namespace StaticCollector{
 	inline std::filesystem::path getImagePath() {
 		return getResPath() / +"img";
 	}
+
+	inline std::filesystem::path getModelPath() {
+		return getResPath() / +"Model";
+	}
 };
