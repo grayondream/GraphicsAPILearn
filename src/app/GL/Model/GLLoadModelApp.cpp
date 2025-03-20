@@ -24,7 +24,6 @@ bool GLLoadModelApp::init(const HINSTANCE inst, const WindowDesc& param) {
 	
 	_camera = Camera(glm::vec3(0.0f, 0.0f, 5.0f));
 	glViewport(0, 0, _attribute.winAttr.width, _attribute.winAttr.height);
-	const auto shaderDir = StaticCollector::getGLShaderPath() / "Light";
 	initProgram("model", _program);
 	loadModel();
 	//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
@@ -38,7 +37,7 @@ void GLLoadModelApp::loadModel() {
 }
 
 void GLLoadModelApp::initProgram(const std::string name, GLProgram &program) {
-	const auto shaderDir = StaticCollector::getGLShaderPath() / "Light";
+	const auto shaderDir = StaticCollector::getGLShaderPath();
 	const auto vfile = shaderDir / "Model" / std::string(name + ".vert");
 	const auto ffile = shaderDir / "Model" / std::string(name + ".frag");
 	LOGI("Generate program {}", name);

@@ -8,6 +8,7 @@ static unsigned int GLCompileShader(const std::string file, const GLenum type) {
 	std::string content = FileUtils::readFile2String(file);
 	unsigned int shader = glCreateShader(type);
 	const char* pcon = content.c_str();
+	ASSERT(!content.empty(), "The file content should not be empty");
 	glShaderSource(shader, 1, &pcon, NULL);
 	glCompileShader(shader);
 	int suc{};
