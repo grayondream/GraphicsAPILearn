@@ -1,6 +1,7 @@
 #pragma once
 #include <string>
 #include <Math/Vector.hpp>
+#include <Geometry/Format.hpp>
 
 class ImageSize : public Vector3DBase<int> {
 public:
@@ -26,8 +27,11 @@ public:
 
 	ImageSize size();
 
+	PixelFormat format();
+
 private:
 	std::string _file{};
 	uint8_t* _pdata{};
 	ImageSize _size{};
+	PixelFormat _format{};
 };

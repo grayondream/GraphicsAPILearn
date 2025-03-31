@@ -5,7 +5,7 @@
 #include "Base/Log.hpp"
 #include "App/AppFactory.hpp"
 #include "App/IApplication.hpp"
-#include "Util/EnumUtil.hpp"
+#include "Utils/EnumUtil.hpp"
 
 static inline constexpr int GAME_WIN_WIDTH = 720;
 static inline constexpr int GAME_WIN_HEIGHT = 480;

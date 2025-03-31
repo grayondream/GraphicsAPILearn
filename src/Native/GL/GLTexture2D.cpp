@@ -1,6 +1,7 @@
 #include "GLTexture2D.hpp"
 #include "glad/glad.h"
 #include <cassert>
+#include <Utils/GL/GLUtils.hpp>
 
 GLTexture2D::~GLTexture2D(){
     release();
@@ -10,6 +11,7 @@ bool GLTexture2D::init(const Texture2DDataView &data){
     assert(data.data() && data.size().length() != 0);
     _size = data.size();
     unsigned int texture{};
+    auto format = GLUtils::PixelFormat2GLFormat(data.format());
 	glGenTextures(1, &texture);
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, texture);
@@ -41,7 +43,8 @@ void GLTexture2D::release(){
 }
 
 void* GLTexture2D::handle() {
-    return reinterpret_cast<void*>(static_cast<uintptr_t>(_textureId));
+    return GLUtils::GLTextureId2Ptr(_textureId);
+    //return reinterpret_cast<void*>(static_cast<uintptr_t>(_textureId));
 }
 
 bool GLTexture2D::valid() {

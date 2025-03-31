@@ -16,7 +16,7 @@ ImageTexture2D::ImageTexture2D(const std::string& file) {
 
 ImageTexture2D& ImageTexture2D::load() {
 	_img.load();
-	const Texture2DDataView data = { _img.data(), _img.size().size(), _img.size()};
+	const Texture2DDataView data = { _img.data(), _img.size().size(), _img.format(), _img.size()};
 	_texture->init(data);
 	return *this;
 }
