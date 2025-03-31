@@ -32,7 +32,7 @@ bool GLLoadModelApp::init(const HINSTANCE inst, const WindowDesc& param) {
 
 void GLLoadModelApp::loadModel() {
 	const auto modelPath = StaticCollector::getModelPath();
-	const auto modelFile = modelPath / "backpack.obj";
+	const auto modelFile = modelPath / "backpack" / "backpack.obj";
 	_model = std::make_shared<Model>(modelFile.string().c_str());
 }
 
@@ -73,7 +73,7 @@ void GLLoadModelApp::drawScene(const float dt) {
     model = glm::translate(model, glm::vec3(0.0f, 0.0f, 0.0f)); // translate it down so it's at the center of the scene
     model = glm::scale(model, glm::vec3(1.0f, 1.0f, 1.0f));	// it's a bit too big for our scene, so scale it down
 	_program.update("model", model);
-	_model->draw(_program);
+	_model->Draw(_program);
 }
 
 void GLLoadModelApp::endDrawScene() {
