@@ -32,6 +32,7 @@ void Mesh::draw(GLProgram& shader){
 
         // now set the sampler to the correct texture unit
         glUniform1i(glGetUniformLocation(shader.id(), (name + number).c_str()), i);
+        //shader.update((name + number), (int)i);
         // and finally bind the texture
         glBindTexture(GL_TEXTURE_2D, textures[i].id);
     }
