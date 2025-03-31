@@ -73,7 +73,7 @@ void GLLoadModelApp::drawScene(const float dt) {
     model = glm::translate(model, glm::vec3(0.0f, 0.0f, 0.0f)); // translate it down so it's at the center of the scene
     model = glm::scale(model, glm::vec3(1.0f, 1.0f, 1.0f));	// it's a bit too big for our scene, so scale it down
 	_program.update("model", model);
-	_model->Draw(_program);
+	_model->draw(_program);
 }
 
 void GLLoadModelApp::endDrawScene() {
