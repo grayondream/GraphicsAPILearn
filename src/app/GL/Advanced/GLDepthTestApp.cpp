@@ -159,7 +159,7 @@ void GLDepthTestApp::drawScene(const float dt) {
 	static float curTime = 0; // ���ֵ�ǰʱ��
 	curTime += dt; // ���µ�ǰʱ��
 	glBindVertexArray(_cubeVao);
-	_program.update("textureSampler", 0);
+	//_program.update("textureSampler", 0);
 	for (int i = 0; i < count; i++) {
 		glm::mat4 model = glm::mat4(1.0f); // ��ʼ������Ϊ��λ����
 		model = glm::translate(model, cubePositions[i]); // ƽ����������λ��
@@ -174,9 +174,9 @@ void GLDepthTestApp::drawScene(const float dt) {
 
 	glBindVertexArray(_planeVao);
 	glm::mat4 model = glm::mat4(1.0f); // ��ʼ������Ϊ��λ����
-	model = glm::translate(model, glm::vec3(-1.0,-4.50, -5)); // ƽ����������λ��
+	model = glm::translate(model, glm::vec3(-1.0,-4.50, -10)); // ƽ����������λ��
 	_program.update("model", model); // ����ģ�;���
-	_program.update("textureSampler", 1);
+	//_program.update("textureSampler", 1);
 	glDrawArrays(GL_TRIANGLES, 0, 6); // ����������
 
 	glBindVertexArray(0);
