@@ -14,6 +14,7 @@
 #include "App/GL/Light/LightSource/GLLightSourceSpot.hpp"
 #include "App/GL/Light/LightSource/GLLightSourceMult.hpp"
 #include "App/GL/Model/GLLoadModelApp.hpp"
+#include "App/GL/Advanced/GLDepthTestApp.hpp"
 
 std::shared_ptr<GLApp> GLAppFactory::create(const AppType type){
 	switch(type){
@@ -49,6 +50,8 @@ std::shared_ptr<GLApp> GLAppFactory::create(const AppType type){
 			return std::make_shared<GLLightSourceMult>();
 		case AppType::LoadModel:
 			return std::make_shared<GLLoadModelApp>();
+		case AppType::DepthTest:
+			return std::make_shared<GLDepthTestApp>();
 		default:
 			break;	
 	}
