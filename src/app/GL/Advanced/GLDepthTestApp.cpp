@@ -1,4 +1,4 @@
-#include "GLDepthTestApp.hpp"
+ï»¿#include "GLDepthTestApp.hpp"
 #include "Native/GL/GLProgram.hpp"
 #include "Config/StaticCollector.hpp"
 #include "EH/ErrorHandle.hpp"
@@ -49,6 +49,8 @@ bool GLDepthTestApp::init(const HINSTANCE inst, const WindowDesc& param) {
 	createCubeBuffer();
 	createPlaneBuffer();
 	//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+	glEnable(GL_DEPTH_TEST);
+	glDepthFunc(GL_LESS);
 	return true;
 }
 
@@ -125,7 +127,7 @@ void GLDepthTestApp::beginDrawScene() {
 
 std::vector<glm::vec3> initializeCubePositions() {
 	std::vector<glm::vec3> positions;
-	float spacing = 1.1f; // ¾àÀëÉèÖÃÎª 2.0f£¬Ê¹µÃÁ¢·½Ìå½ô°¤ÔÚÒ»Æð
+	float spacing = 1.1f; // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Îª 2.0fï¿½ï¿½Ê¹ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½
 
 	for (int x = -2; x < 2; ++x) {
 		for (int y = -2; y < 2; ++y) {
@@ -144,38 +146,38 @@ void GLDepthTestApp::drawScene(const float dt) {
 	ImGui::End();
 	
 	std::vector<glm::vec3> cubePositions = initializeCubePositions();
-	int count = cubePositions.size(); // Á¢·½ÌåÊýÁ¿
+	int count = cubePositions.size(); // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 
-	// ¼ÆËãÍ¶Ó°¾ØÕó
+	// ï¿½ï¿½ï¿½ï¿½Í¶Ó°ï¿½ï¿½ï¿½ï¿½
 	const auto projection = glm::perspective(glm::radians(_camera.zoom()), aspectRatio(), 0.1f, 100.0f);
 	_program.update("projection", projection);
 
-	// »ñÈ¡ÊÓÍ¼¾ØÕó
+	// ï¿½ï¿½È¡ï¿½ï¿½Í¼ï¿½ï¿½ï¿½ï¿½
 	const auto view = _camera.getViewMatrix();
 	_program.update("view", view);
 
-	static float curTime = 0; // ±£³Öµ±Ç°Ê±¼ä
-	curTime += dt; // ¸üÐÂµ±Ç°Ê±¼ä
+	static float curTime = 0; // ï¿½ï¿½ï¿½Öµï¿½Ç°Ê±ï¿½ï¿½
+	curTime += dt; // ï¿½ï¿½ï¿½Âµï¿½Ç°Ê±ï¿½ï¿½
 	glBindVertexArray(_cubeVao);
 	_program.update("textureSampler", 0);
 	for (int i = 0; i < count; i++) {
-		glm::mat4 model = glm::mat4(1.0f); // ³õÊ¼»¯¾ØÕóÎªµ¥Î»¾ØÕó
-		model = glm::translate(model, cubePositions[i]); // Æ½ÒÆÖÁÁ¢·½ÌåÎ»ÖÃ
+		glm::mat4 model = glm::mat4(1.0f); // ï¿½ï¿½Ê¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Îªï¿½ï¿½Î»ï¿½ï¿½ï¿½ï¿½
+		model = glm::translate(model, cubePositions[i]); // Æ½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Î»ï¿½ï¿½
 
-		// Ê¹ÓÃµ±Ç°Ê±¼äºÍÁ¢·½ÌåË÷Òý¼ÆËãÐý×ª½Ç¶È
-		float angle = 0; // Ã¿¸öÁ¢·½ÌåÒÔ²»Í¬µÄËÙ¶ÈÐý×ª
-		model = glm::rotate(model, glm::radians(angle), glm::vec3(1.0f, 0.3f, 0.5f)); // Ðý×ª
+		// Ê¹ï¿½Ãµï¿½Ç°Ê±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½×ªï¿½Ç¶ï¿½
+		float angle = 0; // Ã¿ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ô²ï¿½Í¬ï¿½ï¿½ï¿½Ù¶ï¿½ï¿½ï¿½×ª
+		model = glm::rotate(model, glm::radians(angle), glm::vec3(1.0f, 0.3f, 0.5f)); // ï¿½ï¿½×ª
 
-		_program.update("model", model); // ¸üÐÂÄ£ÐÍ¾ØÕó
-		glDrawArrays(GL_TRIANGLES, 0, 36); // »æÖÆÁ¢·½Ìå
+		_program.update("model", model); // ï¿½ï¿½ï¿½ï¿½Ä£ï¿½Í¾ï¿½ï¿½ï¿½
+		glDrawArrays(GL_TRIANGLES, 0, 36); // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	}
 
 	glBindVertexArray(_planeVao);
-	glm::mat4 model = glm::mat4(1.0f); // ³õÊ¼»¯¾ØÕóÎªµ¥Î»¾ØÕó
-	model = glm::translate(model, glm::vec3(-1.0,-4.50, -5)); // Æ½ÒÆÖÁÁ¢·½ÌåÎ»ÖÃ
-	_program.update("model", model); // ¸üÐÂÄ£ÐÍ¾ØÕó
+	glm::mat4 model = glm::mat4(1.0f); // ï¿½ï¿½Ê¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Îªï¿½ï¿½Î»ï¿½ï¿½ï¿½ï¿½
+	model = glm::translate(model, glm::vec3(-1.0,-4.50, -5)); // Æ½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Î»ï¿½ï¿½
+	_program.update("model", model); // ï¿½ï¿½ï¿½ï¿½Ä£ï¿½Í¾ï¿½ï¿½ï¿½
 	_program.update("textureSampler", 1);
-	glDrawArrays(GL_TRIANGLES, 0, 6); // »æÖÆÁ¢·½Ìå
+	glDrawArrays(GL_TRIANGLES, 0, 6); // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 
 	glBindVertexArray(0);
 	return GLApp::drawScene(dt);
