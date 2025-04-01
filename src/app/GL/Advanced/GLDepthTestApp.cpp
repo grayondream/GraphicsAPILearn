@@ -4,6 +4,7 @@
 #include "EH/ErrorHandle.hpp"
 #include "glad/glad.h"
 #include "Geometry/Cube.hpp"
+#include <Geometry/Plane.hpp>
 #include "Native/GL/GLImageTexture2D.hpp"
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -14,9 +15,9 @@
 using namespace ErrorHandle;
 
 GLDepthTestApp::~GLDepthTestApp() {
-	if (_vao != 0) {
-		glDeleteVertexArrays(1, &_vao);
-		glDeleteBuffers(2, _vbo);
+	if (_cubeVao != 0) {
+		glDeleteVertexArrays(1, &_cubeVao);
+		glDeleteBuffers(2, _cubeVbo);
 	}
 }
 
@@ -25,23 +26,33 @@ bool GLDepthTestApp::init(const HINSTANCE inst, const WindowDesc& param) {
 		return false;
 	}
 
-	_camera = Camera(glm::vec3(0.0f, 0.0f, 3.0f));
+	_camera = Camera(glm::vec3(0.0f, 0.0f, 3.0f), glm::vec3(0.0f, 1.0f, 0.0f), -90, -10);
 	glViewport(0, 0, _attribute.winAttr.width, _attribute.winAttr.height);
-	const auto vfile = StaticCollector::getGLShaderPath() / "Base" / "Cube.vert";
-	const auto ffile = StaticCollector::getGLShaderPath() / "Base" / "Cube.frag";
+	const auto vfile = StaticCollector::getGLShaderPath() / "Advanced" / "DepthTest" / "Basic.vert";
+	const auto ffile = StaticCollector::getGLShaderPath() / "Advanced" / "DepthTest" / "Basic.frag";
 	auto ret = _program.init(vfile.string(), ffile.string());
 	ErrorHandle::ExitIfFailed(ret, "Create OpenGL program failed!");
-	const auto imgFile = StaticCollector::getImagePath() / "dog.jpg";
-	_texture = std::make_shared<GLImageTexture2D>(imgFile.string());
-	const auto valid = _texture->load().texture()->valid();
-	ExitIfFailed(valid, "Failed to load texture from file {}", imgFile.string());
-	_texture->multiSurface(6);
-	createVertexBuffer();
+	{
+		const auto imgFile = StaticCollector::getImagePath() / "marble.jpg";
+		_cubeTexture = std::make_shared<GLImageTexture2D>(imgFile.string());
+		const auto valid = _cubeTexture->load().texture()->valid();
+		ExitIfFailed(valid, "Failed to load texture from file {}", imgFile.string());
+	}
+	
+	{
+		const auto imgFile = StaticCollector::getImagePath() / "metal.jpg";
+		_planeTexture = std::make_shared<GLImageTexture2D>(imgFile.string());
+		const auto valid = _planeTexture->load().texture()->valid();
+		ExitIfFailed(valid, "Failed to load texture from file {}", imgFile.string());
+	}
+
+	createCubeBuffer();
+	createPlaneBuffer();
 	//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 	return true;
 }
 
-void GLDepthTestApp::createVertexBuffer() {
+void GLDepthTestApp::createCubeBuffer() {
 	Cube shape{};
 	unsigned int vbo[2]{}, vao{}, ebo{};
 	glGenVertexArrays(1, &vao);
@@ -67,8 +78,38 @@ void GLDepthTestApp::createVertexBuffer() {
 		glEnableVertexAttribArray(2);
 	}
 	glBindVertexArray(0);
-	_vao = vao;
-	_vbo[0] = vbo[0], _vbo[1] = vbo[1];
+	_cubeVao = vao;
+	_cubeVbo[0] = vbo[0], _cubeVbo[1] = vbo[1];
+}
+
+void GLDepthTestApp::createPlaneBuffer() {
+	Plane shape{};
+	unsigned int vbo[2]{}, vao{}, ebo{};
+	glGenVertexArrays(1, &vao);
+	glGenBuffers(2, vbo);
+	glBindVertexArray(vao);
+	{
+		glBindBuffer(GL_ARRAY_BUFFER, vbo[0]);
+		glBufferData(GL_ARRAY_BUFFER, shape.byteSize(), shape.toGL().data(), GL_STATIC_DRAW);
+
+		glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex), nullptr);
+		glEnableVertexAttribArray(0);
+
+		glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)(sizeof(float) * 4));
+		glEnableVertexAttribArray(1);
+
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
+		glBufferData(GL_ELEMENT_ARRAY_BUFFER, shape.idxByteSize(), shape.idx(), GL_STATIC_DRAW);
+
+		glBindBuffer(GL_ARRAY_BUFFER, vbo[1]);
+		glBufferData(GL_ARRAY_BUFFER, shape.uvSize(), shape.uv(), GL_STATIC_DRAW);
+
+		glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), nullptr);
+		glEnableVertexAttribArray(2);
+	}
+	glBindVertexArray(0);
+	_planeVao = vao;
+	_planeVbo[0] = vbo[0], _planeVbo[1] = vbo[1];
 }
 
 void GLDepthTestApp::clearColor() {
@@ -76,19 +117,20 @@ void GLDepthTestApp::clearColor() {
 }
 
 void GLDepthTestApp::beginDrawScene() {
-	_texture->texture()->bind(0);
+	_cubeTexture->texture()->bind(0);
+	_planeTexture->texture()->bind(1);
 	_program.use();
 	return GLApp::beginDrawScene();
 }
 
 std::vector<glm::vec3> initializeCubePositions() {
 	std::vector<glm::vec3> positions;
-	float spacing = 1.0f; // 距离设置为 2.0f，使得立方体紧挨在一起
+	float spacing = 1.1f; // 距离设置为 2.0f，使得立方体紧挨在一起
 
 	for (int x = -2; x < 2; ++x) {
 		for (int y = -2; y < 2; ++y) {
 			for (int z = -2; z < 2; ++z) {
-				positions.push_back(glm::vec3(x * spacing, y * spacing, z * spacing - 3));
+				positions.push_back(glm::vec3(x * spacing, y * spacing - 2, z * spacing - 5));
 			}
 		}
 	}
@@ -96,7 +138,6 @@ std::vector<glm::vec3> initializeCubePositions() {
 }
 
 void GLDepthTestApp::drawScene(const float dt) {
-	glBindVertexArray(_vao);
 	ImGui::Begin("OpenGL");
 	ImGui::SetNextItemWidth(200);
 	//ImGui::SliderInt("Cube Count", &count, 1, 10);
@@ -115,7 +156,8 @@ void GLDepthTestApp::drawScene(const float dt) {
 
 	static float curTime = 0; // 保持当前时间
 	curTime += dt; // 更新当前时间
-
+	glBindVertexArray(_cubeVao);
+	_program.update("textureSampler", 0);
 	for (int i = 0; i < count; i++) {
 		glm::mat4 model = glm::mat4(1.0f); // 初始化矩阵为单位矩阵
 		model = glm::translate(model, cubePositions[i]); // 平移至立方体位置
@@ -127,6 +169,13 @@ void GLDepthTestApp::drawScene(const float dt) {
 		_program.update("model", model); // 更新模型矩阵
 		glDrawArrays(GL_TRIANGLES, 0, 36); // 绘制立方体
 	}
+
+	glBindVertexArray(_planeVao);
+	glm::mat4 model = glm::mat4(1.0f); // 初始化矩阵为单位矩阵
+	model = glm::translate(model, glm::vec3(-1.0,-4.50, -5)); // 平移至立方体位置
+	_program.update("model", model); // 更新模型矩阵
+	_program.update("textureSampler", 1);
+	glDrawArrays(GL_TRIANGLES, 0, 6); // 绘制立方体
 
 	glBindVertexArray(0);
 	return GLApp::drawScene(dt);

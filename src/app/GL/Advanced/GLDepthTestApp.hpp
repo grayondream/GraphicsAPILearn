@@ -26,13 +26,16 @@ protected:
 	virtual void onKeyBoardEvent(const UINT msg, const WPARAM wParam, const LPARAM lParam) override;
 
 private:
-	void createVertexBuffer();
-
+	void createCubeBuffer();
+	void createPlaneBuffer();
 private:
-	std::shared_ptr<GLImageTexture2D> _texture{};
+	std::shared_ptr<GLImageTexture2D> _cubeTexture{};
+	std::shared_ptr<GLImageTexture2D> _planeTexture{};
 	GLProgram _program{};
-	unsigned int _vbo[2]{};
-	unsigned int _vao{};
+	unsigned int _cubeVbo[2]{};
+	unsigned int _cubeVao{};
+	unsigned int _planeVbo[2]{};
+	unsigned int _planeVao{};
 	float _curTime{};
 	Camera _camera{};
 	bool _clicked{};
