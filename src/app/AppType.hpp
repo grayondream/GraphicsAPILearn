@@ -27,5 +27,6 @@ enum class AppType : int{
     SimpleLight_Source_Mult,
     LoadModel,
     DepthTest,
+    TemplateTest,
 };
 
