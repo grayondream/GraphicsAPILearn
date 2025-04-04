@@ -1,4 +1,4 @@
-﻿#include "GLDepthTestApp.hpp"
+#include "GLBlendApp.hpp"
 #include "Native/GL/GLProgram.hpp"
 #include "Config/StaticCollector.hpp"
 #include "EH/ErrorHandle.hpp"
@@ -14,31 +14,52 @@
 
 using namespace ErrorHandle;
 
-GLDepthTestApp::~GLDepthTestApp() {
+GLBlendApp::~GLBlendApp() {
 	if (_cubeVao != 0) {
 		glDeleteVertexArrays(1, &_cubeVao);
 		glDeleteBuffers(2, _cubeVbo);
 	}
 }
 
-bool GLDepthTestApp::init(const HINSTANCE inst, const WindowDesc& param) {
+bool GLBlendApp::init(const HINSTANCE inst, const WindowDesc& param) {
 	if (!GLApp::init(inst, param)) {
 		return false;
 	}
 
+	initGLEnv();
+	compileShader();
+	createTexture();
+	createCubeBuffer();
+	createPlaneBuffer();
+	
+	return true;
+}
+
+void GLBlendApp::initGLEnv() {
 	_camera = Camera(glm::vec3(0.0f, 0.0f, 3.0f), glm::vec3(0.0f, 1.0f, 0.0f), -90, -10);
 	glViewport(0, 0, _attribute.winAttr.width, _attribute.winAttr.height);
-	const auto vfile = StaticCollector::getGLShaderPath() / "Advanced" / "DepthTest" / "Basic.vert";
-	const auto ffile = StaticCollector::getGLShaderPath() / "Advanced" / "DepthTest" / "Basic.frag";
+	glEnable(GL_DEPTH_TEST);
+	glDepthFunc(GL_LESS);
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+}
+
+void GLBlendApp::compileShader() {
+	const auto vfile = StaticCollector::getGLShaderPath() / "Advanced" / "Blend" / "Basic.vert";
+	const auto ffile = StaticCollector::getGLShaderPath() / "Advanced" / "Blend" / "Basic.frag";
 	auto ret = _program.init(vfile.string(), ffile.string());
 	ErrorHandle::ExitIfFailed(ret, "Create OpenGL program failed!");
+}
+
+void GLBlendApp::createTexture() {
 	{
 		const auto imgFile = StaticCollector::getImagePath() / "marble.jpg";
 		_cubeTexture = std::make_shared<GLImageTexture2D>(imgFile.string());
 		const auto valid = _cubeTexture->load().texture()->valid();
 		ExitIfFailed(valid, "Failed to load texture from file {}", imgFile.string());
 	}
-	
+
 	{
 		const auto imgFile = StaticCollector::getImagePath() / "metal.jpg";
 		_planeTexture = std::make_shared<GLImageTexture2D>(imgFile.string());
@@ -46,15 +67,15 @@ bool GLDepthTestApp::init(const HINSTANCE inst, const WindowDesc& param) {
 		ExitIfFailed(valid, "Failed to load texture from file {}", imgFile.string());
 	}
 
-	createCubeBuffer();
-	createPlaneBuffer();
-	//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-	glEnable(GL_DEPTH_TEST);
-	//glDepthFunc(GL_LESS);
-	return true;
+	{
+		const auto imgFile = StaticCollector::getImagePath() / "grass.png";
+		_grassTexture = std::make_shared<GLImageTexture2D>(imgFile.string());
+		const auto valid = _grassTexture->load().texture()->valid();
+		ExitIfFailed(valid, "Failed to load texture from file {}", imgFile.string());
+	}
 }
 
-void GLDepthTestApp::createCubeBuffer() {
+void GLBlendApp::createCubeBuffer() {
 	Cube shape{};
 	unsigned int vbo[2]{}, vao{}, ebo{};
 	glGenVertexArrays(1, &vao);
@@ -84,7 +105,7 @@ void GLDepthTestApp::createCubeBuffer() {
 	_cubeVbo[0] = vbo[0], _cubeVbo[1] = vbo[1];
 }
 
-void GLDepthTestApp::createPlaneBuffer() {
+void GLBlendApp::createPlaneBuffer() {
 	Plane shape{};
 	unsigned int vbo[2]{}, vao{}, ebo{};
 	glGenVertexArrays(1, &vao);
@@ -114,14 +135,11 @@ void GLDepthTestApp::createPlaneBuffer() {
 	_planeVbo[0] = vbo[0], _planeVbo[1] = vbo[1];
 }
 
-void GLDepthTestApp::clearColor() {
+void GLBlendApp::clearColor() {
 	return GLApp::clearColor();
 }
 
-void GLDepthTestApp::beginDrawScene() {
-	_cubeTexture->texture()->bind(0);
-	_planeTexture->texture()->bind(1);
-	_program.use();
+void GLBlendApp::beginDrawScene() {
 	return GLApp::beginDrawScene();
 }
 
@@ -139,55 +157,73 @@ static std::vector<glm::vec3> initializeCubePositions() {
 	return positions;
 }
 
-void GLDepthTestApp::drawScene(const float dt) {
+void GLBlendApp::drawScene(const float dt) {
 	ImGui::Begin("OpenGL");
 	ImGui::SetNextItemWidth(200);
-	//ImGui::SliderInt("Cube Count", &count, 1, 10);
+	ImGui::SliderInt("Grass Count", &_grassCount, 1, 10);
+	ImGui::DragFloat3("Position", &_objectPosition[0], 0.1f);
+	ImGui::DragFloat3("Scale", &_objectScale[0], 0.1f);
+	ImGui::DragFloat3("Grass Pos", &_grassPos[0], 0.1f);
 	ImGui::End();
 	
 	std::vector<glm::vec3> cubePositions = initializeCubePositions();
-	int count = cubePositions.size(); // ����������
+	int count = cubePositions.size(); 
+	_cubeTexture->texture()->bind(0);
+	_planeTexture->texture()->bind(1);
+	_grassTexture->texture()->bind(2);
+	_program.use();
 
-	// ����ͶӰ����
 	const auto projection = glm::perspective(glm::radians(_camera.zoom()), aspectRatio(), 0.1f, 100.0f);
 	_program.update("projection", projection);
 
-	// ��ȡ��ͼ����
 	const auto view = _camera.getViewMatrix();
 	_program.update("view", view);
 
-	static float curTime = 0; // ���ֵ�ǰʱ��
-	curTime += dt; // ���µ�ǰʱ��
+	static float curTime = 0; 
+	curTime += dt; 
 	glBindVertexArray(_cubeVao);
-	_program.update("textureSampler", 0);
+	//_program.update("textureSampler", 0);
 	for (int i = 0; i < count; i++) {
-		glm::mat4 model = glm::mat4(1.0f); // ��ʼ������Ϊ��λ����
-		model = glm::translate(model, cubePositions[i]); // ƽ����������λ��
+		glm::mat4 model = glm::mat4(1.0f); 
+		model = glm::translate(model, cubePositions[i] + _objectPosition);
 
 		// ʹ�õ�ǰʱ�������������������ת�Ƕ�
 		float angle = 0; // ÿ���������Բ�ͬ���ٶ���ת
 		model = glm::rotate(model, glm::radians(angle), glm::vec3(1.0f, 0.3f, 0.5f)); // ��ת
-
+		_program.update("textureSampler", 1);
 		_program.update("model", model); // ����ģ�;���
 		glDrawArrays(GL_TRIANGLES, 0, 36); // ����������
 	}
 
 	glBindVertexArray(_planeVao);
-	glm::mat4 model = glm::mat4(1.0f); // ��ʼ������Ϊ��λ����
-	model = glm::translate(model, glm::vec3(-1.0,-4.50, -10)); // ƽ����������λ��
-	_program.update("model", model); // ����ģ�;���
-	_program.update("textureSampler", 1);
-	glDrawArrays(GL_TRIANGLES, 0, 6); // ����������
+	{
+		glm::mat4 model = glm::mat4(1.0f); // ��ʼ������Ϊ��λ����
+		model = glm::translate(model, glm::vec3(-1.0, -4.50, -10)); // ƽ����������λ��
+		model = glm::scale(model, _objectScale);
+		_program.update("model", model); // ����ģ�;���
+		_program.update("textureSampler", 0);
+		glDrawArrays(GL_TRIANGLES, 0, 6); // ����������
+	}
+
+	{
+		glm::mat4 model = glm::mat4(1.0f); // ��ʼ������Ϊ��λ����
+		model = glm::translate(model, _grassPos); // ƽ����������λ��
+		model = glm::scale(model, glm::vec3(0.5, 0.5, 0.5));
+		model = glm::rotate(model, glm::radians(90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
+		_program.update("model", model); // ����ģ�;���
+		_program.update("textureSampler", 2);
+		glDrawArrays(GL_TRIANGLES, 0, 6); // ����������
+	}
 
 	glBindVertexArray(0);
 	return GLApp::drawScene(dt);
 }
 
-void GLDepthTestApp::endDrawScene() {
+void GLBlendApp::endDrawScene() {
 	return GLApp::endDrawScene();
 }
 
-void GLDepthTestApp::onKeyBoardEvent(const UINT msg, const WPARAM wParam, const LPARAM lParam) {
+void GLBlendApp::onKeyBoardEvent(const UINT msg, const WPARAM wParam, const LPARAM lParam) {
 	switch (msg) {
 	case WM_KEYDOWN:
 		break;
@@ -211,7 +247,7 @@ void GLDepthTestApp::onKeyBoardEvent(const UINT msg, const WPARAM wParam, const 
 	return GLApp::onKeyBoardEvent(msg, wParam, lParam);
 }
 
-void GLDepthTestApp::onMouseDown(const UINT msg, WPARAM btnState, int x, int y) {
+void GLBlendApp::onMouseDown(const UINT msg, WPARAM btnState, int x, int y) {
 	switch (msg) {
 	case WM_LBUTTONDOWN:
 		_mouseClicked = true; break;
@@ -220,7 +256,7 @@ void GLDepthTestApp::onMouseDown(const UINT msg, WPARAM btnState, int x, int y) 
 	return GLApp::onMouseDown(msg, btnState, x, y);
 }
 
-void GLDepthTestApp::onMouseUp(const UINT msg, WPARAM btnState, int x, int y) {
+void GLBlendApp::onMouseUp(const UINT msg, WPARAM btnState, int x, int y) {
 	switch (msg) {
 	case WM_LBUTTONUP:
 		_mouseClicked = false; break;
@@ -229,7 +265,7 @@ void GLDepthTestApp::onMouseUp(const UINT msg, WPARAM btnState, int x, int y) {
 	return GLApp::onMouseUp(msg, btnState, x, y);
 }
 
-void GLDepthTestApp::onMouseMove(WPARAM btnState, int x, int y) {
+void GLBlendApp::onMouseMove(WPARAM btnState, int x, int y) {
 	if (!_mouseClicked) {
 		return GLApp::onMouseMove(btnState, x, y);
 	}
@@ -247,7 +283,7 @@ void GLDepthTestApp::onMouseMove(WPARAM btnState, int x, int y) {
 	return GLApp::onMouseMove(btnState, x, y);
 }
 
-void GLDepthTestApp::onMouseScroll(const UINT msg, const WPARAM wParam, const LPARAM lParam) {
+void GLBlendApp::onMouseScroll(const UINT msg, const WPARAM wParam, const LPARAM lParam) {
 	int zDelta = GET_WHEEL_DELTA_WPARAM(wParam);
 	_camera.processMouseScrool(zDelta);
 	return GLApp::onMouseScroll(msg, wParam, lParam);

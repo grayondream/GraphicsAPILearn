@@ -28,5 +28,6 @@ enum class AppType : int{
     LoadModel,
     DepthTest,
     TemplateTest,
+    Blend,
 };
 

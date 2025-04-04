@@ -16,6 +16,7 @@
 #include "App/GL/Model/GLLoadModelApp.hpp"
 #include "App/GL/Advanced/GLDepthTestApp.hpp"
 #include "App/GL/Advanced/GLTemplateTestApp.hpp"
+#include "App/GL/Advanced/GLBlendApp.hpp"
 
 std::shared_ptr<GLApp> GLAppFactory::create(const AppType type){
 	switch(type){
@@ -55,6 +56,8 @@ std::shared_ptr<GLApp> GLAppFactory::create(const AppType type){
 			return std::make_shared<GLDepthTestApp>();
 		case AppType::TemplateTest:
 			return std::make_shared<GLTemplateTestApp>();
+		case AppType::Blend:
+			return std::make_shared<GLBlendApp>();
 		default:
 			break;	
 	}
