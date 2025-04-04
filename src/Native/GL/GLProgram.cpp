@@ -44,7 +44,7 @@ bool GLProgram::init(const std::string vertFile, const std::string fragFile) {
 
 GLint GLProgram::locate(const std::string& name) const {
 	const auto loc = glGetUniformLocation(_program, name.c_str());
-	ASSERT(loc != -1, "Failed to locate {}", name);
+	//ASSERT(loc != -1, "Failed to locate {}", name);
 	return loc;
 }
 

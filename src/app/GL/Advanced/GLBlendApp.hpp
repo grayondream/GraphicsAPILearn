@@ -36,6 +36,7 @@ private:
 	std::shared_ptr<GLImageTexture2D> _cubeTexture{};
 	std::shared_ptr<GLImageTexture2D> _planeTexture{};
 	std::shared_ptr<GLImageTexture2D> _grassTexture{};
+	std::shared_ptr<GLImageTexture2D> _winTexture{};
 	GLProgram _program{};
 	unsigned int _cubeVbo[2]{};
 	unsigned int _cubeVao{};
@@ -48,6 +49,6 @@ private:
 	Point2D _lastPos{ 0.0, 0.0 };
 	glm::vec3 _objectPosition = glm::vec3(0, 0, -4.0f);
 	glm::vec3 _objectScale = glm::vec3(20, 1, 20.0f);
-	glm::vec3 _grassPos = glm::vec3(0.5f, 0.5f, 0.5f);
-	int _grassCount;
+	glm::vec3 _winPos = glm::vec3(0.5f, 0.5f, 5);
+	int _grassCount = 4;
 };

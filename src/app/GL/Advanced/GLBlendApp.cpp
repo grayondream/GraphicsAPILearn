@@ -36,7 +36,7 @@ bool GLBlendApp::init(const HINSTANCE inst, const WindowDesc& param) {
 }
 
 void GLBlendApp::initGLEnv() {
-	_camera = Camera(glm::vec3(0.0f, 0.0f, 3.0f), glm::vec3(0.0f, 1.0f, 0.0f), -90, -10);
+	_camera = Camera(glm::vec3(0.0f, -1.0f, 10.0f), glm::vec3(0.0f, 1.0f, 0.0f), -90, -10);
 	glViewport(0, 0, _attribute.winAttr.width, _attribute.winAttr.height);
 	glEnable(GL_DEPTH_TEST);
 	glDepthFunc(GL_LESS);
@@ -71,6 +71,13 @@ void GLBlendApp::createTexture() {
 		const auto imgFile = StaticCollector::getImagePath() / "grass.png";
 		_grassTexture = std::make_shared<GLImageTexture2D>(imgFile.string());
 		const auto valid = _grassTexture->load().texture()->valid();
+		ExitIfFailed(valid, "Failed to load texture from file {}", imgFile.string());
+	}
+
+	{
+		const auto imgFile = StaticCollector::getImagePath() / "window.png";
+		_winTexture = std::make_shared<GLImageTexture2D>(imgFile.string());
+		const auto valid = _winTexture->load().texture()->valid();
 		ExitIfFailed(valid, "Failed to load texture from file {}", imgFile.string());
 	}
 }
@@ -163,7 +170,7 @@ void GLBlendApp::drawScene(const float dt) {
 	ImGui::SliderInt("Grass Count", &_grassCount, 1, 10);
 	ImGui::DragFloat3("Position", &_objectPosition[0], 0.1f);
 	ImGui::DragFloat3("Scale", &_objectScale[0], 0.1f);
-	ImGui::DragFloat3("Grass Pos", &_grassPos[0], 0.1f);
+	ImGui::DragFloat3("Windows Pos", &_winPos[0], 0.1f);
 	ImGui::End();
 	
 	std::vector<glm::vec3> cubePositions = initializeCubePositions();
@@ -171,6 +178,7 @@ void GLBlendApp::drawScene(const float dt) {
 	_cubeTexture->texture()->bind(0);
 	_planeTexture->texture()->bind(1);
 	_grassTexture->texture()->bind(2);
+	_winTexture->texture()->bind(3);
 	_program.use();
 
 	const auto projection = glm::perspective(glm::radians(_camera.zoom()), aspectRatio(), 0.1f, 100.0f);
@@ -191,6 +199,7 @@ void GLBlendApp::drawScene(const float dt) {
 		float angle = 0; // ÿ���������Բ�ͬ���ٶ���ת
 		model = glm::rotate(model, glm::radians(angle), glm::vec3(1.0f, 0.3f, 0.5f)); // ��ת
 		_program.update("textureSampler", 1);
+		_program.update("texColor", glm::vec4(1.0, 1.0, 1.0, 0.0));
 		_program.update("model", model); // ����ģ�;���
 		glDrawArrays(GL_TRIANGLES, 0, 36); // ����������
 	}
@@ -202,17 +211,34 @@ void GLBlendApp::drawScene(const float dt) {
 		model = glm::scale(model, _objectScale);
 		_program.update("model", model); // ����ģ�;���
 		_program.update("textureSampler", 0);
+		_program.update("texColor", glm::vec4(1.0, 1.0, 1.0, 0.0));
 		glDrawArrays(GL_TRIANGLES, 0, 6); // ����������
 	}
 
 	{
 		glm::mat4 model = glm::mat4(1.0f); // ��ʼ������Ϊ��λ����
-		model = glm::translate(model, _grassPos); // ƽ����������λ��
+		model = glm::translate(model, glm::vec3(0.5f, 0.5f, 0.5f)); // ƽ����������λ��
 		model = glm::scale(model, glm::vec3(0.5, 0.5, 0.5));
 		model = glm::rotate(model, glm::radians(90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
 		_program.update("model", model); // ����ģ�;���
 		_program.update("textureSampler", 2);
+		_program.update("texColor", glm::vec4(1.0, 1.0, 1.0, 0.0));
 		glDrawArrays(GL_TRIANGLES, 0, 6); // ����������
+	}
+
+	{
+		for (int i = 0; i < _grassCount; i++) {
+			glm::mat4 model = glm::mat4(1.0f); // ��ʼ������Ϊ��λ����
+			model = glm::scale(model, glm::vec3(0.5, 0.5, 0.5));
+			model = glm::rotate(model, glm::radians(90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
+			//如果這裏的坐標是亂序的，則需要根據距離排序透明目標
+			//但是這裏已經是有序的了就不做了
+			model = glm::translate(model, _winPos + glm::vec3(-0.5 * i, 1 * i, 0)); // ƽ����������λ��
+			_program.update("model", model); // ����ģ�;���
+			_program.update("textureSampler", 3);
+			_program.update("texColor", glm::vec4(1.0, 1.0, 1.0, 0.0));
+			glDrawArrays(GL_TRIANGLES, 0, 6); // ����������
+		}
 	}
 
 	glBindVertexArray(0);
