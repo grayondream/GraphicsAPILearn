@@ -170,7 +170,7 @@ void GLTemplateTestApp::drawScene(const float dt) {
 	ImGui::End();
 
 	std::vector<glm::vec3> cubePositions = initializeCubePositions();
-	int count = 1;// cubePositions.size();
+	int count = cubePositions.size();
 
 	// 设置投影矩阵
 	_program.use();
@@ -203,46 +203,43 @@ void GLTemplateTestApp::drawScene(const float dt) {
 
 	// 3. 绘制多个立方体 (写入模板缓冲)
 	{
-		glStencilFunc(GL_ALWAYS, 1, 0xFF); // 所有像素都写入模板缓冲，值为 1
-		glStencilMask(0xFF); // 启用模板缓冲写入
-		glBindVertexArray(_cubeVao);
-		_program.use();
-		_program.update("textureSampler", 0);
 		for (int i = 0; i < count; i++) {
-			auto model = glm::mat4(1.0f);
-			model = glm::translate(model, cubePositions[i]);
-			_program.update("model", model);
-			glDrawArrays(GL_TRIANGLES, 0, 36);
+			{
+				glStencilFunc(GL_ALWAYS, 1, 0xFF); // 所有像素都写入模板缓冲，值为 1
+				glStencilMask(0xFF); // 启用模板缓冲写入
+				glBindVertexArray(_cubeVao);
+				_program.use();
+				_program.update("textureSampler", 0);
+				auto model = glm::mat4(1.0f);
+				model = glm::translate(model, cubePositions[i]);
+				_program.update("model", model);
+				glDrawArrays(GL_TRIANGLES, 0, 36);
+				glBindVertexArray(0);
+			}
+
+			{
+				glStencilFunc(GL_NOTEQUAL, 1, 0xFF); // 仅在模板值不等于 1 时绘制
+				glStencilMask(0x00); // 禁止写入模板缓冲
+				glDisable(GL_DEPTH_TEST); // 禁用深度测试，确保描边在最前面
+				_borderProgram.use();
+				_borderProgram.update("view", view);
+				_borderProgram.update("projection", projection);
+				glBindVertexArray(_cubeVao);
+				auto model = glm::mat4(1.0f);
+				model = glm::translate(model, cubePositions[i]);
+				const auto scale = 1.1f; // 稍微小一点的缩放
+				model = glm::scale(model, glm::vec3(scale, scale, scale));
+				_borderProgram.update("model", model);
+				glDrawArrays(GL_TRIANGLES, 0, 36);
+				glBindVertexArray(0);
+				// 5. 重置 OpenGL 状态
+				glStencilMask(0xFF);
+				glStencilFunc(GL_ALWAYS, 0, 0xFF);
+				glEnable(GL_DEPTH_TEST);
+			}
 		}
-		glBindVertexArray(0);
+		
 	}
-
-	// 4. 绘制描边立方体 (只在模板值为 1 的地方绘制)
-	{
-		glStencilFunc(GL_NOTEQUAL, 1, 0xFF); // 仅在模板值不等于 1 时绘制
-		glStencilMask(0x00); // 禁止写入模板缓冲
-		glDisable(GL_DEPTH_TEST); // 禁用深度测试，确保描边在最前面
-		_borderProgram.use();
-		_borderProgram.update("view", view);
-		_borderProgram.update("projection", projection);
-		glBindVertexArray(_cubeVao);
-
-		for (int i = 0; i < count; i++) {
-			auto model = glm::mat4(1.0f);
-			model = glm::translate(model, cubePositions[i]);
-			const auto scale = 1.1f; // 稍微小一点的缩放
-			model = glm::scale(model, glm::vec3(scale, scale, scale));
-			_borderProgram.update("model", model);
-			glDrawArrays(GL_TRIANGLES, 0, 36);
-		}
-		glBindVertexArray(0);
-	}
-
-	// 5. 重置 OpenGL 状态
-	
-	glStencilMask(0xFF);
-	glStencilFunc(GL_ALWAYS, 0, 0xFF);
-	glEnable(GL_DEPTH_TEST);
 
 	return GLApp::drawScene(dt);
 }
