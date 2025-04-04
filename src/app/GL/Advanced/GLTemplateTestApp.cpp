@@ -21,6 +21,16 @@ GLTemplateTestApp::~GLTemplateTestApp() {
 	}
 }
 
+static void CheckGLStencilAbility() {
+	GLint stencilBits;
+	glGetIntegerv(GL_STENCIL_BITS, &stencilBits);
+	LOGI("Stencil bits: {}", stencilBits);
+	if (stencilBits == 0) {
+		LOGI("Error: Stencil buffer is not available!");
+		ExitIfFailed(false, "Stencil buffer is not available in this gl context");
+	}
+}
+
 bool GLTemplateTestApp::init(const HINSTANCE inst, const WindowDesc& param) {
 	if (!GLApp::init(inst, param)) {
 		return false;
@@ -58,13 +68,13 @@ bool GLTemplateTestApp::init(const HINSTANCE inst, const WindowDesc& param) {
 
 	createCubeBuffer();
 	createPlaneBuffer();
+	CheckGLStencilAbility();
 	//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 	glEnable(GL_DEPTH_TEST);
-	glEnable(GL_STENCIL_TEST);
 	glDepthFunc(GL_LESS);
+	glEnable(GL_STENCIL_TEST);
+	glStencilFunc(GL_NOTEQUAL, 1, 0xFF);
 	glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
-	glStencilFunc(GL_ALWAYS, 1, 0xFF);
-	glStencilMask(0xFF); // 启用模板缓冲写入
 	return true;
 }
 
@@ -135,9 +145,6 @@ void GLTemplateTestApp::clearColor() {
 void GLTemplateTestApp::beginDrawScene() {
 	_cubeTexture->texture()->bind(0);
 	_planeTexture->texture()->bind(1);
-	//glStencilMask(0xFF); // 每一位写入模板缓冲时都保持原样
-	//glStencilMask(0x00); // 每一位在写入模板缓冲时都会变成0（禁用写入）
-	_program.use();
 	return GLApp::beginDrawScene();
 }
 
@@ -156,79 +163,87 @@ static std::vector<glm::vec3> initializeCubePositions() {
 }
 
 void GLTemplateTestApp::drawScene(const float dt) {
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
 	ImGui::Begin("OpenGL");
 	ImGui::SetNextItemWidth(200);
 	//ImGui::SliderInt("Cube Count", &count, 1, 10);
 	ImGui::End();
-	
-	std::vector<glm::vec3> cubePositions = initializeCubePositions();
-	int count = cubePositions.size(); // ����������
 
-	// ����ͶӰ����
+	std::vector<glm::vec3> cubePositions = initializeCubePositions();
+	int count = 1;// cubePositions.size();
+
+	// 设置投影矩阵
+	_program.use();
 	const auto projection = glm::perspective(glm::radians(_camera.zoom()), aspectRatio(), 0.1f, 100.0f);
 	_program.update("projection", projection);
 
-	// ��ȡ��ͼ����
+	// 获取视图矩阵
 	const auto view = _camera.getViewMatrix();
 	_program.update("view", view);
-	static float curTime = 0; // ���ֵ�ǰʱ��
-	curTime += dt; // ���µ�ǰʱ��
-	glStencilFunc(GL_ALWAYS, 1, 0xFF);
-	glStencilMask(0xFF);
-	glBindVertexArray(_cubeVao);
-	_program.update("textureSampler", 0);
-	for (int i = 0; i < count; i++) {
-		
-	}
 
+	static float curTime = 0;
+	curTime += dt;
 
+	// 1. 清空模板缓冲和深度缓冲
+	glClear(GL_STENCIL_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	glEnable(GL_DEPTH_TEST); // 确保深度测试开启
+
+	// 2. 绘制地面 (写入模板缓冲)
 	{
-		//draw plane
 		glStencilMask(0x00);
 		glBindVertexArray(_planeVao);
-		auto model = glm::mat4(1.0f); // ��ʼ������Ϊ��λ����
-		model = glm::translate(model, glm::vec3(-1.0, -4.50, -10)); // ƽ����������λ��
-		_program.update("model", model); // ����ģ�;���
+		_program.use();
+		auto model = glm::mat4(1.0f);
+		model = glm::translate(model, glm::vec3(-1.0, -4.50, -10));
+		_program.update("model", model);
 		_program.update("textureSampler", 1);
-		glDrawArrays(GL_TRIANGLES, 0, 6); // ����������
+		glDrawArrays(GL_TRIANGLES, 0, 6);
+		glBindVertexArray(0);
 	}
 
+	// 3. 绘制多个立方体 (写入模板缓冲)
 	{
-		auto cubePos = glm::vec3(0.0f, 0.0f, 0.0f);
-		{
-			glStencilFunc(GL_ALWAYS, 1, 0xFF);
-			glStencilMask(0xFF);
-			glBindVertexArray(_cubeVao);
+		glStencilFunc(GL_ALWAYS, 1, 0xFF); // 所有像素都写入模板缓冲，值为 1
+		glStencilMask(0xFF); // 启用模板缓冲写入
+		glBindVertexArray(_cubeVao);
+		_program.use();
+		_program.update("textureSampler", 0);
+		for (int i = 0; i < count; i++) {
 			auto model = glm::mat4(1.0f);
-			model = glm::translate(model, cubePos);
-			//model = glm::scale(model, glm::vec3(1, 1, 1));
+			model = glm::translate(model, cubePositions[i]);
 			_program.update("model", model);
-			_program.update("textureSampler", 0);
 			glDrawArrays(GL_TRIANGLES, 0, 36);
 		}
+		glBindVertexArray(0);
+	}
 
-		{
-			glStencilFunc(GL_NOTEQUAL, 1, 0xFF);
-			glStencilMask(0x00);
-			glDisable(GL_DEPTH_TEST);
-			_borderProgram.use();
-			_borderProgram.update("view", view);
-			_borderProgram.update("projection", projection);
-			glBindVertexArray(_cubeVao);
+	// 4. 绘制描边立方体 (只在模板值为 1 的地方绘制)
+	{
+		glStencilFunc(GL_NOTEQUAL, 1, 0xFF); // 仅在模板值不等于 1 时绘制
+		glStencilMask(0x00); // 禁止写入模板缓冲
+		glDisable(GL_DEPTH_TEST); // 禁用深度测试，确保描边在最前面
+		_borderProgram.use();
+		_borderProgram.update("view", view);
+		_borderProgram.update("projection", projection);
+		glBindVertexArray(_cubeVao);
+
+		for (int i = 0; i < count; i++) {
 			auto model = glm::mat4(1.0f);
-			model = glm::translate(model, cubePos);
-			const auto scale = 1.1f;
+			model = glm::translate(model, cubePositions[i]);
+			const auto scale = 1.1f; // 稍微小一点的缩放
 			model = glm::scale(model, glm::vec3(scale, scale, scale));
 			_borderProgram.update("model", model);
 			glDrawArrays(GL_TRIANGLES, 0, 36);
-
 		}
+		glBindVertexArray(0);
 	}
 
-	glBindVertexArray(0);
+	// 5. 重置 OpenGL 状态
+	
 	glStencilMask(0xFF);
 	glStencilFunc(GL_ALWAYS, 0, 0xFF);
 	glEnable(GL_DEPTH_TEST);
+
 	return GLApp::drawScene(dt);
 }
 

@@ -44,14 +44,26 @@ void GLApp::initImGUI() {
 }
 
 HGLRC GLApp::CreateOpenGLContext(const HWND hwnd) {
-    PIXELFORMATDESCRIPTOR pfd{};
-    pfd.nSize = sizeof(pfd);
-    pfd.nVersion = 1;
-    pfd.dwFlags = PFD_DRAW_TO_WINDOW | PFD_SUPPORT_OPENGL | PFD_DOUBLEBUFFER;
-    pfd.iPixelType = PFD_TYPE_RGBA;
-    pfd.cColorBits = 32;
-    pfd.cDepthBits = 24;
-    pfd.iLayerType = PFD_MAIN_PLANE;
+    PIXELFORMATDESCRIPTOR pfd = {
+        sizeof(PIXELFORMATDESCRIPTOR),  //  size of this pfd
+        1,                     // version number
+        PFD_DRAW_TO_WINDOW |   // support window
+        PFD_SUPPORT_OPENGL |   // support OpenGL
+        PFD_DOUBLEBUFFER,       // double buffered
+        PFD_TYPE_RGBA,           // RGBA type
+        32,                      // 32-bit color depth
+        0, 0, 0, 0, 0, 0,        // color bits ignored
+        0,                      // no alpha buffer
+        0,                      // shift bit ignored
+        0,                      // no accumulation buffer
+        0, 0, 0, 0,             // accum bits ignored
+        24,                     // 24-bit z-buffer (depth buffer)
+        8,                      // 8-bit stencil buffer  <-- 关键：指定模板缓冲位数
+        0,                      // no auxiliary buffer
+        PFD_MAIN_PLANE,           // main layer
+        0,                      // reserved
+        0, 0, 0                 // layer masks ignored
+    };
 
     _hdc = GetDC(hwnd);
     int pixelFormat = ChoosePixelFormat(_hdc, &pfd);
