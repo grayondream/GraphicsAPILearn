@@ -29,5 +29,6 @@ enum class AppType : int{
     DepthTest,
     TemplateTest,
     Blend,
+    CullFace,
 };
 
