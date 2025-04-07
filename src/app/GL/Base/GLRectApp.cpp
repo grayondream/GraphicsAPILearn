@@ -11,6 +11,8 @@ GLRectApp::~GLRectApp() {
 		glDeleteBuffers(1, &_vbo);
 		glDeleteBuffers(1, &_ebo);
 	}
+
+	_program.destroy();
 }
 
 bool GLRectApp::init(const HINSTANCE inst, const WindowDesc& param) {

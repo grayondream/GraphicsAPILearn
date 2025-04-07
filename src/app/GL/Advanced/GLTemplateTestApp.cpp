@@ -19,6 +19,9 @@ GLTemplateTestApp::~GLTemplateTestApp() {
 		glDeleteVertexArrays(1, &_cubeVao);
 		glDeleteBuffers(2, _cubeVbo);
 	}
+
+	_program.destroy();
+	_borderProgram.destroy();
 }
 
 static void CheckGLStencilAbility() {

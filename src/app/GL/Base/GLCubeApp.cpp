@@ -18,6 +18,8 @@ GLCubeApp::~GLCubeApp() {
 		glDeleteVertexArrays(1, &_vao);
 		glDeleteBuffers(2, _vbo);
 	}
+
+	_program.destroy();
 }
 
 bool GLCubeApp::init(const HINSTANCE inst, const WindowDesc& param) {

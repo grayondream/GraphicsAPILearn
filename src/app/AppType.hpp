@@ -30,5 +30,6 @@ enum class AppType : int{
     TemplateTest,
     Blend,
     CullFace,
+    FrameBuffer,
 };
 

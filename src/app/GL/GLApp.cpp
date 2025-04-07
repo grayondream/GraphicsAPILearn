@@ -7,6 +7,7 @@
 using namespace ErrorHandle;
 
 GLApp::GLApp() {
+    _glContext = nullptr;
 }
 
 GLApp::~GLApp() {

@@ -18,6 +18,8 @@ GLCameraApp::~GLCameraApp() {
 		glDeleteVertexArrays(1, &_vao);
 		glDeleteBuffers(2, _vbo);
 	}
+
+	_program.destroy();
 }
 
 bool GLCameraApp::init(const HINSTANCE inst, const WindowDesc& param) {

@@ -10,6 +10,8 @@ GLTriangleApp::~GLTriangleApp() {
 		glDeleteVertexArrays(1, &_vao);
 		glDeleteBuffers(1, &_vbo);
 	}
+
+	_program.destroy();
 }
 
 bool GLTriangleApp::init(const HINSTANCE inst, const WindowDesc& param) {

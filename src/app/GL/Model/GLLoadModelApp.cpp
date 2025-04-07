@@ -15,6 +15,7 @@
 using namespace ErrorHandle;
 
 GLLoadModelApp::~GLLoadModelApp() {
+	_program.destroy();
 }
 
 bool GLLoadModelApp::init(const HINSTANCE inst, const WindowDesc& param) {

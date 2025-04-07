@@ -18,6 +18,9 @@ GLSimpleLightMap::~GLSimpleLightMap() {
 		glDeleteBuffers(2, _vbo);
 		glDeleteBuffers(1, &_ebo);
 	}
+
+	_lightProgram.destroy();
+	_targetProgram.destroy();
 }
 
 bool GLSimpleLightMap::init(const HINSTANCE inst, const WindowDesc& param) {

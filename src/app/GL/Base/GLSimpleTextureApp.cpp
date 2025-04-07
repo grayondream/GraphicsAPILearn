@@ -14,6 +14,8 @@ GLSimpleTextureApp::~GLSimpleTextureApp() {
 		glDeleteBuffers(2, _vbos.data());
 		glDeleteBuffers(1, &_ebo);
 	}
+
+	_program.destroy();
 }
 
 bool GLSimpleTextureApp::init(const HINSTANCE inst, const WindowDesc& param) {

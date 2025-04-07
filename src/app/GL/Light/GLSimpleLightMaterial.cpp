@@ -18,6 +18,9 @@ GLSimpleLightMaterial::~GLSimpleLightMaterial() {
 		glDeleteBuffers(2, _vbo);
 		glDeleteBuffers(1, &_ebo);
 	}
+
+	_lightProgram.destroy();
+	_targetProgram.destroy();
 }
 
 bool GLSimpleLightMaterial::init(const HINSTANCE inst, const WindowDesc& param) {

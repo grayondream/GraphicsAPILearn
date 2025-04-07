@@ -18,6 +18,9 @@ GLSimpleLightAmbination::~GLSimpleLightAmbination() {
 		glDeleteBuffers(2, _vbo);
 		glDeleteBuffers(1, &_ebo);
 	}
+
+	_lightProgram.destroy();
+	_targetProgram.destroy();
 }
 
 bool GLSimpleLightAmbination::init(const HINSTANCE inst, const WindowDesc& param) {

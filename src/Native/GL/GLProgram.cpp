@@ -24,6 +24,9 @@ static unsigned int GLCompileShader(const std::string file, const GLenum type) {
 }
 
 GLProgram::~GLProgram() {
+}
+
+void GLProgram::destroy() {
 	if (_program != 0) {
 		glDeleteProgram(_program);
 	}

@@ -19,6 +19,8 @@ GLCullFaceApp::~GLCullFaceApp() {
 		glDeleteVertexArrays(1, &_cubeVao);
 		glDeleteBuffers(2, _cubeVbo);
 	}
+
+	_program.destroy();
 }
 
 bool GLCullFaceApp::init(const HINSTANCE inst, const WindowDesc& param) {

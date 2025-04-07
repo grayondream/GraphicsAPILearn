@@ -19,6 +19,8 @@ GLDepthTestApp::~GLDepthTestApp() {
 		glDeleteVertexArrays(1, &_cubeVao);
 		glDeleteBuffers(2, _cubeVbo);
 	}
+
+	_program.destroy();
 }
 
 bool GLDepthTestApp::init(const HINSTANCE inst, const WindowDesc& param) {

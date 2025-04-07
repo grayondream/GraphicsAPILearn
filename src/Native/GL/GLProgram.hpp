@@ -15,6 +15,8 @@ public:
 
 	GLint locate(const std::string &name) const;
 
+	void destroy();
+
 	const GLProgram& update(const std::string& name, const bool value) const;
 
 	const GLProgram& update(const std::string& name, const int value) const;
