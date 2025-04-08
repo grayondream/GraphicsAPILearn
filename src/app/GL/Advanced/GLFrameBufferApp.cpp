@@ -284,16 +284,20 @@ void GLFrameBufferApp::drawScene(const float dt) {
 	ImGui::End();
 	
 	glBindFramebuffer(GL_FRAMEBUFFER, _screenFrameBuffer);
-
+	clearColor();
 	drawCube();
 	drawPlane();
 
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+	glDisable(GL_DEPTH_TEST);
 	clearColor();
+	glClear(GL_COLOR_BUFFER_BIT);
 	_screenProgram.use();
 	glBindVertexArray(_screenVao);
 	glBindTexture(GL_TEXTURE_2D, _screenTextureId);
-	_screenProgram.update("textureSampler", (int)_screenTextureId);
+	//_screenProgram.update("textureSampler", (int)_screenTextureId);
+	_screenProgram.update("textureSampler", 1);
 	glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 	glBindVertexArray(0);
 	return GLApp::drawScene(dt);
