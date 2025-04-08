@@ -20,8 +20,18 @@ public:
 	}
 
 private:
+	void storeUv() {
+		_uv = {
+				Vector2DBase<float>(1.0f, 1.0f),
+				Vector2DBase<float>(1.0f, 0.0f),
+				Vector2DBase<float>(0.0f, 0.0f),
+				Vector2DBase<float>(0.0f, 1.0f)
+		};
+	}
+
 	void store(const Vertex& v1, const Vertex& v2, const Vertex& v3, const Vertex& v4) {
 		_pts = { v1, v2, v3, v4};
 		_idx = { 0, 1, 2 , 2, 3, 0};
+		storeUv();
 	}
 };

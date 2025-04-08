@@ -28,9 +28,13 @@ protected:
 private:
 	void createCubeBuffer();
 	void createPlaneBuffer();
+	void createScreenBuffer();
+	void createFrameBuffer();
 	void compileShader();
 	void loadTexture();
 	void initGLEnv();
+	void drawPlane();
+	void drawCube();
 	GLProgram compileShader(const std::string& name);
 
 private:
@@ -42,6 +46,12 @@ private:
 	unsigned int _cubeVao{};
 	unsigned int _planeVbo[2]{};
 	unsigned int _planeVao{};
+	unsigned int _screenVao{};
+	unsigned int _screenVbo[2];
+	unsigned int _screenEbo{};
+	unsigned int _screenFrameBuffer{};
+	unsigned int _screenTextureId{};
+	unsigned int _screenRbo{};
 	float _curTime{};
 	Camera _camera{};
 	bool _clicked{};

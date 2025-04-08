@@ -11,6 +11,7 @@
 #include <glm/gtc/type_ptr.hpp>
 #include "Base/Log.hpp"
 #include "imgui.h"
+#include "Geometry/Rect.hpp"
 
 using namespace ErrorHandle;
 
@@ -20,6 +21,15 @@ GLFrameBufferApp::~GLFrameBufferApp() {
 		glDeleteBuffers(2, _cubeVbo);
 	}
 
+	glDeleteVertexArrays(1, &_planeVao);
+	glDeleteBuffers(2, _planeVbo);
+
+	glDeleteVertexArrays(1, &_screenVao);
+	glDeleteBuffers(2, _screenVbo);
+	glDeleteBuffers(1, &_screenEbo);
+
+	glDeleteFramebuffers(1, &_screenFrameBuffer);
+	glDeleteRenderbuffers(1, &_screenRbo);
 	_contentProgram.destroy();
 	_screenProgram.destroy();
 }
@@ -71,8 +81,35 @@ bool GLFrameBufferApp::init(const HINSTANCE inst, const WindowDesc& param) {
 	loadTexture();
 	createCubeBuffer();
 	createPlaneBuffer();
+	createScreenBuffer();
+	createFrameBuffer();
 	initGLEnv();
 	return true;
+}
+
+void GLFrameBufferApp::createFrameBuffer() {
+	unsigned int frameBuffer{}, frameTexture{  };
+	glGenFramebuffers(1, &frameBuffer);
+	glBindFramebuffer(GL_FRAMEBUFFER, frameBuffer);
+	glGenTextures(1, &frameTexture);
+	glBindTexture(GL_TEXTURE_2D, frameTexture);
+	const auto attr = _attribute.winAttr;
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, attr.width, attr.height, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, frameTexture, 0);
+
+	unsigned int rbo{};
+	glGenRenderbuffers(1, &rbo);
+	glBindRenderbuffer(GL_RENDERBUFFER, rbo);
+	glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, attr.width, attr.height);
+	glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_FRAMEBUFFER, rbo);
+	auto ret = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+	ErrorHandle::ExitIfFailed(ret == GL_FRAMEBUFFER_COMPLETE, "Failed to create frame buffer and bind it into render buffer");
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	_screenFrameBuffer = frameBuffer;
+	_screenTextureId = frameTexture;
+	_screenRbo = rbo;
 }
 
 void GLFrameBufferApp::createCubeBuffer() {
@@ -135,13 +172,46 @@ void GLFrameBufferApp::createPlaneBuffer() {
 	_planeVbo[0] = vbo[0], _planeVbo[1] = vbo[1];
 }
 
+void GLFrameBufferApp::createScreenBuffer() {
+	Rect shape{};
+	unsigned int vbos[2]{}, vao{}, ebo{};
+	glGenVertexArrays(1, &vao);
+	glGenBuffers(2, vbos);
+	glGenBuffers(1, &ebo);
+
+	glBindVertexArray(vao);
+	{
+		glBindBuffer(GL_ARRAY_BUFFER, vbos[0]);
+		glBufferData(GL_ARRAY_BUFFER, shape.byteSize(), shape.toGL().data(), GL_STATIC_DRAW);
+
+		glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 8 * sizeof(float), nullptr);
+		glEnableVertexAttribArray(0);
+
+		glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(4 * sizeof(float)));
+		glEnableVertexAttribArray(1);
+
+		glBindBuffer(GL_ARRAY_BUFFER, vbos[1]);
+		glBufferData(GL_ARRAY_BUFFER, shape.uvSize(), shape.uv(), GL_STATIC_DRAW);
+
+		glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), nullptr);
+		glEnableVertexAttribArray(2);
+
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
+		glBufferData(GL_ELEMENT_ARRAY_BUFFER, shape.idxByteSize(), shape.idx(), GL_STATIC_DRAW);
+
+	}
+	glBindVertexArray(0);
+	_screenVao = vao;
+	_screenEbo = ebo;
+	_screenVbo[0] = vbos[0];
+	_screenVbo[1] = vbos[1];
+}
+
 void GLFrameBufferApp::clearColor() {
 	return GLApp::clearColor();
 }
 
 void GLFrameBufferApp::beginDrawScene() {
-	_cubeTexture->texture()->bind(0);
-	_planeTexture->texture()->bind(1);
 	return GLApp::beginDrawScene();
 }
 
@@ -159,28 +229,39 @@ static std::vector<glm::vec3> initializeCubePositions() {
 	return positions;
 }
 
-void GLFrameBufferApp::drawScene(const float dt) {
-	ImGui::Begin("OpenGL");
-	ImGui::SetNextItemWidth(200);
-	//ImGui::SliderInt("Cube Count", &count, 1, 10);
-	ImGui::End();
-	
-	std::vector<glm::vec3> cubePositions = initializeCubePositions();
-	int count = cubePositions.size(); // ����������
-
+void GLFrameBufferApp::drawPlane() {
+	_planeTexture->texture()->bind(1);
 	_contentProgram.use();
-	// ����ͶӰ����
 	const auto projection = glm::perspective(glm::radians(_camera.zoom()), aspectRatio(), 0.1f, 100.0f);
 	_contentProgram.update("projection", projection);
 
-	// ��ȡ��ͼ����
+	const auto view = _camera.getViewMatrix();
+	_contentProgram.update("view", view);
+	glBindVertexArray(_planeVao);
+	glm::mat4 model = glm::mat4(1.0f); // ��ʼ������Ϊ��λ����
+	model = glm::translate(model, glm::vec3(-1.0, -4.50, -10)); // ƽ����������λ��
+	_contentProgram.update("model", model); // ����ģ�;���
+	_contentProgram.update("textureSampler", 1);
+	glDrawArrays(GL_TRIANGLES, 0, 6); // ����������
+
+	glBindVertexArray(0);
+}
+
+void GLFrameBufferApp::drawCube() {
+	_cubeTexture->texture()->bind(0);
+	_contentProgram.use();
+	const auto projection = glm::perspective(glm::radians(_camera.zoom()), aspectRatio(), 0.1f, 100.0f);
+	_contentProgram.update("projection", projection);
+
 	const auto view = _camera.getViewMatrix();
 	_contentProgram.update("view", view);
 
 	static float curTime = 0; // ���ֵ�ǰʱ��
-	curTime += dt; // ���µ�ǰʱ��
 	glBindVertexArray(_cubeVao);
 	_contentProgram.update("textureSampler", 0);
+
+	std::vector<glm::vec3> cubePositions = initializeCubePositions();
+	int count = cubePositions.size(); // ����������
 	for (int i = 0; i < count; i++) {
 		glm::mat4 model = glm::mat4(1.0f); // ��ʼ������Ϊ��λ����
 		model = glm::translate(model, cubePositions[i]); // ƽ����������λ��
@@ -193,13 +274,27 @@ void GLFrameBufferApp::drawScene(const float dt) {
 		glDrawArrays(GL_TRIANGLES, 0, 36); // ����������
 	}
 
-	glBindVertexArray(_planeVao);
-	glm::mat4 model = glm::mat4(1.0f); // ��ʼ������Ϊ��λ����
-	model = glm::translate(model, glm::vec3(-1.0,-4.50, -10)); // ƽ����������λ��
-	_contentProgram.update("model", model); // ����ģ�;���
-	_contentProgram.update("textureSampler", 1);
-	glDrawArrays(GL_TRIANGLES, 0, 6); // ����������
+	glBindVertexArray(0);
+}
 
+void GLFrameBufferApp::drawScene(const float dt) {
+	ImGui::Begin("OpenGL");
+	ImGui::SetNextItemWidth(200);
+	//ImGui::SliderInt("Cube Count", &count, 1, 10);
+	ImGui::End();
+	
+	glBindFramebuffer(GL_FRAMEBUFFER, _screenFrameBuffer);
+
+	drawCube();
+	drawPlane();
+
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	clearColor();
+	_screenProgram.use();
+	glBindVertexArray(_screenVao);
+	glBindTexture(GL_TEXTURE_2D, _screenTextureId);
+	_screenProgram.update("textureSampler", (int)_screenTextureId);
+	glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 	glBindVertexArray(0);
 	return GLApp::drawScene(dt);
 }
