@@ -31,5 +31,6 @@ enum class AppType : int{
     Blend,
     CullFace,
     FrameBuffer,
+    SkyBox,
 };
 

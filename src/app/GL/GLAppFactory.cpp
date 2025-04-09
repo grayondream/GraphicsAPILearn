@@ -19,6 +19,7 @@
 #include "App/GL/Advanced/GLBlendApp.hpp"
 #include "App/GL/Advanced/GLCullFaceApp.hpp"
 #include "App/GL/Advanced/GLFrameBufferApp.hpp"
+#include "App/GL/Advanced/GLSkyboxApp.hpp"
 
 std::shared_ptr<GLApp> GLAppFactory::create(const AppType type){
 	switch(type){
@@ -64,6 +65,8 @@ std::shared_ptr<GLApp> GLAppFactory::create(const AppType type){
 			return std::make_shared<GLCullFaceApp>();
 		case AppType::FrameBuffer:
 			return std::make_shared<GLFrameBufferApp>();
+		case AppType::SkyBox:
+			return std::make_shared<GLSkyboxApp>();
 		default:
 			break;	
 	}
