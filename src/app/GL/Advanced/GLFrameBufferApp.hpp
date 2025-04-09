@@ -57,4 +57,5 @@ private:
 	bool _clicked{};
 	bool _mouseClicked{ false };
 	Point2D _lastPos{ 0.0, 0.0 };
+	int _selectEffectType{ 0 };
 };

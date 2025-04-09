@@ -280,7 +280,11 @@ void GLFrameBufferApp::drawCube() {
 void GLFrameBufferApp::drawScene(const float dt) {
 	ImGui::Begin("OpenGL");
 	ImGui::SetNextItemWidth(200);
-	//ImGui::SliderInt("Cube Count", &count, 1, 10);
+	const char* items[4] = { "None", "Inversion", "Gray", "Kernel"};
+
+	if (ImGui::Combo("Cube Count", &_selectEffectType, items, IM_ARRAYSIZE(items))) {
+		LOGI("Select Effect {}", std::string(items[_selectEffectType]));
+    }
 	ImGui::End();
 	
 	glBindFramebuffer(GL_FRAMEBUFFER, _screenFrameBuffer);
@@ -298,8 +302,10 @@ void GLFrameBufferApp::drawScene(const float dt) {
 	glBindTexture(GL_TEXTURE_2D, _screenTextureId);
 	//_screenProgram.update("textureSampler", (int)_screenTextureId);
 	_screenProgram.update("textureSampler", 1);
+	_screenProgram.update("effectType", _selectEffectType);
 	glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 	glBindVertexArray(0);
+	glEnable(GL_DEPTH_TEST);
 	return GLApp::drawScene(dt);
 }
 
