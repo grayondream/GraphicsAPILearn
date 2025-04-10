@@ -73,6 +73,7 @@ bool GLSkyboxApp::init(const HINSTANCE inst, const WindowDesc& param) {
 	_camera = Camera(glm::vec3(0.0f, 0.0f, 3.0f));
 	glViewport(0, 0, _attribute.winAttr.width, _attribute.winAttr.height);
 	_program = GLUtils::CompileShader("Cube");
+	//_skyboxProgram = GLUtils::CompileShader("SkyBox");
 	const auto imgFile = StaticCollector::getImagePath() / "dog.jpg";
 	_texture = std::make_shared<GLImageTexture2D>(imgFile.string());
 	const auto valid = _texture->load().texture()->valid();
@@ -112,6 +113,63 @@ void GLSkyboxApp::createVertexBuffer() {
 	_vbo[0] = vbo[0], _vbo[1] = vbo[1];
 }
 
+std::pair<unsigned int, unsigned int> CreateSkyBoxBuffer() {
+	float skyboxVertices[] = {
+		// positions          
+		-1.0f,  1.0f, -1.0f,
+		-1.0f, -1.0f, -1.0f,
+		 1.0f, -1.0f, -1.0f,
+		 1.0f, -1.0f, -1.0f,
+		 1.0f,  1.0f, -1.0f,
+		-1.0f,  1.0f, -1.0f,
+
+		-1.0f, -1.0f,  1.0f,
+		-1.0f, -1.0f, -1.0f,
+		-1.0f,  1.0f, -1.0f,
+		-1.0f,  1.0f, -1.0f,
+		-1.0f,  1.0f,  1.0f,
+		-1.0f, -1.0f,  1.0f,
+
+		 1.0f, -1.0f, -1.0f,
+		 1.0f, -1.0f,  1.0f,
+		 1.0f,  1.0f,  1.0f,
+		 1.0f,  1.0f,  1.0f,
+		 1.0f,  1.0f, -1.0f,
+		 1.0f, -1.0f, -1.0f,
+
+		-1.0f, -1.0f,  1.0f,
+		-1.0f,  1.0f,  1.0f,
+		 1.0f,  1.0f,  1.0f,
+		 1.0f,  1.0f,  1.0f,
+		 1.0f, -1.0f,  1.0f,
+		-1.0f, -1.0f,  1.0f,
+
+		-1.0f,  1.0f, -1.0f,
+		 1.0f,  1.0f, -1.0f,
+		 1.0f,  1.0f,  1.0f,
+		 1.0f,  1.0f,  1.0f,
+		-1.0f,  1.0f,  1.0f,
+		-1.0f,  1.0f, -1.0f,
+
+		-1.0f, -1.0f, -1.0f,
+		-1.0f, -1.0f,  1.0f,
+		 1.0f, -1.0f, -1.0f,
+		 1.0f, -1.0f, -1.0f,
+		-1.0f, -1.0f,  1.0f,
+		 1.0f, -1.0f,  1.0f
+	};
+
+	unsigned int skyboxVAO, skyboxVBO;
+	glGenVertexArrays(1, &skyboxVAO);
+	glGenBuffers(1, &skyboxVBO);
+	glBindVertexArray(skyboxVAO);
+	glBindBuffer(GL_ARRAY_BUFFER, skyboxVBO);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(skyboxVertices), &skyboxVertices, GL_STATIC_DRAW);
+	glEnableVertexAttribArray(0);
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+	return { skyboxVAO, skyboxVBO };
+}
+
 void GLSkyboxApp::clearColor() {
 	return GLApp::clearColor();
 }
@@ -122,43 +180,34 @@ void GLSkyboxApp::beginDrawScene() {
 	return GLApp::beginDrawScene();
 }
 
-void GLSkyboxApp::drawScene(const float dt) {
-	glBindVertexArray(_vao);
-	ImGui::Begin("OpenGL");
-	static int count{ 1 };
-	ImGui::SetNextItemWidth(200);
-	ImGui::SliderInt("Cube Count", &count, 1, 10);
-	ImGui::End();
-	glm::vec3 cubePositions[] = {
-	  glm::vec3(0.0f,  0.0f,  0.0f),
-	  glm::vec3(2.0f,  5.0f, -15.0f),
-	  glm::vec3(-1.5f, -2.2f, -2.5f),
-	  glm::vec3(-3.8f, -2.0f, -12.3f),
-	  glm::vec3(2.4f, -0.4f, -3.5f),
-	  glm::vec3(-1.7f,  3.0f, -7.5f),
-	  glm::vec3(1.3f, -2.0f, -2.5f),
-	  glm::vec3(1.5f,  2.0f, -2.5f),
-	  glm::vec3(1.5f,  0.2f, -1.5f),
-	  glm::vec3(-1.3f,  1.0f, -1.5f)
-	};
-
-	static float curTime = 0;
-	curTime += dt;
+void GLSkyboxApp::drawCube() {
 	const auto projection = glm::perspective(glm::radians(_camera.zoom()), aspectRatio(), 0.1f, 100.0f);
 	_program.update("projection", projection);
 	const auto view = _camera.getViewMatrix();
 	_program.update("view", view);
-	for (int i = 0; i < count; i++) {
-		glm::mat4 model = glm::mat4(1.0f); // make sure to initialize matrix to identity matrix first
-		model = glm::translate(model, cubePositions[i]);
-		float angle = 20.0f * (i + 1) * curTime;
-		model = glm::rotate(model, glm::radians(angle), glm::vec3(1.0f, 0.3f, 0.5f));
-		_program.update("model", model);
+	glm::mat4 model = glm::mat4(1.0f); // make sure to initialize matrix to identity matrix first
+	model = glm::translate(model, glm::vec3(0, 0, 0));
+	model = glm::rotate(model, glm::radians(45.f), glm::vec3(1, 0, 0));
+	model = glm::rotate(model, glm::radians(45.f), glm::vec3(0, 1, 0));
+	_program.update("model", model);
 
-		glDrawArrays(GL_TRIANGLES, 0, 36);
-	}
-
+	glDrawArrays(GL_TRIANGLES, 0, 36);
 	glBindVertexArray(0);
+}
+
+void GLSkyboxApp::drawSkybox() {
+
+}
+
+void GLSkyboxApp::drawScene(const float dt) {
+	glBindVertexArray(_vao);
+	ImGui::Begin("OpenGL");
+	ImGui::SetNextItemWidth(200);
+	ImGui::End();
+	
+	drawCube();
+	drawSkybox();
+	
 	return GLApp::drawScene(dt);
 }
 

@@ -28,10 +28,13 @@ protected:
 
 private:
 	void createVertexBuffer();
+	void drawCube();
+	void drawSkybox();
 
 private:
 	std::shared_ptr<GLImageTexture2D> _texture{};
 	GLProgram _program{};
+	GLProgram _skyboxProgram{};
 	unsigned int _vbo[2]{};
 	unsigned int _vao{};
 	float _curTime{};
