@@ -281,7 +281,7 @@ void GLFrameBufferApp::drawScene(const float dt) {
 	ImGui::Begin("OpenGL");
 	ImGui::SetNextItemWidth(200);
 	const char* items[4] = { "None", "Inversion", "Gray", "Kernel"};
-
+	
 	if (ImGui::Combo("Cube Count", &_selectEffectType, items, IM_ARRAYSIZE(items))) {
 		LOGI("Select Effect {}", std::string(items[_selectEffectType]));
     }

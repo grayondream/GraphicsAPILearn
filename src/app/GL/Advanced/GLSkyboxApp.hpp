@@ -37,6 +37,9 @@ private:
 	GLProgram _skyboxProgram{};
 	unsigned int _vbo[2]{};
 	unsigned int _vao{};
+	unsigned int _skyVao{};
+	unsigned int _skyVbo{};
+	unsigned int _skyTexture{};
 	float _curTime{};
 	Camera _camera{};
 	bool _clicked{};

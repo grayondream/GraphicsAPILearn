@@ -23,10 +23,12 @@ set(RENDER_3PARTY_PATH "${CMAKE_SOURCE_DIR}/3party" CACHE STRING "all 3party too
 include_directories(${RENDER_SOURCE_PATH})
 include_directories(${WINDOWS_SDK_ROOT})
 include(${RENDER_3PARTY_PATH}/include.cmake)
+include_directories(${WINDOWS_SDK_ROOT}/winrt)
 
 option(ENABLE_DX11 "Enable Direct3D 11 support" ON)
 option(ENABLE_DX12 "Enable Direct3D 12 support" ON)
 option(ENABLE_OPENGL "Enable OpenGL" ON)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 if(ENABLE_DX11 OR ENABLE_DX12)
     include_directories(${DX_SDK_ROOT}/Include)

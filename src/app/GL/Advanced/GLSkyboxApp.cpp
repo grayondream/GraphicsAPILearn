@@ -22,6 +22,8 @@ GLSkyboxApp::~GLSkyboxApp() {
 		glDeleteBuffers(2, _vbo);
 	}
 
+	glDeleteVertexArrays(1, &_skyVao);
+	glDeleteBuffers(1, &_skyVbo);
 	_program.destroy();
 }
 
@@ -39,15 +41,15 @@ static unsigned int LoadCubeMap(const std::vector<std::string> faces) {
 	}
 
 	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
 	return textureId;
 }
 
 unsigned int LoadCubeMap() {
-	const auto path = StaticCollector::getImagePath() / "skybox";
+	const auto path = StaticCollector::getImagePath() / "Skybox";
 	std::vector<std::string> faces{
 		"right.jpg",
 		"left.jpg",
@@ -65,55 +67,7 @@ unsigned int LoadCubeMap() {
 	return LoadCubeMap(faceFiles);
 }
 
-bool GLSkyboxApp::init(const HINSTANCE inst, const WindowDesc& param) {
-	if (!GLApp::init(inst, param)) {
-		return false;
-	}
-	
-	_camera = Camera(glm::vec3(0.0f, 0.0f, 3.0f));
-	glViewport(0, 0, _attribute.winAttr.width, _attribute.winAttr.height);
-	_program = GLUtils::CompileShader("Cube");
-	//_skyboxProgram = GLUtils::CompileShader("SkyBox");
-	const auto imgFile = StaticCollector::getImagePath() / "dog.jpg";
-	_texture = std::make_shared<GLImageTexture2D>(imgFile.string());
-	const auto valid = _texture->load().texture()->valid();
-	ExitIfFailed(valid, "Failed to load texture from file {}", imgFile.string());
-	createVertexBuffer();
-	//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-	return true;
-}
-
-void GLSkyboxApp::createVertexBuffer() {
-	Cube shape{};
-	unsigned int vbo[2]{}, vao{}, ebo{};
-	glGenVertexArrays(1, &vao);
-	glGenBuffers(2, vbo);
-	glBindVertexArray(vao);
-	{
-		glBindBuffer(GL_ARRAY_BUFFER, vbo[0]);
-		glBufferData(GL_ARRAY_BUFFER, shape.byteSize(), shape.toGL().data(), GL_STATIC_DRAW);
-
-		glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex), nullptr);
-		glEnableVertexAttribArray(0);
-
-		glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)(sizeof(float) * 4));
-		glEnableVertexAttribArray(1);
-
-		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
-		glBufferData(GL_ELEMENT_ARRAY_BUFFER, shape.idxByteSize(), shape.idx(), GL_STATIC_DRAW);
-
-		glBindBuffer(GL_ARRAY_BUFFER, vbo[1]);
-		glBufferData(GL_ARRAY_BUFFER, shape.uvSize(), shape.uv(), GL_STATIC_DRAW);
-
-		glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), nullptr);
-		glEnableVertexAttribArray(2);
-	}
-	glBindVertexArray(0);
-	_vao = vao;
-	_vbo[0] = vbo[0], _vbo[1] = vbo[1];
-}
-
-std::pair<unsigned int, unsigned int> CreateSkyBoxBuffer() {
+static std::pair<unsigned int, unsigned int> CreateSkyBoxBuffer() {
 	float skyboxVertices[] = {
 		// positions          
 		-1.0f,  1.0f, -1.0f,
@@ -170,6 +124,56 @@ std::pair<unsigned int, unsigned int> CreateSkyBoxBuffer() {
 	return { skyboxVAO, skyboxVBO };
 }
 
+bool GLSkyboxApp::init(const HINSTANCE inst, const WindowDesc& param) {
+	if (!GLApp::init(inst, param)) {
+		return false;
+	}
+	
+	_camera = Camera(glm::vec3(0.0f, 0.0f, 3.0f));
+	glViewport(0, 0, _attribute.winAttr.width, _attribute.winAttr.height);
+	_program = GLUtils::CompileShader("Cube");
+	_skyboxProgram = GLUtils::CompileShader("SkyBox");
+	const auto imgFile = StaticCollector::getImagePath() / "dog.jpg";
+	_texture = std::make_shared<GLImageTexture2D>(imgFile.string());
+	const auto valid = _texture->load().texture()->valid();
+	ExitIfFailed(valid, "Failed to load texture from file {}", imgFile.string());
+	createVertexBuffer();
+	std::tie(_skyVao, _skyVbo) = CreateSkyBoxBuffer();
+	//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+	_skyTexture = LoadCubeMap();
+	return true;
+}
+
+void GLSkyboxApp::createVertexBuffer() {
+	Cube shape{};
+	unsigned int vbo[2]{}, vao{}, ebo{};
+	glGenVertexArrays(1, &vao);
+	glGenBuffers(2, vbo);
+	glBindVertexArray(vao);
+	{
+		glBindBuffer(GL_ARRAY_BUFFER, vbo[0]);
+		glBufferData(GL_ARRAY_BUFFER, shape.byteSize(), shape.toGL().data(), GL_STATIC_DRAW);
+
+		glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex), nullptr);
+		glEnableVertexAttribArray(0);
+
+		glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)(sizeof(float) * 4));
+		glEnableVertexAttribArray(1);
+
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
+		glBufferData(GL_ELEMENT_ARRAY_BUFFER, shape.idxByteSize(), shape.idx(), GL_STATIC_DRAW);
+
+		glBindBuffer(GL_ARRAY_BUFFER, vbo[1]);
+		glBufferData(GL_ARRAY_BUFFER, shape.uvSize(), shape.uv(), GL_STATIC_DRAW);
+
+		glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), nullptr);
+		glEnableVertexAttribArray(2);
+	}
+	glBindVertexArray(0);
+	_vao = vao;
+	_vbo[0] = vbo[0], _vbo[1] = vbo[1];
+}
+
 void GLSkyboxApp::clearColor() {
 	return GLApp::clearColor();
 }
@@ -196,7 +200,26 @@ void GLSkyboxApp::drawCube() {
 }
 
 void GLSkyboxApp::drawSkybox() {
-
+    glDepthFunc(GL_LEQUAL);
+    glDepthMask(GL_FALSE);  // 禁用深度写入
+    
+    _skyboxProgram.use();
+    const auto projection = glm::perspective(glm::radians(_camera.zoom()), aspectRatio(), 0.1f, 100.0f);
+    _skyboxProgram.update("projection", projection);
+    
+    // 使用仅含旋转分量的视图矩阵
+    auto view = glm::mat4(glm::mat3(_camera.getViewMatrix()));
+    _skyboxProgram.update("view", view);
+    
+    _skyboxProgram.update("skybox", 0);
+    glBindVertexArray(_skyVao);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, _skyTexture);
+    glDrawArrays(GL_TRIANGLES, 0, 36);
+    glBindVertexArray(0);
+    
+    glDepthMask(GL_TRUE);   // 恢复深度写入
+    glDepthFunc(GL_LESS);
 }
 
 void GLSkyboxApp::drawScene(const float dt) {
@@ -205,8 +228,9 @@ void GLSkyboxApp::drawScene(const float dt) {
 	ImGui::SetNextItemWidth(200);
 	ImGui::End();
 	
-	drawCube();
+	// 修改渲染顺序：先绘制天空盒，再绘制其他物体
 	drawSkybox();
+	drawCube();
 	
 	return GLApp::drawScene(dt);
 }
