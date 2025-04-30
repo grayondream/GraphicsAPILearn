@@ -21,7 +21,7 @@ public:
 	Image(const std::string& file = {});
 	~Image();
 
-	Image& load();
+	Image& load(bool flip = true);
 
 	uint8_t* data();
 

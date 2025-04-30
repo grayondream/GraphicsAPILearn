@@ -34,7 +34,7 @@ static unsigned int LoadCubeMap(const std::vector<std::string> faces) {
 	int width{}, height{}, channel{};
 	for (auto i = 0; i < faces.size(); i++) {
 		auto img = Image(faces[i]);
-		img.load();
+		img.load(false);
 		const auto format = GLUtils::PixelFormat2GLFormat(img.format());
 		glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, format, img.size().width, img.size().height, 0, format, GL_UNSIGNED_BYTE, img.data());
 		LOGI("Load Cube Image from index {} file {}", i, faces[i]);
@@ -228,9 +228,9 @@ void GLSkyboxApp::drawScene(const float dt) {
 	ImGui::SetNextItemWidth(200);
 	ImGui::End();
 	
+	drawCube();
 	// 修改渲染顺序：先绘制天空盒，再绘制其他物体
 	drawSkybox();
-	drawCube();
 	
 	return GLApp::drawScene(dt);
 }
