@@ -6,6 +6,7 @@
 #include "glad/glad.h"
 #include "Geometry/Cube.hpp"
 #include "Native/GL/GLImageTexture2D.hpp"
+#include "Native/GL/GLImageTexture3D.hpp"
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
@@ -25,46 +26,6 @@ GLSkyboxApp::~GLSkyboxApp() {
 	glDeleteVertexArrays(1, &_skyVao);
 	glDeleteBuffers(1, &_skyVbo);
 	_program.destroy();
-}
-
-static unsigned int LoadCubeMap(const std::vector<std::string> faces) {
-	unsigned int textureId{};
-	glGenTextures(1, &textureId);
-	glBindTexture(GL_TEXTURE_CUBE_MAP, textureId);
-	int width{}, height{}, channel{};
-	for (auto i = 0; i < faces.size(); i++) {
-		auto img = Image(faces[i]);
-		img.load(false);
-		const auto format = GLUtils::PixelFormat2GLFormat(img.format());
-		glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, format, img.size().width, img.size().height, 0, format, GL_UNSIGNED_BYTE, img.data());
-		LOGI("Load Cube Image from index {} file {}", i, faces[i]);
-	}
-
-	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
-	return textureId;
-}
-
-unsigned int LoadCubeMap() {
-	const auto path = StaticCollector::getImagePath() / "Skybox";
-	std::vector<std::string> faces{
-		"right.jpg",
-		"left.jpg",
-		"top.jpg",
-		"bottom.jpg",
-		"front.jpg",
-		"back.jpg"
-	};
-
-	std::vector<std::string> faceFiles{};
-	for (auto name : faces) {
-		faceFiles.push_back((path / name).string());
-	}
-
-	return LoadCubeMap(faceFiles);
 }
 
 static std::pair<unsigned int, unsigned int> CreateSkyBoxBuffer() {
@@ -133,14 +94,18 @@ bool GLSkyboxApp::init(const HINSTANCE inst, const WindowDesc& param) {
 	glViewport(0, 0, _attribute.winAttr.width, _attribute.winAttr.height);
 	_program = GLUtils::CompileShader("Cube");
 	_skyboxProgram = GLUtils::CompileShader("SkyBox");
-	const auto imgFile = StaticCollector::getImagePath() / "dog.jpg";
+	const auto imgPath = StaticCollector::getImagePath();
+	const auto imgFile = imgPath / "dog.jpg";
 	_texture = std::make_shared<GLImageTexture2D>(imgFile.string());
-	const auto valid = _texture->load().texture()->valid();
+	_skyBoxTexture = std::make_shared<GLImageTexture3D>((imgPath / "Skybox").string());
+	auto valid = _skyBoxTexture->load().texture()->valid();
+	ExitIfFailed(valid, "Failed to load texture from file {}", imgFile.string());
+
+	valid = _texture->load().texture()->valid();
 	ExitIfFailed(valid, "Failed to load texture from file {}", imgFile.string());
 	createVertexBuffer();
 	std::tie(_skyVao, _skyVbo) = CreateSkyBoxBuffer();
 	//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-	_skyTexture = LoadCubeMap();
 	return true;
 }
 
@@ -213,8 +178,7 @@ void GLSkyboxApp::drawSkybox() {
     
     _skyboxProgram.update("skybox", 0);
     glBindVertexArray(_skyVao);
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_CUBE_MAP, _skyTexture);
+	_skyBoxTexture->texture()->bind();
     glDrawArrays(GL_TRIANGLES, 0, 36);
     glBindVertexArray(0);
     

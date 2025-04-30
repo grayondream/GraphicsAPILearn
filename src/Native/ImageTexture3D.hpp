@@ -1,30 +1,30 @@
 
 #include <Geometry/Image.hpp>
-#include "ITexture2D.hpp"
+#include "ITexture3D.hpp"
 #include "Geometry/Vertex.hpp"
 
 #include <vector>
+#include <array>
 #include <memory>
 
 using GLTextureType = unsigned int;
-using DX11TextureType = 
-class ImageTexture2D {
+class ImageTexture3D {
 public:
-	ImageTexture2D(const std::string& file);
+	ImageTexture3D(const std::string& path);
 
-	virtual ImageTexture2D& load();
+	virtual ImageTexture3D& load();
 
 	float* coord();
 
 	std::size_t coordSize();
 
-	std::shared_ptr<ITexture2D>& texture() {
+	std::shared_ptr<ITexture3D>& texture() {
 		return _texture;
 	}
 private:
-	Image _img{};
+	std::array<Image, 6> _imgs{};
 	std::vector<Point2D> _coord{};
 
 protected:
-	std::shared_ptr<ITexture2D> _texture{};
+	std::shared_ptr<ITexture3D> _texture{};
 };

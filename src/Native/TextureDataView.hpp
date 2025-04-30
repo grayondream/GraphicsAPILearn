@@ -4,6 +4,7 @@
 #include <cstdint>
 #include "Geometry/Image.hpp"
 #include <Geometry/Format.hpp>
+#include <vector>
 
 class Texture2DDataView{
 public:
@@ -39,3 +40,5 @@ private:
     ImageSize _size{0, 0, 0};
     PixelFormat _format{};
 };
+
+using Texture3DDataView = std::vector<Texture2DDataView>;

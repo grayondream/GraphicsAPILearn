@@ -28,12 +28,3 @@ float* ImageTexture2D::coord() {
 std::size_t ImageTexture2D::coordSize() {
 	return _coord.size() * sizeof(Point2D);
 }
-
-ImageTexture2D& ImageTexture2D::multiSurface(const int cnt) {
-	if (cnt == 1) {
-		return *this;
-	}
-
-	_coord.clear();
-	return *this;
-}

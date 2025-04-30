@@ -36,7 +36,6 @@ bool GLCubeApp::init(const HINSTANCE inst, const WindowDesc& param) {
 	_texture = std::make_shared<GLImageTexture2D>(imgFile.string());
 	const auto valid = _texture->load().texture()->valid();
 	ExitIfFailed(valid, "Failed to load texture from file {}", imgFile.string());
-	_texture->multiSurface(6);
 	createVertexBuffer();
 	//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 	return true;

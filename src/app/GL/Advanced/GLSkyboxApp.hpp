@@ -8,6 +8,7 @@
 #include "Geometry/Vertex.hpp"
 
 class GLImageTexture2D;
+class GLImageTexture3D;
 class GLSkyboxApp : public GLApp {
 public:
 	virtual ~GLSkyboxApp();
@@ -33,13 +34,13 @@ private:
 
 private:
 	std::shared_ptr<GLImageTexture2D> _texture{};
+	std::shared_ptr<GLImageTexture3D> _skyBoxTexture{};
 	GLProgram _program{};
 	GLProgram _skyboxProgram{};
 	unsigned int _vbo[2]{};
 	unsigned int _vao{};
 	unsigned int _skyVao{};
 	unsigned int _skyVbo{};
-	unsigned int _skyTexture{};
 	float _curTime{};
 	Camera _camera{};
 	bool _clicked{};
