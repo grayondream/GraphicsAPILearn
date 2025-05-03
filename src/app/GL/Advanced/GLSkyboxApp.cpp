@@ -126,6 +126,7 @@ void GLSkyboxApp::drawCube() {
 	_program.update("textureSampler", 0);
 	_program.update("skyBoxSampler", 1);
 	_program.update("enableReflection", _enableReflect);
+	_program.update("enableRefraction", _enableRefraction);
 	glDrawArrays(GL_TRIANGLES, 0, 36);
 	glBindVertexArray(0);
 }
