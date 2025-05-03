@@ -37,7 +37,7 @@ private:
 	std::shared_ptr<GLImageTexture3D> _skyBoxTexture{};
 	GLProgram _program{};
 	GLProgram _skyboxProgram{};
-	unsigned int _vbo[2]{};
+	unsigned int _vbo[3]{};
 	unsigned int _vao{};
 	unsigned int _skyVao{};
 	unsigned int _skyVbo{};
