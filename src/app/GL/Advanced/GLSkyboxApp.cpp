@@ -125,7 +125,7 @@ void GLSkyboxApp::drawCube() {
 	_program.update("cameraPos", attr.pos);
 	_program.update("textureSampler", 0);
 	_program.update("skyBoxSampler", 1);
-	_program.update("enableReflection", 1);
+	_program.update("enableReflection", _enableReflect);
 	glDrawArrays(GL_TRIANGLES, 0, 36);
 	glBindVertexArray(0);
 }
@@ -154,7 +154,12 @@ void GLSkyboxApp::drawSkybox() {
 void GLSkyboxApp::drawScene(const float dt) {
 	glBindVertexArray(_vao);
 	ImGui::Begin("OpenGL");
-	ImGui::SetNextItemWidth(200);
+	ImGui::Checkbox("Enable Reflection", &_enableReflect);
+	ImGui::Checkbox("Enable Refraction", &_enableRefraction);
+	if (_enableReflect && _enableRefraction) {
+		_enableReflect = _enableRefraction = false;
+	}
+
 	ImGui::End();
 	_texture->texture()->bind(0);
 	_skyBoxTexture->texture()->bind(1);

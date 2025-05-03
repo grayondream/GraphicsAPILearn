@@ -45,5 +45,7 @@ private:
 	Camera _camera{};
 	bool _clicked{};
 	bool _mouseClicked{ false };
+	bool _enableReflect{};
+	bool _enableRefraction{};
 	Point2D _lastPos{0.0, 0.0};
 };
