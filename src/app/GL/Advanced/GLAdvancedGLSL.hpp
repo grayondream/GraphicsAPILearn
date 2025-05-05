@@ -41,4 +41,5 @@ private:
     bool _enablePointSize;
     bool _enableFragCoord;
     bool _enableVertexId;
+    bool _enableFrontFaceCulling;
 };
