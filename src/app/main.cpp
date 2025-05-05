@@ -36,6 +36,7 @@ static inline constexpr int GAME_ENABLE_MSAA = true;
  *  CullFace                        Cull Face Test
  *  FrameBuffer                     Frame Buffer Test
  *  SkyBox                          Render a skybox around the camera
+ *  AdvancedGLSL                    Advanced GLSL Test
  */
 
 namespace EnumUtil = Utils::Enum;
@@ -43,7 +44,7 @@ namespace EnumUtil = Utils::Enum;
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nShowCmd) {
     ConsoleDebugger consoleDebugger{};
     
-    auto type = AppType::SkyBox;
+    auto type = AppType::AdvancedGLSL;
     auto api = GraphicsType::GL;
     LOGI("Start Graphics Learn!!!");
     LOGI("Select {} Application, Render App With {} API", EnumUtil::EnumName(type), EnumUtil::EnumName(api));

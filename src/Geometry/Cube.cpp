@@ -55,7 +55,7 @@ Cube::Cube() {
 	for (int i = 0; i < sizeof(vertices) / sizeof(float); i += 8) {
 		_pts.push_back(Vertex{
 			{vertices[i], vertices[i + 1], vertices[i + 2], 1.0f},
-			{1.0f, 1.0f, 1.0f, 1.0f}
+			{1.0, 1.0, 1.0, 1.0},
 		});
 		_normal.push_back({vertices[i + 3], vertices[i + 4], vertices[i + 5], 0.0f});
 		_uv.push_back({vertices[i + 6], vertices[i + 7]});

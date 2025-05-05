@@ -1,5 +1,6 @@
 #pragma once
 
+#include "GL/Advanced/GLAdvancedGLSL.hpp"
 enum class GraphicsType : int{
     GL,
     DX11,
@@ -32,5 +33,6 @@ enum class AppType : int{
     CullFace,
     FrameBuffer,
     SkyBox,
+    AdvancedGLSL
 };
 

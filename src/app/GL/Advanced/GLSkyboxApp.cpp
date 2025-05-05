@@ -49,8 +49,8 @@ bool GLSkyboxApp::init(const HINSTANCE inst, const WindowDesc& param) {
 	
 	_camera = Camera(glm::vec3(0.0f, 0.0f, 3.0f));
 	glViewport(0, 0, _attribute.winAttr.width, _attribute.winAttr.height);
-	_program = GLUtils::CompileShader("Cube");
-	_skyboxProgram = GLUtils::CompileShader("SkyBox");
+	_program = GLUtils::CompileShader("Advanced", "SkyBox", "Cube");
+	_skyboxProgram = GLUtils::CompileShader("Advanced", "SkyBox", "SkyBox");
 	const auto imgPath = StaticCollector::getImagePath();
 	const auto imgFile = imgPath / "dog.jpg";
 	_texture = std::make_shared<GLImageTexture2D>(imgFile.string());
@@ -112,6 +112,7 @@ void GLSkyboxApp::beginDrawScene() {
 }
 
 void GLSkyboxApp::drawCube() {
+	glBindVertexArray(_vao);
 	const auto projection = glm::perspective(glm::radians(_camera.zoom()), aspectRatio(), 0.1f, 100.0f);
 	_program.update("projection", projection);
 	const auto view = _camera.getViewMatrix();
@@ -153,7 +154,6 @@ void GLSkyboxApp::drawSkybox() {
 }
 
 void GLSkyboxApp::drawScene(const float dt) {
-	glBindVertexArray(_vao);
 	ImGui::Begin("OpenGL");
 	ImGui::Checkbox("Enable Reflection", &_enableReflect);
 	ImGui::Checkbox("Enable Refraction", &_enableRefraction);
