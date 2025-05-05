@@ -87,6 +87,7 @@ void GLAdvancedGLSL::drawScene(const float dt) {
 	static int count{ 1 };
 	ImGui::Checkbox("Enable Point Size", &_enablePointSize);
     ImGui::Checkbox("Enable Frag Coord", &_enableFragCoord);
+    ImGui::Checkbox("Enable Vertex Id", &_enableVertexId);
 	ImGui::SliderInt("Cube Count", &count, 1, 10);
 	ImGui::End();
 	glm::vec3 cubePositions[] = {
@@ -125,6 +126,7 @@ void GLAdvancedGLSL::drawScene(const float dt) {
 		_program.update("model", model);
         _program.update("enablePointSize", _enablePointSize);
         _program.update("enableFragCoord", _enableFragCoord);
+        _program.update("enableVertexId", _enableVertexId);
 		glDrawArrays(GL_TRIANGLES, 0, 36);
 	}
 

@@ -40,4 +40,5 @@ private:
 	Point2D _lastPos{0.0, 0.0};
     bool _enablePointSize;
     bool _enableFragCoord;
+    bool _enableVertexId;
 };
