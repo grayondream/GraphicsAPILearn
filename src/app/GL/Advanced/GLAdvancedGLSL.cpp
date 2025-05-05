@@ -86,6 +86,7 @@ void GLAdvancedGLSL::drawScene(const float dt) {
 	ImGui::Begin("OpenGL");
 	static int count{ 1 };
 	ImGui::Checkbox("Enable Point Size", &_enablePointSize);
+    ImGui::Checkbox("Enable Frag Coord", &_enableFragCoord);
 	ImGui::SliderInt("Cube Count", &count, 1, 10);
 	ImGui::End();
 	glm::vec3 cubePositions[] = {
@@ -123,6 +124,7 @@ void GLAdvancedGLSL::drawScene(const float dt) {
 		model = glm::rotate(model, glm::radians(angle), glm::vec3(1.0f, 0.3f, 0.5f));
 		_program.update("model", model);
         _program.update("enablePointSize", _enablePointSize);
+        _program.update("enableFragCoord", _enableFragCoord);
 		glDrawArrays(GL_TRIANGLES, 0, 36);
 	}
 
