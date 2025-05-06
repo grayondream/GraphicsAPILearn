@@ -16,7 +16,7 @@ constexpr std::string_view EnumName() {
 }
 
 namespace Detail{
-#define kEnumMaxIndex 30
+#define kEnumMaxIndex 256
 #define kEnumMinIndex -10
 
 constexpr auto EnumMaxIndex() {

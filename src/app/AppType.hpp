@@ -33,6 +33,7 @@ enum class AppType : int{
     CullFace,
     FrameBuffer,
     SkyBox,
-    AdvancedGLSL
+    AdvancedGLSL,
+    UniformBuffer,
 };
 

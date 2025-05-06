@@ -26,6 +26,15 @@ static unsigned int GLCompileShader(const std::string file, const GLenum type) {
 GLProgram::~GLProgram() {
 }
 
+GLuint GLProgram::uniformIndex(const std::string& name) const {
+	return glGetUniformBlockIndex(id(), name.c_str());
+}
+
+const GLProgram& GLProgram::uniformBind(const std::string& name, const int binding) const {
+	glUniformBlockBinding(id(), uniformIndex(name), binding);
+	return *this;
+}
+
 void GLProgram::destroy() {
 	if (_program != 0) {
 		glDeleteProgram(_program);

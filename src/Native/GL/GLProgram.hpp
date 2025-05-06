@@ -15,6 +15,10 @@ public:
 
 	GLint locate(const std::string &name) const;
 
+	GLuint uniformIndex(const std::string& name) const;
+
+	const GLProgram& uniformBind(const std::string& name, const int binding = 0) const;
+
 	void destroy();
 
 	const GLProgram& update(const std::string& name, const bool value) const;
