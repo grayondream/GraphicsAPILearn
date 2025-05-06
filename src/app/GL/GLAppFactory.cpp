@@ -20,8 +20,8 @@
 #include "App/GL/Advanced/GLCullFaceApp.hpp"
 #include "App/GL/Advanced/GLFrameBufferApp.hpp"
 #include "App/GL/Advanced/GLSkyboxApp.hpp"
-#include "App/GL/Advanced/GLAdvancedGLSL.hpp"
-#include "App/GL/Advanced/GLUniformBuffer.hpp"
+#include "App/GL/Advanced/GLAdvancedGLSLApp.hpp"
+#include "App/GL/Advanced/GLUniformBufferApp.hpp"
 
 std::shared_ptr<GLApp> GLAppFactory::create(const AppType type){
 	switch(type){
@@ -70,9 +70,9 @@ std::shared_ptr<GLApp> GLAppFactory::create(const AppType type){
 		case AppType::SkyBox:
 			return std::make_shared<GLSkyboxApp>();
 		case AppType::AdvancedGLSL:
-			return std::make_shared<GLAdvancedGLSL>();
+			return std::make_shared<GLAdvancedGLSLApp>();
 		case AppType::UniformBuffer:
-			return std::make_shared<GLUniformBuffer>();
+			return std::make_shared<GLUniformBufferApp>();
 		default:
 			break;	
 	}

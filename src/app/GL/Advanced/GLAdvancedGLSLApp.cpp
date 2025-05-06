@@ -1,4 +1,4 @@
-#include "GLUniformBuffer.hpp"
+#include "GLAdvancedGLSLApp.hpp"
 #include "Native/GL/GLProgram.hpp"
 #include "Config/StaticCollector.hpp"
 #include "EH/ErrorHandle.hpp"
@@ -13,39 +13,35 @@
 
 using namespace ErrorHandle;
 
-GLUniformBuffer::~GLUniformBuffer() {
+GLAdvancedGLSLApp::~GLAdvancedGLSLApp() {
 	if (_vao != 0) {
 		glDeleteVertexArrays(1, &_vao);
 		glDeleteBuffers(2, _vbo);
 	}
 
-	for(auto& program : _programs) {
-		program.destroy();
-	}
+	_program.destroy();
 }
 
-bool GLUniformBuffer::init(const HINSTANCE inst, const WindowDesc& param) {
+bool GLAdvancedGLSLApp::init(const HINSTANCE inst, const WindowDesc& param) {
 	if (!GLApp::init(inst, param)) {
 		return false;
 	}
 	
 	_camera = Camera(glm::vec3(0.0f, 0.0f, 3.0f));
 	glViewport(0, 0, _attribute.winAttr.width, _attribute.winAttr.height);
-	const auto vfile = StaticCollector::getGLShaderPath() / "Advanced" / "UniformBuffer" / "Cube.vert";
-	const auto ffile = StaticCollector::getGLShaderPath() / "Advanced" / "UniformBuffer" / "Cube.frag";
-	for(int i = 0;i < 4;i ++) {
-		GLProgram program{};
-		auto ret = program.init(vfile.string(), ffile.string());
-		ErrorHandle::ExitIfFailed(ret, "Create OpenGL program failed!");
-		_programs.push_back(program);
-	}
-
+	const auto vfile = StaticCollector::getGLShaderPath() / "Advanced" / "GLSL" / "Cube.vert";
+	const auto ffile = StaticCollector::getGLShaderPath() / "Advanced" / "GLSL" / "Cube.frag";
+	auto ret = _program.init(vfile.string(), ffile.string());
+	ErrorHandle::ExitIfFailed(ret, "Create OpenGL program failed!");
+	const auto imgFile = StaticCollector::getImagePath() / "dog.jpg";
+	_texture = std::make_shared<GLImageTexture2D>(imgFile.string());
+	const auto valid = _texture->load().texture()->valid();
+	ExitIfFailed(valid, "Failed to load texture from file {}", imgFile.string());
 	createVertexBuffer();
-	createUniformBuffer();
 	return true;
 }
 
-void GLUniformBuffer::createVertexBuffer() {
+void GLAdvancedGLSLApp::createVertexBuffer() {
 	Cube shape{};
 	unsigned int vbo[2]{}, vao{}, ebo{};
 	glGenVertexArrays(1, &vao);
@@ -75,69 +71,64 @@ void GLUniformBuffer::createVertexBuffer() {
 	_vbo[0] = vbo[0], _vbo[1] = vbo[1];
 }
 
-unsigned int GLUniformBuffer::createUniformBuffer() {
-	for(auto i = 0;i < 4;i ++) {
-		auto program = _programs[i];
-		program.uniformBind("Matrices", 0);
-	}
-
-	unsigned int uboMatrices;
-	glGenBuffers(1, &uboMatrices);
-	glBindBuffer(GL_UNIFORM_BUFFER, uboMatrices);
-	glBufferData(GL_UNIFORM_BUFFER, sizeof(glm::mat4) * 2, nullptr, GL_STATIC_DRAW);
-	glBindBuffer(GL_UNIFORM_BUFFER, 0);
-
-	glBindBufferRange(GL_UNIFORM_BUFFER, 0, uboMatrices, 0, 2 * sizeof(glm::mat4));
-
-	const auto projection = glm::perspective(glm::radians(_camera.zoom()), aspectRatio(), 0.1f, 100.0f);
-	const auto view = _camera.getViewMatrix();
-
-	glBindBuffer(GL_UNIFORM_BUFFER, uboMatrices);
-    glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(glm::mat4), glm::value_ptr(projection));
-	glBufferSubData(GL_UNIFORM_BUFFER, sizeof(glm::mat4), sizeof(glm::mat4), glm::value_ptr(view));
-    glBindBuffer(GL_UNIFORM_BUFFER, 0);
-	return uboMatrices;
-}
-
-void GLUniformBuffer::clearColor() {
+void GLAdvancedGLSLApp::clearColor() {
 	return GLApp::clearColor();
 }
 
-void GLUniformBuffer::beginDrawScene() {
+void GLAdvancedGLSLApp::beginDrawScene() {
+	_texture->texture()->bind(0);
+	_program.use();
 	return GLApp::beginDrawScene();
 }
 
-void GLUniformBuffer::drawScene(const float dt) {
+void GLAdvancedGLSLApp::drawScene(const float dt) {
 	glBindVertexArray(_vao);
 	ImGui::Begin("OpenGL");
+	static int count{ 1 };
+	ImGui::Checkbox("Enable Point Size", &_enablePointSize);
+    ImGui::Checkbox("Enable Frag Coord", &_enableFragCoord);
+    ImGui::Checkbox("Enable Vertex Id", &_enableVertexId);
+    ImGui::Checkbox("Enable Front Face Culling", &_enableFrontFaceCulling);
+	ImGui::SliderInt("Cube Count", &count, 1, 10);
 	ImGui::End();
-	const auto x = 1;
 	glm::vec3 cubePositions[] = {
-	  glm::vec3(-x, -x, -1.f),
-	  glm::vec3(-x, x, -1.f),
-	  glm::vec3(x, x, -1.f),
-	  glm::vec3(x, -x, -1.f),
+	  glm::vec3(0.0f,  0.0f,  0.0f),
+	  glm::vec3(2.0f,  5.0f, -15.0f),
+	  glm::vec3(-1.5f, -2.2f, -2.5f),
+	  glm::vec3(-3.8f, -2.0f, -12.3f),
+	  glm::vec3(2.4f, -0.4f, -3.5f),
+	  glm::vec3(-1.7f,  3.0f, -7.5f),
+	  glm::vec3(1.3f, -2.0f, -2.5f),
+	  glm::vec3(1.5f,  2.0f, -2.5f),
+	  glm::vec3(1.5f,  0.2f, -1.5f),
+	  glm::vec3(-1.3f,  1.0f, -1.5f)
 	};
-
-	glm::vec4 colors[] = {
-		glm::vec4(1.0f, 0.0f, 0.0f, 1.0f),
-		glm::vec4(0.0f, 1.0f, 0.0f, 1.0f),
-		glm::vec4(0.0f, 0.0f, 1.0f, 1.0f),
-		glm::vec4(1.0f, 1.0f, 0.0f, 1.0f),
-	};
+    if(_enablePointSize){
+        glPolygonMode(GL_FRONT_AND_BACK, GL_POINT);
+        //glEnable(GL_VERTEX_PROGRAM_POINT_SIZE);
+        glEnable(GL_PROGRAM_POINT_SIZE);
+    }else{
+        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+        glDisable(GL_PROGRAM_POINT_SIZE);
+        //glDisable(GL_VERTEX_PROGRAM_POINT_SIZE);
+    }
 
 	static float curTime = 0;
 	curTime += dt;
-
-	for (int i = 0; i < 4; i++) {
-		auto program = _programs[i];
-		program.use();
+	const auto projection = glm::perspective(glm::radians(_camera.zoom()), aspectRatio(), 0.1f, 100.0f);
+	_program.update("projection", projection);
+	const auto view = _camera.getViewMatrix();
+	_program.update("view", view);
+	for (int i = 0; i < count; i++) {
 		glm::mat4 model = glm::mat4(1.0f); // make sure to initialize matrix to identity matrix first
 		model = glm::translate(model, cubePositions[i]);
 		float angle = 20.0f * (i + 1) * curTime;
 		model = glm::rotate(model, glm::radians(angle), glm::vec3(1.0f, 0.3f, 0.5f));
-		program.update("model", model);
-		program.update("cubeColor", colors[i]);
+		_program.update("model", model);
+        _program.update("enablePointSize", _enablePointSize);
+        _program.update("enableFragCoord", _enableFragCoord);
+        _program.update("enableVertexId", _enableVertexId);
+        _program.update("enableFrontFaceCulling", _enableFrontFaceCulling);
 		glDrawArrays(GL_TRIANGLES, 0, 36);
 	}
 
@@ -145,11 +136,11 @@ void GLUniformBuffer::drawScene(const float dt) {
 	return GLApp::drawScene(dt);
 }
 
-void GLUniformBuffer::endDrawScene() {
+void GLAdvancedGLSLApp::endDrawScene() {
 	return GLApp::endDrawScene();
 }
 
-void GLUniformBuffer::onKeyBoardEvent(const UINT msg, const WPARAM wParam, const LPARAM lParam) {
+void GLAdvancedGLSLApp::onKeyBoardEvent(const UINT msg, const WPARAM wParam, const LPARAM lParam) {
 	switch (msg) {
 	case WM_KEYDOWN:
 		break;
@@ -173,7 +164,7 @@ void GLUniformBuffer::onKeyBoardEvent(const UINT msg, const WPARAM wParam, const
 	return GLApp::onKeyBoardEvent(msg, wParam, lParam);
 }
 
-void GLUniformBuffer::onMouseDown(const UINT msg, WPARAM btnState, int x, int y) {
+void GLAdvancedGLSLApp::onMouseDown(const UINT msg, WPARAM btnState, int x, int y) {
 	switch (msg) {
 	case WM_LBUTTONDOWN:
 		_mouseClicked = true; break;
@@ -182,7 +173,7 @@ void GLUniformBuffer::onMouseDown(const UINT msg, WPARAM btnState, int x, int y)
 	return GLApp::onMouseDown(msg, btnState, x, y);
 }
 
-void GLUniformBuffer::onMouseUp(const UINT msg, WPARAM btnState, int x, int y) {
+void GLAdvancedGLSLApp::onMouseUp(const UINT msg, WPARAM btnState, int x, int y) {
 	switch (msg) {
 	case WM_LBUTTONUP:
 		_mouseClicked = false; break;
@@ -191,7 +182,7 @@ void GLUniformBuffer::onMouseUp(const UINT msg, WPARAM btnState, int x, int y) {
 	return GLApp::onMouseUp(msg, btnState, x, y);
 }
 
-void GLUniformBuffer::onMouseMove(WPARAM btnState, int x, int y) {
+void GLAdvancedGLSLApp::onMouseMove(WPARAM btnState, int x, int y) {
 	if (!_mouseClicked) {
 		return GLApp::onMouseMove(btnState, x, y);
 	}
@@ -209,7 +200,7 @@ void GLUniformBuffer::onMouseMove(WPARAM btnState, int x, int y) {
 	return GLApp::onMouseMove(btnState, x, y);
 }
 
-void GLUniformBuffer::onMouseScroll(const UINT msg, const WPARAM wParam, const LPARAM lParam) {
+void GLAdvancedGLSLApp::onMouseScroll(const UINT msg, const WPARAM wParam, const LPARAM lParam) {
 	int zDelta = GET_WHEEL_DELTA_WPARAM(wParam);
 	_camera.processMouseScrool(zDelta);
 	return GLApp::onMouseScroll(msg, wParam, lParam);
