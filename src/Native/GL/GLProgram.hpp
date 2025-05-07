@@ -1,6 +1,7 @@
 #pragma once
 #include <string>
 #include <map>
+#include <tuple>
 #include <glm/glm.hpp>
 #include <glad/glad.h>
 class GLProgram {
@@ -8,7 +9,7 @@ public:
 	~GLProgram();
 
 public:
-	bool init(const std::string vertFile = {}, const std::string fragFile = {});
+	bool init(const std::string vertFile, const std::string fragFile, const std::string geomFile = {});
 	void use();
 	
 	GLuint id() const;
@@ -36,8 +37,8 @@ public:
 	const GLProgram& update(const std::string& name, const glm::vec4& value) const;
 
 private:
-	std::pair<unsigned int, unsigned int> compileShader(const std::string vertFile, const std::string fragFile);
-	GLuint createProgram(const std::string vertFile, const std::string fragFile);
+	std::tuple<unsigned int, unsigned int, unsigned int> compileShader(const std::string vertFile, const std::string fragFile, const std::string geomFile);
+	GLuint createProgram(const std::string vertFile, const std::string fragFile, const std::string geomFile);
 
 private:
 	GLuint _program{};

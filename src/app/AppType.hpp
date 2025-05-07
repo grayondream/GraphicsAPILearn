@@ -34,5 +34,6 @@ enum class AppType : int{
     SkyBox,
     AdvancedGLSL,
     UniformBuffer,
+    SimpleGeometry,
 };
 

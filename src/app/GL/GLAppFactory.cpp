@@ -22,6 +22,7 @@
 #include "App/GL/Advanced/GLSkyboxApp.hpp"
 #include "App/GL/Advanced/GLAdvancedGLSLApp.hpp"
 #include "App/GL/Advanced/GLUniformBufferApp.hpp"
+#include "App/GL/Advanced/Geomtery/GLSimpleGemoteryApp.hpp"
 
 std::shared_ptr<GLApp> GLAppFactory::create(const AppType type){
 	switch(type){
@@ -73,6 +74,8 @@ std::shared_ptr<GLApp> GLAppFactory::create(const AppType type){
 			return std::make_shared<GLAdvancedGLSLApp>();
 		case AppType::UniformBuffer:
 			return std::make_shared<GLUniformBufferApp>();
+		case AppType::SimpleGeometry:
+			return std::make_shared<GLSimpleGemoteryApp>();
 		default:
 			break;	
 	}

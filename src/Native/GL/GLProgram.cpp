@@ -45,8 +45,8 @@ void GLProgram::use() {
 	glUseProgram(_program);
 }
 
-bool GLProgram::init(const std::string vertFile, const std::string fragFile) {
-	_program = createProgram(vertFile, fragFile);
+bool GLProgram::init(const std::string vertFile, const std::string fragFile, const std::string geoFile) {
+	_program = createProgram(vertFile, fragFile, geoFile);
 	if (_program == GL_INVALID_INDEX) {
 		return false;
 	}
@@ -99,20 +99,25 @@ const GLProgram& GLProgram::update(const std::string& name, const glm::vec4& val
 	return *this;
 }
 
-std::pair<unsigned int, unsigned int> GLProgram::compileShader(const std::string vertFile, const std::string fragFile) {
+std::tuple<unsigned int, unsigned int, unsigned int> GLProgram::compileShader(const std::string vertFile, const std::string fragFile, const std::string geomFile) {
 	if (vertFile.empty() || fragFile.empty()) {
 		LOGI("Empty input for shader file!\nvertex file is {}\nfragment files is", vertFile, fragFile);
-		return { GL_INVALID_INDEX ,GL_INVALID_INDEX };
+		return { GL_INVALID_INDEX ,GL_INVALID_INDEX, GL_INVALID_INDEX };
 	}
 
 
 	const auto vshader = GLCompileShader(vertFile, GL_VERTEX_SHADER);
 	const auto fshader = GLCompileShader(fragFile, GL_FRAGMENT_SHADER);
-	return { vshader, fshader };
+	unsigned int gshader{};
+	if (!geomFile.empty()) {
+		gshader = GLCompileShader(geomFile, GL_GEOMETRY_SHADER);
+	}
+
+	return { vshader, fshader, gshader};
 }
 
-unsigned int GLProgram::createProgram(const std::string vertFile, const std::string fragFile) {
-	const auto [vshader, fshader] = compileShader(vertFile, fragFile);
+unsigned int GLProgram::createProgram(const std::string vertFile, const std::string fragFile, const std::string geomFile) {
+	const auto [vshader, fshader, gshader] = compileShader(vertFile, fragFile, geomFile);
 	if (vshader == GL_INVALID_INDEX || fshader == GL_INVALID_INDEX) {
 		LOGE("Failed to compile shader from input file");
 		return GL_INVALID_INDEX;
@@ -121,6 +126,10 @@ unsigned int GLProgram::createProgram(const std::string vertFile, const std::str
 	const auto program = glCreateProgram();
 	glAttachShader(program, vshader);
 	glAttachShader(program, fshader);
+	if (gshader != GL_INVALID_INDEX) {
+		glAttachShader(program, gshader);
+	}
+	
 	glLinkProgram(program);
 	int suc{};
 	if (glGetProgramiv(program, GL_LINK_STATUS, &suc), !suc) {
