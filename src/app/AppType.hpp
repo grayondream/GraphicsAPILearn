@@ -35,5 +35,6 @@ enum class AppType : int{
     AdvancedGLSL,
     UniformBuffer,
     SimpleGeometry,
+    Explode,
 };
 
