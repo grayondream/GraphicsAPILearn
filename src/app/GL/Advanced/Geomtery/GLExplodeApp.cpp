@@ -32,13 +32,13 @@ bool GLExplodeApp::init(const HINSTANCE inst, const WindowDesc& param) {
 	glViewport(0, 0, _attribute.winAttr.width, _attribute.winAttr.height);
 	const auto vfile = StaticCollector::getGLShaderPath() / "Advanced" / "Geometry" / "Explode.vs";
 	const auto ffile = StaticCollector::getGLShaderPath() / "Advanced" / "Geometry" / "Explode.fs";
-	const auto gfile = "";//StaticCollector::getGLShaderPath() / "Advanced" / "Geometry" / "Base.gs";
+	const auto gfile = StaticCollector::getGLShaderPath() / "Advanced" / "Geometry" / "Explode.gs";
 
 	GLProgram program{};
-	auto ret = program.init(vfile.string(), ffile.string(), "");
+	auto ret = program.init(vfile.string(), ffile.string(), gfile.string());
 	ErrorHandle::ExitIfFailed(ret, "Create OpenGL program failed!");
 	_program = program;
-	glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+	//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 	createVertexBuffer();
 	return true;
 }
@@ -109,6 +109,7 @@ void GLExplodeApp::drawScene(const float dt) {
 		_program.update("projection", projection);
 		_program.update("view", view);
 		_program.update("model", model);
+		_program.update("time", curTime);
 		glDrawElements(GL_TRIANGLES, shape.idxSize(), GL_UNSIGNED_INT, 0);
 	}
 
