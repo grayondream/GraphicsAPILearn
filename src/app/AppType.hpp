@@ -36,5 +36,6 @@ enum class AppType : int{
     UniformBuffer,
     SimpleGeometry,
     Explode,
+    NormalLine,
 };
 

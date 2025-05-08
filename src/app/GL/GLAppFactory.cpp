@@ -24,6 +24,7 @@
 #include "App/GL/Advanced/GLUniformBufferApp.hpp"
 #include "App/GL/Advanced/Geomtery/GLSimpleGemoteryApp.hpp"
 #include "App/GL/Advanced/Geomtery/GLExplodeApp.hpp"
+#include "App/GL/Advanced/Geomtery/GLNormalLine.hpp"
 
 std::shared_ptr<GLApp> GLAppFactory::create(const AppType type){
 	switch(type){
@@ -79,6 +80,8 @@ std::shared_ptr<GLApp> GLAppFactory::create(const AppType type){
 			return std::make_shared<GLSimpleGemoteryApp>();
 		case AppType::Explode:
 			return std::make_shared<GLExplodeApp>();
+		case AppType::NormalLine:
+			return std::make_shared<GLNormalLine>();
 		default:
 			break;	
 	}

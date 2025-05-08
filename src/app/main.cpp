@@ -39,6 +39,8 @@ static inline constexpr int GAME_ENABLE_MSAA = true;
  *  AdvancedGLSL                    Advanced GLSL Test
  *  UniformBuffer                   Uniform Buffer Test
  *  SimpleGeometry                  Simple Geometry Test
+ *  Explode                         Explode Geometry Test
+ *  NormalLine                      Draw Normal Line
  */
 
 namespace EnumUtil = Utils::Enum;
@@ -46,7 +48,7 @@ namespace EnumUtil = Utils::Enum;
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nShowCmd) {
     ConsoleDebugger consoleDebugger{};
     
-    auto type = AppType::Explode;
+    auto type = AppType::NormalLine;
     auto api = GraphicsType::GL;
     LOGI("Start Graphics Learn!!!");
     LOGI("Select {} Application, Render App With {} API", EnumUtil::EnumName(type), EnumUtil::EnumName(api));
