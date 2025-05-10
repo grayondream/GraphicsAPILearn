@@ -13,7 +13,6 @@ bool GLTexture2D::init(const Texture2DDataView &data){
     unsigned int texture{};
     auto format = GLUtils::PixelFormat2GLFormat(data.format());
 	glGenTextures(1, &texture);
-	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, texture);
 	// set the texture wrapping parameters
     auto type = format == GL_RGBA ? GL_CLAMP_TO_EDGE : GL_REPEAT;

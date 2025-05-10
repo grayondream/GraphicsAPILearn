@@ -16,6 +16,8 @@
 #include "Geometry/Image.hpp"
 #include "Utils/GL/GLUtils.hpp"
 #include "Utils/GL/GLAppUtils.hpp"
+#include "Utils/FileUtils.hpp"
+using FileUtils::join;
 using namespace ErrorHandle;
 
 GLSkyboxApp::~GLSkyboxApp() {
@@ -52,14 +54,14 @@ bool GLSkyboxApp::init(const HINSTANCE inst, const WindowDesc& param) {
 	_program = GLUtils::CompileShader("Advanced", "SkyBox", "Cube");
 	_skyboxProgram = GLUtils::CompileShader("Advanced", "SkyBox", "SkyBox");
 	const auto imgPath = StaticCollector::getImagePath();
-	const auto imgFile = imgPath / "dog.jpg";
-	_texture = std::make_shared<GLImageTexture2D>(imgFile.string());
-	_skyBoxTexture = std::make_shared<GLImageTexture3D>((imgPath / "Skybox").string());
+	const auto imgFile = join(imgPath, "dog.jpg");
+	_texture = std::make_shared<GLImageTexture2D>(imgFile);
+	_skyBoxTexture = std::make_shared<GLImageTexture3D>(join(imgPath, "Skybox"));
 	auto valid = _skyBoxTexture->load().texture()->valid();
-	ExitIfFailed(valid, "Failed to load texture from file {}", imgFile.string());
+	ExitIfFailed(valid, "Failed to load texture from file {}", imgFile);
 
 	valid = _texture->load().texture()->valid();
-	ExitIfFailed(valid, "Failed to load texture from file {}", imgFile.string());
+	ExitIfFailed(valid, "Failed to load texture from file {}", imgFile);
 	createVertexBuffer();
 	std::tie(_skyVao, _skyVbo) = CreateSkyBoxBuffer();
 	//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);

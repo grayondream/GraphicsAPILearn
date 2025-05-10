@@ -5,7 +5,8 @@
 #include <Base/MathHelper.h>
 #include <filesystem>
 #include "Geometry/Rect.hpp"
-
+#include <Utils/FileUtils.hpp>
+using FileUtils::join;
 namespace eh = ErrorHandle;
 namespace fs = std::filesystem;
 namespace sc = StaticCollector;
@@ -43,7 +44,9 @@ void DX11RectApp::compileShader() {
     DWORD sharedFlags{};
 
     ComPtr<ID3D10Blob> pvsShader{}, pfsShader{}, pErrorBlob{};
-    const fs::path file = StaticCollector::getDX11ShaderPath() / "Base" / "rect.hlsl";
+    const auto resPath = StaticCollector::getDX11ShaderPath();
+    const auto sfile = join(resPath, "Base", "rect.hlsl");
+    const fs::path file = sfile;
     auto hr = D3DX11CompileFromFileW(file.wstring().c_str(), 0, 0, "vs_main", "vs_4_0", sharedFlags, 0, 0, pvsShader.GetAddressOf(), pErrorBlob.GetAddressOf(), 0);
     if (FAILED(hr) && pErrorBlob) {
         OutputDebugStringA(reinterpret_cast<const char*>(pErrorBlob->GetBufferPointer()));

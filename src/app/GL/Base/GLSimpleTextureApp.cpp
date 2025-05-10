@@ -5,7 +5,8 @@
 #include "glad/glad.h"
 #include "Geometry/Rect.hpp"
 #include "Native/GL/GLImageTexture2D.hpp"
-
+#include <Utils/FileUtils.hpp>
+using FileUtils::join;
 using namespace ErrorHandle;
 
 GLSimpleTextureApp::~GLSimpleTextureApp() {
@@ -24,14 +25,14 @@ bool GLSimpleTextureApp::init(const HINSTANCE inst, const WindowDesc& param) {
 	}
 	
 	glViewport(0, 0, _attribute.winAttr.width, _attribute.winAttr.height);
-	const auto vfile = StaticCollector::getGLShaderPath() / "Base" / "SimpleTexture.vert";
-	const auto ffile = StaticCollector::getGLShaderPath() / "Base" / "SimpleTexture.frag";
-	auto ret = _program.init(vfile.string(), ffile.string());
+	const auto vfile = join(StaticCollector::getGLShaderPath(), "Base", "SimpleTexture.vert");
+	const auto ffile = join(StaticCollector::getGLShaderPath(), "Base", "SimpleTexture.frag");
+	auto ret = _program.init(vfile, ffile);
 	ErrorHandle::ExitIfFailed(ret, "Create OpenGL program failed!");
-	const auto imgFile = StaticCollector::getImagePath() / "dog.jpg";
-	_texture = std::make_shared<GLImageTexture2D>(imgFile.string());
+	const auto imgFile = join(StaticCollector::getImagePath(), "dog.jpg");
+	_texture = std::make_shared<GLImageTexture2D>(imgFile);
 	const auto valid = _texture->load().texture()->valid();
-	ExitIfFailed(valid, "Failed to load texture from file {}", imgFile.string());
+	ExitIfFailed(valid, "Failed to load texture from file {}", imgFile);
 
 	createVertexBuffer();
 	//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);

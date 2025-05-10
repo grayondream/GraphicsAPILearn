@@ -10,6 +10,8 @@
 #include <glm/gtc/type_ptr.hpp>
 #include "Base/Log.hpp"
 #include "imgui.h"
+#include <Utils/FileUtils.hpp>
+using FileUtils::join;
 
 using namespace ErrorHandle;
 
@@ -31,10 +33,10 @@ bool GLMultieInstanceApp::init(const HINSTANCE inst, const WindowDesc& param) {
 	_camera = Camera(glm::vec3(0.0f, 0.0f, 3.0f));
 	glViewport(0, 0, _attribute.winAttr.width, _attribute.winAttr.height);
 	{
-		const auto vfile = StaticCollector::getGLShaderPath() / "Advanced" / "Instance" / "Sphere.vs";
-		const auto ffile = StaticCollector::getGLShaderPath() / "Advanced" / "Instance" / "Sphere.fs";
+		const auto vfile = join(StaticCollector::getGLShaderPath(), "Advanced", "Instance", "Sphere.vs");
+		const auto ffile = join(StaticCollector::getGLShaderPath(), "Advanced", "Instance", "Sphere.fs");
 		GLProgram program{};
-		auto ret = program.init(vfile.string(), ffile.string());
+		auto ret = program.init(vfile, ffile);
 		ErrorHandle::ExitIfFailed(ret, "Create OpenGL program failed!");
 		_program = program;
 	}
@@ -44,7 +46,7 @@ bool GLMultieInstanceApp::init(const HINSTANCE inst, const WindowDesc& param) {
 	return true;
 }
 
-unsigned int CreateObjectPositions(int count, int gap = 2.5){
+static unsigned int CreateObjectPositions(int count, int gap = 2.5){
 	glm::vec2* translations = new glm::vec2[count * count];
     int index = 0;
     float offset = 0.1f;

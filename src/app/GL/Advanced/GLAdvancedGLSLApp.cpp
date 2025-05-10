@@ -10,6 +10,8 @@
 #include <glm/gtc/type_ptr.hpp>
 #include "Base/Log.hpp"
 #include "imgui.h"
+#include "Utils/FileUtils.hpp"
+using FileUtils::join;
 
 using namespace ErrorHandle;
 
@@ -29,14 +31,14 @@ bool GLAdvancedGLSLApp::init(const HINSTANCE inst, const WindowDesc& param) {
 	
 	_camera = Camera(glm::vec3(0.0f, 0.0f, 3.0f));
 	glViewport(0, 0, _attribute.winAttr.width, _attribute.winAttr.height);
-	const auto vfile = StaticCollector::getGLShaderPath() / "Advanced" / "GLSL" / "Cube.vert";
-	const auto ffile = StaticCollector::getGLShaderPath() / "Advanced" / "GLSL" / "Cube.frag";
-	auto ret = _program.init(vfile.string(), ffile.string());
+	const auto vfile = join(StaticCollector::getGLShaderPath(), "Advanced", "GLSL", "Cube.vert");
+	const auto ffile = join(StaticCollector::getGLShaderPath(), "Advanced", "GLSL", "Cube.frag");
+	auto ret = _program.init(vfile, ffile);
 	ErrorHandle::ExitIfFailed(ret, "Create OpenGL program failed!");
-	const auto imgFile = StaticCollector::getImagePath() / "dog.jpg";
-	_texture = std::make_shared<GLImageTexture2D>(imgFile.string());
+	const auto imgFile = join(StaticCollector::getImagePath(), "dog.jpg");
+	_texture = std::make_shared<GLImageTexture2D>(imgFile);
 	const auto valid = _texture->load().texture()->valid();
-	ExitIfFailed(valid, "Failed to load texture from file {}", imgFile.string());
+	ExitIfFailed(valid, "Failed to load texture from file {}", imgFile);
 	createVertexBuffer();
 	return true;
 }

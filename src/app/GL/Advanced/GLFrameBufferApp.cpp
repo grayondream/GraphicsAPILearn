@@ -12,6 +12,8 @@
 #include "Base/Log.hpp"
 #include "imgui.h"
 #include "Geometry/Rect.hpp"
+#include "Utils/FileUtils.hpp"
+using FileUtils::join;
 
 using namespace ErrorHandle;
 
@@ -35,10 +37,10 @@ GLFrameBufferApp::~GLFrameBufferApp() {
 }
 
 GLProgram GLFrameBufferApp::compileShader(const std::string& name) {
-	const auto vfile = StaticCollector::getGLShaderPath() / "Advanced" / "FrameBuffer" / (name + ".vert");
-	const auto ffile = StaticCollector::getGLShaderPath() / "Advanced" / "FrameBuffer" / (name + ".frag");
+	const auto vfile = join(StaticCollector::getGLShaderPath(), "Advanced", "FrameBuffer", (name + ".vert"));
+	const auto ffile = join(StaticCollector::getGLShaderPath(), "Advanced", "FrameBuffer", (name + ".frag"));
 	GLProgram program;
-	auto ret = program.init(vfile.string(), ffile.string());
+	auto ret = program.init(vfile, ffile);
 	ErrorHandle::ExitIfFailed(ret, "Create OpenGL program failed!");
 	return program;
 }
@@ -50,17 +52,17 @@ void GLFrameBufferApp::compileShader() {
 
 void GLFrameBufferApp::loadTexture() {
 	{
-		const auto imgFile = StaticCollector::getImagePath() / "container2.jpg";
-		_cubeTexture = std::make_shared<GLImageTexture2D>(imgFile.string());
+		const auto imgFile = join(StaticCollector::getImagePath(), "container2.jpg");
+		_cubeTexture = std::make_shared<GLImageTexture2D>(imgFile);
 		const auto valid = _cubeTexture->load().texture()->valid();
-		ExitIfFailed(valid, "Failed to load texture from file {}", imgFile.string());
+		ExitIfFailed(valid, "Failed to load texture from file {}", imgFile);
 	}
 	
 	{
-		const auto imgFile = StaticCollector::getImagePath() / "metal.jpg";
-		_planeTexture = std::make_shared<GLImageTexture2D>(imgFile.string());
+		const auto imgFile = join(StaticCollector::getImagePath(), "metal.jpg");
+		_planeTexture = std::make_shared<GLImageTexture2D>(imgFile);
 		const auto valid = _planeTexture->load().texture()->valid();
-		ExitIfFailed(valid, "Failed to load texture from file {}", imgFile.string());
+		ExitIfFailed(valid, "Failed to load texture from file {}", imgFile);
 	}
 }
 

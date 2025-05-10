@@ -4,7 +4,8 @@
 #include "EH/ErrorHandle.hpp"
 #include "glad/glad.h"
 #include <Geometry/Rect.hpp>
-
+#include <Utils/FileUtils.hpp>
+using FileUtils::join;
 GLRectApp::~GLRectApp() {
 	if (_vao != 0) {
 		glDeleteVertexArrays(1, &_vao);
@@ -20,9 +21,9 @@ bool GLRectApp::init(const HINSTANCE inst, const WindowDesc& param) {
 		return false;
 	}
 
-	const auto vfile = StaticCollector::getGLShaderPath() / "Base" / "rect.vert";
-	const auto ffile = StaticCollector::getGLShaderPath() / "Base" / "rect.frag";
-	auto ret = _program.init(vfile.string(), ffile.string());
+	const auto vfile = join(StaticCollector::getGLShaderPath(), "Base", "rect.vert");
+	const auto ffile = join(StaticCollector::getGLShaderPath(), "Base", "rect.frag");
+	auto ret = _program.init(vfile, ffile);
 	ErrorHandle::ExitIfFailed(ret, "Create OpenGL program failed!");
 	std::tie(_vao, _vbo, _ebo) = createVertexBuffer();
 	//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);

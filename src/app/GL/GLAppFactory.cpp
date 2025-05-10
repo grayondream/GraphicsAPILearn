@@ -26,6 +26,7 @@
 #include "App/GL/Advanced/Geomtery/GLExplodeApp.hpp"
 #include "App/GL/Advanced/Geomtery/GLNormalLine.hpp"
 #include "App/GL/Advanced/Instance/GLMultieInstanceApp.hpp"
+#include "App/GL/Advanced/Instance/GLSaturnApp.hpp"
 
 std::shared_ptr<GLApp> GLAppFactory::create(const AppType type){
 	switch(type){
@@ -85,6 +86,8 @@ std::shared_ptr<GLApp> GLAppFactory::create(const AppType type){
 			return std::make_shared<GLNormalLine>();
 		case AppType::MultiInstance:
 			return std::make_shared<GLMultieInstanceApp>();
+		case AppType::MultiInstance_Saturn:
+			return std::make_shared<GLSaturnApp>();
 		default:
 			break;	
 	}

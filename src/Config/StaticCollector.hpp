@@ -1,27 +1,16 @@
 #pragma once
 #include <string>
-#include <filesystem>
 
 namespace StaticCollector{
-	std::filesystem::path getResPath();
+	std::string getResPath();
 
-	inline std::filesystem::path getGLShaderPath() {
-		return getResPath() / "GL";
-	}
+	std::string getGLShaderPath();
 
-	inline std::filesystem::path getDX11ShaderPath() {
-		return getResPath() / "DX11";
-	}
+	std::string getDX11ShaderPath();
 
-	inline std::filesystem::path getDX12ShaderPath() {
-		return getResPath() / + "DX12";
-	}
+	std::string getDX12ShaderPath();
 
-	inline std::filesystem::path getImagePath() {
-		return getResPath() / +"img";
-	}
+	std::string getImagePath();
 
-	inline std::filesystem::path getModelPath() {
-		return getResPath() / +"Model";
-	}
+	std::string getModelPath();
 };

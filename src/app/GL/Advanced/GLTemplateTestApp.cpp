@@ -11,6 +11,8 @@
 #include <glm/gtc/type_ptr.hpp>
 #include "Base/Log.hpp"
 #include "imgui.h"
+#include "Utils/FileUtils.hpp"
+using FileUtils::join;
 
 using namespace ErrorHandle;
 
@@ -42,31 +44,31 @@ bool GLTemplateTestApp::init(const HINSTANCE inst, const WindowDesc& param) {
 	_camera = Camera(glm::vec3(0.0f, 0.0f, 3.0f), glm::vec3(0.0f, 1.0f, 0.0f), -90, -10);
 	glViewport(0, 0, _attribute.winAttr.width, _attribute.winAttr.height);
 	{
-		const auto vfile = StaticCollector::getGLShaderPath() / "Advanced" / "TemplateTest" / "Basic.vert";
-		const auto ffile = StaticCollector::getGLShaderPath() / "Advanced" / "TemplateTest" / "Basic.frag";
-		auto ret = _program.init(vfile.string(), ffile.string());
+		const auto vfile = join(StaticCollector::getGLShaderPath(), "Advanced", "TemplateTest", "Basic.vert");
+		const auto ffile = join(StaticCollector::getGLShaderPath(), "Advanced", "TemplateTest", "Basic.frag");
+		auto ret = _program.init(vfile, ffile);
 		ErrorHandle::ExitIfFailed(ret, "Create OpenGL program failed!");
 	}
 
 	{
-		const auto vfile = StaticCollector::getGLShaderPath() / "Advanced" / "TemplateTest" / "Border.vert";
-		const auto ffile = StaticCollector::getGLShaderPath() / "Advanced" / "TemplateTest" / "Border.frag";
-		auto ret = _borderProgram.init(vfile.string(), ffile.string());
+		const auto vfile = join(StaticCollector::getGLShaderPath(), "Advanced", "TemplateTest", "Border.vert");
+		const auto ffile = join(StaticCollector::getGLShaderPath(), "Advanced", "TemplateTest", "Border.frag");
+		auto ret = _borderProgram.init(vfile, ffile);
 		ErrorHandle::ExitIfFailed(ret, "Create OpenGL program failed!");
 	}
 
 	{
-		const auto imgFile = StaticCollector::getImagePath() / "marble.jpg";
-		_cubeTexture = std::make_shared<GLImageTexture2D>(imgFile.string());
+		const auto imgFile = join(StaticCollector::getImagePath(), "marble.jpg");
+		_cubeTexture = std::make_shared<GLImageTexture2D>(imgFile);
 		const auto valid = _cubeTexture->load().texture()->valid();
-		ExitIfFailed(valid, "Failed to load texture from file {}", imgFile.string());
+		ExitIfFailed(valid, "Failed to load texture from file {}", imgFile);
 	}
 	
 	{
-		const auto imgFile = StaticCollector::getImagePath() / "metal.jpg";
-		_planeTexture = std::make_shared<GLImageTexture2D>(imgFile.string());
+		const auto imgFile = join(StaticCollector::getImagePath(), "metal.jpg");
+		_planeTexture = std::make_shared<GLImageTexture2D>(imgFile);
 		const auto valid = _planeTexture->load().texture()->valid();
-		ExitIfFailed(valid, "Failed to load texture from file {}", imgFile.string());
+		ExitIfFailed(valid, "Failed to load texture from file {}", imgFile);
 	}
 
 	createCubeBuffer();

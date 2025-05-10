@@ -10,6 +10,8 @@
 #include <glm/gtc/type_ptr.hpp>
 #include "Base/Log.hpp"
 #include "imgui.h"
+#include "Utils/FileUtils.hpp"
+using FileUtils::join;
 
 using namespace ErrorHandle;
 
@@ -31,11 +33,11 @@ bool GLUniformBufferApp::init(const HINSTANCE inst, const WindowDesc& param) {
 	
 	_camera = Camera(glm::vec3(0.0f, 0.0f, 3.0f));
 	glViewport(0, 0, _attribute.winAttr.width, _attribute.winAttr.height);
-	const auto vfile = StaticCollector::getGLShaderPath() / "Advanced" / "UniformBuffer" / "Cube.vert";
-	const auto ffile = StaticCollector::getGLShaderPath() / "Advanced" / "UniformBuffer" / "Cube.frag";
+	const auto vfile = join(StaticCollector::getGLShaderPath(), "Advanced", "UniformBuffer", "Cube.vert");
+	const auto ffile = join(StaticCollector::getGLShaderPath(), "Advanced", "UniformBuffer", "Cube.frag");
 	for(int i = 0;i < 4;i ++) {
 		GLProgram program{};
-		auto ret = program.init(vfile.string(), ffile.string());
+		auto ret = program.init(vfile, ffile);
 		ErrorHandle::ExitIfFailed(ret, "Create OpenGL program failed!");
 		_programs.push_back(program);
 	}

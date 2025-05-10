@@ -9,7 +9,8 @@
 #include <glm/gtc/type_ptr.hpp>
 #include "Base/Log.hpp"
 #include "imgui.h"
-
+#include <Utils/FileUtils.hpp>
+using FileUtils::join;
 using namespace ErrorHandle;
 
 GLLightSourceSpot::~GLLightSourceSpot() {
@@ -30,33 +31,33 @@ bool GLLightSourceSpot::init(const HINSTANCE inst, const WindowDesc& param) {
 	
 	_camera = Camera(glm::vec3(0.0f, 0.0f, 5.0f));
 	glViewport(0, 0, _attribute.winAttr.width, _attribute.winAttr.height);
-	const auto shaderDir = StaticCollector::getGLShaderPath() / "Light";
+	const auto shaderDir = join(StaticCollector::getGLShaderPath(), "Light");
 	{
-		const auto vfile = shaderDir / "LightSource" / "Spot" / "Light.vert";
-		const auto ffile = shaderDir / "LightSource" / "Spot" / "Light.frag";
-		auto ret = _lightProgram.init(vfile.string(), ffile.string());
+		const auto vfile = join(shaderDir, "LightSource", "Spot", "Light.vert");
+		const auto ffile = join(shaderDir, "LightSource", "Spot", "Light.frag");
+		auto ret = _lightProgram.init(vfile, ffile);
 		ErrorHandle::ExitIfFailed(ret, "Create OpenGL program failed!");
 	}
 
 	{
-		const auto vfile = shaderDir / "LightSource" / "Spot" / "Object.vert";
-		const auto ffile = shaderDir / "LightSource" / "Spot" / "Object.frag";
-		auto ret = _targetProgram.init(vfile.string(), ffile.string());
+		const auto vfile = join(shaderDir, "LightSource", "Spot", "Object.vert");
+		const auto ffile = join(shaderDir, "LightSource", "Spot", "Object.frag");
+		auto ret = _targetProgram.init(vfile, ffile);
 		ErrorHandle::ExitIfFailed(ret, "Create OpenGL program failed!");
 	}
 	
 	{
-		const auto objImg = StaticCollector::getImagePath() / "container2.jpg";
-		_objTex = std::make_shared<GLImageTexture2D>(objImg.string());
+		const auto objImg = join(StaticCollector::getImagePath(), "container2.jpg");
+		_objTex = std::make_shared<GLImageTexture2D>(objImg);
 		const auto valid = _objTex->load().texture()->valid();
-		ExitIfFailed(valid, "Failed to load texture from file {}", objImg.string());
+		ExitIfFailed(valid, "Failed to load texture from file {}", objImg);
 	}
 
 	{
-		const auto objImg = StaticCollector::getImagePath() / "container2_specular.jpg";
-		_objBorderTex = std::make_shared<GLImageTexture2D>(objImg.string());
+		const auto objImg = join(StaticCollector::getImagePath(), "container2_specular.jpg");
+		_objBorderTex = std::make_shared<GLImageTexture2D>(objImg);
 		const auto valid = _objBorderTex->load().texture()->valid();
-		ExitIfFailed(valid, "Failed to load texture from file {}", objImg.string());
+		ExitIfFailed(valid, "Failed to load texture from file {}", objImg);
 	}
 
 	createVertexBuffer();

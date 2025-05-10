@@ -11,7 +11,8 @@
 #include "Base/Log.hpp"
 #include "imgui.h"
 #include "Model/Model.hpp"
-
+#include <Utils/FileUtils.hpp>
+using FileUtils::join;
 using namespace ErrorHandle;
 
 GLLoadModelApp::~GLLoadModelApp() {
@@ -33,18 +34,18 @@ bool GLLoadModelApp::init(const HINSTANCE inst, const WindowDesc& param) {
 
 void GLLoadModelApp::loadModel() {
 	const auto modelPath = StaticCollector::getModelPath();
-	const auto modelFile = modelPath / "backpack" / "backpack.obj";
-	_model = std::make_shared<Model>(modelFile.string().c_str());
+	const auto modelFile = join(modelPath, "backpack", "backpack.obj");
+	_model = std::make_shared<Model>(modelFile);
 }
 
 void GLLoadModelApp::initProgram(const std::string name, GLProgram &program) {
 	const auto shaderDir = StaticCollector::getGLShaderPath();
-	const auto vfile = shaderDir / "Model" / std::string(name + ".vert");
-	const auto ffile = shaderDir / "Model" / std::string(name + ".frag");
+	const auto vfile = join(shaderDir, "Model", std::string(name + ".vert"));
+	const auto ffile = join(shaderDir, "Model", std::string(name + ".frag"));
 	LOGI("Generate program {}", name);
-	LOGI("Vertex file : {}", vfile.string());
-	LOGI("Fragment file : {}", ffile.string());
-	auto ret = program.init(vfile.string(), ffile.string());
+	LOGI("Vertex file : {}", vfile);
+	LOGI("Fragment file : {}", ffile);
+	auto ret = program.init(vfile, ffile);
 	ASSERT(ret, "Failed to create program {}", name);
 }
 
@@ -74,7 +75,7 @@ void GLLoadModelApp::drawScene(const float dt) {
     model = glm::translate(model, glm::vec3(0.0f, 0.0f, 0.0f)); // translate it down so it's at the center of the scene
     model = glm::scale(model, glm::vec3(1.0f, 1.0f, 1.0f));	// it's a bit too big for our scene, so scale it down
 	_program.update("model", model);
-	_model->draw(_program);
+	_model->Draw(_program);
 }
 
 void GLLoadModelApp::endDrawScene() {

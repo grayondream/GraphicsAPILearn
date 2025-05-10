@@ -11,6 +11,8 @@
 #include <glm/gtc/type_ptr.hpp>
 #include "Base/Log.hpp"
 #include "imgui.h"
+#include "Utils/FileUtils.hpp"
+using FileUtils::join;
 
 using namespace ErrorHandle;
 
@@ -48,39 +50,39 @@ void GLBlendApp::initGLEnv() {
 }
 
 void GLBlendApp::compileShader() {
-	const auto vfile = StaticCollector::getGLShaderPath() / "Advanced" / "Blend" / "Basic.vert";
-	const auto ffile = StaticCollector::getGLShaderPath() / "Advanced" / "Blend" / "Basic.frag";
-	auto ret = _program.init(vfile.string(), ffile.string());
+	const auto vfile = join(StaticCollector::getGLShaderPath(), "Advanced", "Blend", "Basic.vert");
+	const auto ffile = join(StaticCollector::getGLShaderPath(), "Advanced", "Blend", "Basic.frag");
+	auto ret = _program.init(vfile, ffile);
 	ErrorHandle::ExitIfFailed(ret, "Create OpenGL program failed!");
 }
 
 void GLBlendApp::createTexture() {
 	{
-		const auto imgFile = StaticCollector::getImagePath() / "marble.jpg";
-		_cubeTexture = std::make_shared<GLImageTexture2D>(imgFile.string());
+		const auto imgFile = join(StaticCollector::getImagePath(), "marble.jpg");
+		_cubeTexture = std::make_shared<GLImageTexture2D>(imgFile);
 		const auto valid = _cubeTexture->load().texture()->valid();
-		ExitIfFailed(valid, "Failed to load texture from file {}", imgFile.string());
+		ExitIfFailed(valid, "Failed to load texture from file {}", imgFile);
 	}
 
 	{
-		const auto imgFile = StaticCollector::getImagePath() / "metal.jpg";
-		_planeTexture = std::make_shared<GLImageTexture2D>(imgFile.string());
+		const auto imgFile = join(StaticCollector::getImagePath(), "metal.jpg");
+		_planeTexture = std::make_shared<GLImageTexture2D>(imgFile);
 		const auto valid = _planeTexture->load().texture()->valid();
-		ExitIfFailed(valid, "Failed to load texture from file {}", imgFile.string());
+		ExitIfFailed(valid, "Failed to load texture from file {}", imgFile);
 	}
 
 	{
-		const auto imgFile = StaticCollector::getImagePath() / "grass.png";
-		_grassTexture = std::make_shared<GLImageTexture2D>(imgFile.string());
+		const auto imgFile = join(StaticCollector::getImagePath(), "grass.png");
+		_grassTexture = std::make_shared<GLImageTexture2D>(imgFile);
 		const auto valid = _grassTexture->load().texture()->valid();
-		ExitIfFailed(valid, "Failed to load texture from file {}", imgFile.string());
+		ExitIfFailed(valid, "Failed to load texture from file {}", imgFile);
 	}
 
 	{
-		const auto imgFile = StaticCollector::getImagePath() / "window.png";
-		_winTexture = std::make_shared<GLImageTexture2D>(imgFile.string());
+		const auto imgFile = join(StaticCollector::getImagePath(), "window.png");
+		_winTexture = std::make_shared<GLImageTexture2D>(imgFile);
 		const auto valid = _winTexture->load().texture()->valid();
-		ExitIfFailed(valid, "Failed to load texture from file {}", imgFile.string());
+		ExitIfFailed(valid, "Failed to load texture from file {}", imgFile);
 	}
 }
 

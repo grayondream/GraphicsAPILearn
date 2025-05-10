@@ -10,7 +10,8 @@
 #include <Base/Assert.hpp>
 #include "Base/Log.hpp"
 #include "imgui.h"
-
+#include <Utils/FileUtils.hpp>
+using FileUtils::join;
 using namespace ErrorHandle;
 
 GLLightSourceMult::~GLLightSourceMult() {
@@ -31,7 +32,7 @@ bool GLLightSourceMult::init(const HINSTANCE inst, const WindowDesc& param) {
 	
 	_camera = Camera(glm::vec3(0.0f, 0.0f, 5.0f));
 	glViewport(0, 0, _attribute.winAttr.width, _attribute.winAttr.height);
-	const auto shaderDir = StaticCollector::getGLShaderPath() / "Light";
+	const auto shaderDir = join(StaticCollector::getGLShaderPath(), "Light");
 	 initProgram("Light", _lightProgram);
 	 initProgram("Object", _targetProgram);
 	_objTex = initTexture("container2.jpg");
@@ -42,22 +43,22 @@ bool GLLightSourceMult::init(const HINSTANCE inst, const WindowDesc& param) {
 }
 
 void GLLightSourceMult::initProgram(const std::string name, GLProgram &program) {
-	const auto shaderDir = StaticCollector::getGLShaderPath() / "Light";
-	const auto vfile = shaderDir / "LightSource" / "Mult" / std::string(name + ".vert");
-	const auto ffile = shaderDir / "LightSource" / "Mult" / std::string(name + ".frag");
+	const auto shaderDir = join(StaticCollector::getGLShaderPath(), "Light");
+	const auto vfile = join(shaderDir, "LightSource", "Mult", std::string(name + ".vert"));
+	const auto ffile = join(shaderDir, "LightSource", "Mult", std::string(name + ".frag"));
 	LOGI("Generate program {}", name);
-	LOGI("Vertex file : {}", vfile.string());
-	LOGI("Fragment file : {}", ffile.string());
-	auto ret = program.init(vfile.string(), ffile.string());
+	LOGI("Vertex file : {}", vfile);
+	LOGI("Fragment file : {}", ffile);
+	auto ret = program.init(vfile, ffile);
 	ASSERT(ret, "Failed to create program {}", name);
 }
 
 std::shared_ptr<GLImageTexture2D> GLLightSourceMult::initTexture(const std::string img) {
-	const auto imgfile = StaticCollector::getImagePath() / img;
-	auto tex = std::make_shared<GLImageTexture2D>(imgfile.string());
-	LOGI("Initalize texture from file {}", imgfile.string());
+	const auto imgfile = join(StaticCollector::getImagePath(), img);
+	auto tex = std::make_shared<GLImageTexture2D>(imgfile);
+	LOGI("Initalize texture from file {}", imgfile);
 	const auto valid = tex->load().texture()->valid();
-	ASSERT(valid, "Failed to initalize texture from {}", imgfile.string());
+	ASSERT(valid, "Failed to initalize texture from {}", imgfile);
 	return tex;
 }
 

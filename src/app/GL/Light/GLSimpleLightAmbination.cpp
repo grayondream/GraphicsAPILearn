@@ -9,7 +9,8 @@
 #include <glm/gtc/type_ptr.hpp>
 #include "Base/Log.hpp"
 #include "imgui.h"
-
+#include <Utils/FileUtils.hpp>
+using FileUtils::join;
 using namespace ErrorHandle;
 
 GLSimpleLightAmbination::~GLSimpleLightAmbination() {
@@ -30,18 +31,18 @@ bool GLSimpleLightAmbination::init(const HINSTANCE inst, const WindowDesc& param
 	
 	_camera = Camera(glm::vec3(0.0f, 0.0f, 3.0f));
 	glViewport(0, 0, _attribute.winAttr.width, _attribute.winAttr.height);
-	const auto shaderDir = StaticCollector::getGLShaderPath() / "Light";
+	const auto shaderDir = join(StaticCollector::getGLShaderPath(), "Light");
 	{
-		const auto vfile = shaderDir / "Ambination" / "Source.vert";
-		const auto ffile = shaderDir / "Ambination" / "Source.frag";
-		auto ret = _lightProgram.init(vfile.string(), ffile.string());
+		const auto vfile = join(shaderDir, "Ambination", "Source.vert");
+		const auto ffile = join(shaderDir, "Ambination", "Source.frag");
+		auto ret = _lightProgram.init(vfile, ffile);
 		ErrorHandle::ExitIfFailed(ret, "Create OpenGL program failed!");
 	}
 
 	{
-		const auto vfile = shaderDir / "Ambination" / "Object.vert";
-		const auto ffile = shaderDir / "Ambination" / "Object.frag";
-		auto ret = _targetProgram.init(vfile.string(), ffile.string());
+		const auto vfile = join(shaderDir, "Ambination", "Object.vert");
+		const auto ffile = join(shaderDir, "Ambination", "Object.frag");
+		auto ret = _targetProgram.init(vfile, ffile);
 		ErrorHandle::ExitIfFailed(ret, "Create OpenGL program failed!");
 	}
 	

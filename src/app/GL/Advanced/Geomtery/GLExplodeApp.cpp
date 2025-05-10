@@ -10,6 +10,8 @@
 #include <glm/gtc/type_ptr.hpp>
 #include "Base/Log.hpp"
 #include "imgui.h"
+#include <Utils/FileUtils.hpp>
+using FileUtils::join;
 
 using namespace ErrorHandle;
 
@@ -30,12 +32,12 @@ bool GLExplodeApp::init(const HINSTANCE inst, const WindowDesc& param) {
 	
 	_camera = Camera(glm::vec3(0.0f, 0.0f, 3.0f));
 	glViewport(0, 0, _attribute.winAttr.width, _attribute.winAttr.height);
-	const auto vfile = StaticCollector::getGLShaderPath() / "Advanced" / "Geometry" / "Explode.vs";
-	const auto ffile = StaticCollector::getGLShaderPath() / "Advanced" / "Geometry" / "Explode.fs";
-	const auto gfile = StaticCollector::getGLShaderPath() / "Advanced" / "Geometry" / "Explode.gs";
+	const auto vfile = join(StaticCollector::getGLShaderPath(), "Advanced", "Geometry", "Explode.vs");
+	const auto ffile = join(StaticCollector::getGLShaderPath(), "Advanced", "Geometry", "Explode.fs");
+	const auto gfile = join(StaticCollector::getGLShaderPath(), "Advanced", "Geometry", "Explode.gs");
 
 	GLProgram program{};
-	auto ret = program.init(vfile.string(), ffile.string(), gfile.string());
+	auto ret = program.init(vfile, ffile, gfile);
 	ErrorHandle::ExitIfFailed(ret, "Create OpenGL program failed!");
 	_program = program;
 	//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
