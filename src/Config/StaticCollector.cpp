@@ -9,8 +9,7 @@ constexpr const char* kResourceRoot = RESOURCE_DIR;
 
 namespace StaticCollector {
     std::string getResPath(){
-        const auto path = std::filesystem::current_path().string();
-        return FileUtils::join(path, kResourceRoot);
+		return kResourceRoot;
     }
 
     std::string getGLShaderPath() {
