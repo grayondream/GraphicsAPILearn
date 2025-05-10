@@ -37,5 +37,6 @@ enum class AppType : int{
     SimpleGeometry,
     Explode,
     NormalLine,
+    MultiInstance
 };
 
