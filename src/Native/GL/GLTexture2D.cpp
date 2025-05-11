@@ -4,6 +4,7 @@
 #include <Utils/GL/GLUtils.hpp>
 
 //TODO:
+//memory leak
 GLTexture2D::~GLTexture2D(){
 }
 
@@ -35,7 +36,7 @@ void GLTexture2D::bind(const unsigned int unit){
 }
 
 void GLTexture2D::release(){
-    if (!_textureId) {
+    if (!valid()) {
         return;
     }
 
