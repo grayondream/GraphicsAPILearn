@@ -39,5 +39,6 @@ enum class AppType : int{
     NormalLine,
     MultiInstance,
     MultiInstance_Saturn,
+    Msaa,
 };
 

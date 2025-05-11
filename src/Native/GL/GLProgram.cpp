@@ -105,7 +105,6 @@ std::tuple<unsigned int, unsigned int, unsigned int> GLProgram::compileShader(co
 		return { GL_INVALID_INDEX ,GL_INVALID_INDEX, GL_INVALID_INDEX };
 	}
 
-
 	const auto vshader = GLCompileShader(vertFile, GL_VERTEX_SHADER);
 	const auto fshader = GLCompileShader(fragFile, GL_FRAGMENT_SHADER);
 	unsigned int gshader{};

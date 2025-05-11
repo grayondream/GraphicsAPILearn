@@ -42,7 +42,8 @@ static inline constexpr int GAME_ENABLE_MSAA = true;
  *  Explode                         Explode Geometry Test
  *  NormalLine                      Draw Normal Line
  *  MultiInstance                   draw multiple instance
- * MultiInstance_Saturn            draw multiple instance with saturn model
+ *  MultiInstance_Saturn            draw multiple instance with saturn model
+ *  Msaa                            Multi Sample Anti Aliasing
  */
 
 namespace EnumUtil = Utils::Enum;
@@ -50,7 +51,7 @@ namespace EnumUtil = Utils::Enum;
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nShowCmd) {
     ConsoleDebugger consoleDebugger{};
     
-    auto type = AppType::MultiInstance_Saturn;
+    auto type = AppType::Msaa;
     auto api = GraphicsType::GL;
     LOGI("Start Graphics Learn!!!");
     LOGI("Select {} Application, Render App With {} API", EnumUtil::EnumName(type), EnumUtil::EnumName(api));
