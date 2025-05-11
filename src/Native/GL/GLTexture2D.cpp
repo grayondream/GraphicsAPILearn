@@ -3,8 +3,8 @@
 #include <cassert>
 #include <Utils/GL/GLUtils.hpp>
 
+//TODO:
 GLTexture2D::~GLTexture2D(){
-    release();
 }
 
 bool GLTexture2D::init(const Texture2DDataView &data){
