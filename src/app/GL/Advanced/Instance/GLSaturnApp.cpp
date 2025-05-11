@@ -30,14 +30,14 @@ std::vector<glm::mat4> GenerateRocksPosition(int amount, const glm::mat4& pos) {
 	std::vector<glm::mat4> modelMatrices;
 	modelMatrices.resize(amount);
 	srand(static_cast<unsigned int>(0)); // initialize random seed
-	float radius = 50.0;
+	float radius = 20.0;
 	float offset = 10.0f;
 	for (unsigned int i = 0; i < amount; i++)
 	{
 		glm::mat4 model = pos;
 		// 1. translation: displace along circle with 'radius' in range [-offset, offset]
 		float angle = (float)i / (float)amount * 360.0f;
-		float displacement = (rand() % (int)(2 * offset * 10)) / 10.0f - offset;
+		float displacement = (rand() % (int)(20 * offset * 10)) / 10.0f - offset;
 		float x = sin(angle) * radius + displacement;
 		displacement = (rand() % (int)(2 * offset * 10)) / 10.0f - offset;
 		float y = displacement * 0.4f; // keep height of asteroid field smaller compared to width of x and z
@@ -75,7 +75,7 @@ bool GLSaturnApp::init(const HINSTANCE inst, const WindowDesc& param) {
 	}
 	
 	_camera = Camera(glm::vec3(0.0f, 0.0f, 3.0f));
-	_saturnPos = glm::translate(glm::mat4(1.0f), glm::vec3(0, 0, -3));
+	_saturnPos = glm::vec3(0, 0, -3);
 	glViewport(0, 0, _attribute.winAttr.width, _attribute.winAttr.height);
 	{
 		const auto vfile = join(StaticCollector::getGLShaderPath(), "Advanced", "Instance", "Saturn.vs");
@@ -114,7 +114,7 @@ void GLSaturnApp::loadModel() {
 	}
 
 	{
-		_count = 10000;
+		_count = 30000;
 		const auto buffer = GenerateRockPoisitonBuffer(_count);
 		for (unsigned int i = 0; i < _rock->meshes.size(); i++)
 		{
@@ -157,7 +157,7 @@ void GLSaturnApp::drawScene(const float dt) {
 	const auto view = _camera.getViewMatrix();
 	
 	float radius = 5.0f; // 旋转半径
-	auto model = _saturnPos;
+	auto model = glm::translate(glm::mat4(1.0), _saturnPos);
 	model = glm::rotate(model, 0.f, glm::vec3(1.0f, 0.f, 0.f));
 	const float scale = 0.3;
 	model = glm::scale(model, glm::vec3(scale, scale, scale));
@@ -177,6 +177,8 @@ void GLSaturnApp::drawScene(const float dt) {
 		_rockProgram.update("view", view);
 		model = glm::translate(model, glm::vec3(0.0f, 0.f, 0.0f)); // translate it down so it's at the center of the scene
 		_rockProgram.update("model", model);
+		_rockProgram.update("time", curTime);
+		_rockProgram.update("radiusPos", _saturnPos);
 		_rock->draw(_rockProgram, _count);
 	}
 

@@ -36,7 +36,7 @@ private:
 	GLProgram _rockProgram{};
 	std::shared_ptr<Model> _saturn;
 	std::shared_ptr<Model> _rock;
-	glm::mat4 _saturnPos{};
+	glm::vec3 _saturnPos{};
 	unsigned int _vbo[2]{};
 	unsigned int _vao{};
 	unsigned int _ebo{};
