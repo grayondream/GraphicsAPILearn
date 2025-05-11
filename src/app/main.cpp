@@ -49,7 +49,7 @@ namespace EnumUtil = Utils::Enum;
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nShowCmd) {
     ConsoleDebugger consoleDebugger{};
     
-    auto type = AppType::SkyBox;
+    auto type = AppType::LoadModel;
     auto api = GraphicsType::GL;
     LOGI("Start Graphics Learn!!!");
     LOGI("Select {} Application, Render App With {} API", EnumUtil::EnumName(type), EnumUtil::EnumName(api));

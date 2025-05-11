@@ -36,7 +36,7 @@ if(ENABLE_DX11 OR ENABLE_DX12)
 endif()
 
 
-include(${RENDER_CMAKE_PATH}/Init.cmake)
+include(${RENDER_CMAKE_PATH}/Preinit.cmake)
 
 set(PROJECT_NAME renderLearn)
 
