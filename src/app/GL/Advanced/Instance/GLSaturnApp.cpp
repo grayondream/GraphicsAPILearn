@@ -11,6 +11,7 @@
 #include "Base/Log.hpp"
 #include "imgui.h"
 #include <Utils/FileUtils.hpp>
+#include <Model/Model.hpp>
 using FileUtils::join;
 
 using namespace ErrorHandle;
@@ -22,7 +23,50 @@ GLSaturnApp::~GLSaturnApp() {
 		glDeleteBuffers(1, &_ebo);
 	}
 
-	_program.destroy();
+	_saturnProgram.destroy();
+}
+
+std::vector<glm::mat4> GenerateRocksPosition(int amount, const glm::mat4& pos) {
+	std::vector<glm::mat4> modelMatrices;
+	modelMatrices.resize(amount);
+	srand(static_cast<unsigned int>(0)); // initialize random seed
+	float radius = 50.0;
+	float offset = 10.0f;
+	for (unsigned int i = 0; i < amount; i++)
+	{
+		glm::mat4 model = pos;
+		// 1. translation: displace along circle with 'radius' in range [-offset, offset]
+		float angle = (float)i / (float)amount * 360.0f;
+		float displacement = (rand() % (int)(2 * offset * 10)) / 10.0f - offset;
+		float x = sin(angle) * radius + displacement;
+		displacement = (rand() % (int)(2 * offset * 10)) / 10.0f - offset;
+		float y = displacement * 0.4f; // keep height of asteroid field smaller compared to width of x and z
+		displacement = (rand() % (int)(2 * offset * 10)) / 10.0f - offset;
+		float z = cos(angle) * radius + displacement;
+		model = glm::translate(model, glm::vec3(x, y, z));
+
+		// 2. scale: Scale between 0.05 and 0.25f
+		float scale = static_cast<float>((rand() % 20) / 100.0 + 0.05);
+		model = glm::scale(model, glm::vec3(scale));
+
+		// 3. rotation: add random rotation around a (semi)randomly picked rotation axis vector
+		float rotAngle = static_cast<float>((rand() % 360));
+		model = glm::rotate(model, rotAngle, glm::vec3(0.4f, 0.6f, 0.8f));
+
+		// 4. now add to list of matrices
+		modelMatrices[i] = model;
+	}
+
+	return modelMatrices;
+}
+
+unsigned int GenerateRockPoisitonBuffer(int count = 100, const glm::mat4& pos = glm::mat4(1.0)) {
+	const auto poses = GenerateRocksPosition(count, pos);
+	unsigned int buffer{};
+	glGenBuffers(1, &buffer);
+	glBindBuffer(GL_ARRAY_BUFFER, buffer);
+	glBufferData(GL_ARRAY_BUFFER, poses.size() * sizeof(poses[0]), poses.data(), GL_STATIC_DRAW);
+	return buffer;
 }
 
 bool GLSaturnApp::init(const HINSTANCE inst, const WindowDesc& param) {
@@ -31,85 +75,69 @@ bool GLSaturnApp::init(const HINSTANCE inst, const WindowDesc& param) {
 	}
 	
 	_camera = Camera(glm::vec3(0.0f, 0.0f, 3.0f));
+	_saturnPos = glm::translate(glm::mat4(1.0f), glm::vec3(0, 0, -3));
 	glViewport(0, 0, _attribute.winAttr.width, _attribute.winAttr.height);
 	{
-		const auto vfile = join(StaticCollector::getGLShaderPath(), "Advanced", "Instance", "Sphere.vs");
-		const auto ffile = join(StaticCollector::getGLShaderPath(), "Advanced", "Instance", "Sphere.fs");
+		const auto vfile = join(StaticCollector::getGLShaderPath(), "Advanced", "Instance", "Saturn.vs");
+		const auto ffile = join(StaticCollector::getGLShaderPath(), "Advanced", "Instance", "Saturn.fs");
 		GLProgram program{};
 		auto ret = program.init(vfile, ffile);
 		ErrorHandle::ExitIfFailed(ret, "Create OpenGL program failed!");
-		_program = program;
+		_saturnProgram = program;
 	}
 	
-	glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-	createVertexBuffer();
+	{
+		const auto vfile = join(StaticCollector::getGLShaderPath(), "Advanced", "Instance", "Rock.vs");
+		const auto ffile = join(StaticCollector::getGLShaderPath(), "Advanced", "Instance", "Rock.fs");
+		GLProgram program{};
+		auto ret = program.init(vfile, ffile);
+		ErrorHandle::ExitIfFailed(ret, "Create OpenGL program failed!");
+		_rockProgram = program;
+	}
+
+	loadModel();
+	//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+	//createVertexBuffer();
 	return true;
 }
 
-static unsigned int CreateObjectPositions(int count, int gap = 2.5){
-	glm::vec2* translations = new glm::vec2[count * count];
-    int index = 0;
-    float offset = 0.1f;
-	const int length = 2 * gap * (count - 1) / 2;
-    for (int y = -length; y < length; y += 2 * gap)
-    {
-        for (int x = -length; x < length; x += 2 * gap)
-        {
-            glm::vec2 translation;
-			translation.x = x;
-			translation.y = y;
-            translations[index++] = translation;
-			LOGI("Append Position [{}, {}]", x, y);
-        }
-    }
-
-	unsigned int instanceVBO;
-    glGenBuffers(1, &instanceVBO);
-    glBindBuffer(GL_ARRAY_BUFFER, instanceVBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(glm::vec2) * count * count, translations, GL_STATIC_DRAW);
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
-	delete [] translations;
-	return instanceVBO;
-}
-
-void GLSaturnApp::createVertexBuffer() {
-	unsigned int vbo[2]{}, vao{}, ebo{};
-	glGenVertexArrays(1, &vao);
-	glGenBuffers(2, vbo);
-	glGenBuffers(1, &ebo);
-
-	glBindVertexArray(vao);
+void GLSaturnApp::loadModel() {
+	const auto modelPath = StaticCollector::getModelPath();
 	{
-		glBindBuffer(GL_ARRAY_BUFFER, vbo[0]);
-		glBufferData(GL_ARRAY_BUFFER, shape.byteSize(), shape.toGL().data(), GL_STATIC_DRAW);
-		glEnableVertexAttribArray(0);
-		glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex), nullptr);
-		
-		glEnableVertexAttribArray(1);
-		glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)(sizeof(float) * 4));
-		
-		glBindBuffer(GL_ARRAY_BUFFER, vbo[1]);
-		glBufferData(GL_ARRAY_BUFFER, shape.normalSize(), shape.normal(), GL_STATIC_DRAW);
-		glEnableVertexAttribArray(2);
-		glVertexAttribPointer(2, 4, GL_FLOAT, GL_FALSE, sizeof(Vector4DBase<float>), nullptr);
-		
-		_positionVbo = CreateObjectPositions(_count);
-		glBindBuffer(GL_ARRAY_BUFFER, _positionVbo);
-		glEnableVertexAttribArray(3);
-		glVertexAttribPointer(3, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0);
-    	glBindBuffer(GL_ARRAY_BUFFER, 0);
-	    glVertexAttribDivisor(3, 1);
-
-		// ������������
-		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
-		glBufferData(GL_ELEMENT_ARRAY_BUFFER, shape.idxByteSize(), shape.idx(), GL_STATIC_DRAW);
+		const auto modelFile = join(modelPath, "planet", "planet.obj");
+		_saturn = std::make_shared<Model>(modelFile);
 	}
-	glBindVertexArray(0);
 
-	// ��¼ VBO �� EBO
-	_vao = vao;
-	_vbo[0] = vbo[0], _vbo[1] = vbo[1];
-	_ebo = ebo;
+	{
+		const auto modelFile = join(modelPath, "rock", "rock.obj");
+		_rock = std::make_shared<Model>(modelFile);
+	}
+
+	{
+		_count = 10000;
+		const auto buffer = GenerateRockPoisitonBuffer(_count);
+		for (unsigned int i = 0; i < _rock->meshes.size(); i++)
+		{
+			unsigned int VAO = _rock->meshes[i]._vao;
+			glBindVertexArray(VAO);
+			// set attribute pointers for matrix (4 times vec4)
+			glEnableVertexAttribArray(3);
+			glVertexAttribPointer(3, 4, GL_FLOAT, GL_FALSE, sizeof(glm::mat4), (void*)0);
+			glEnableVertexAttribArray(4);
+			glVertexAttribPointer(4, 4, GL_FLOAT, GL_FALSE, sizeof(glm::mat4), (void*)(sizeof(glm::vec4)));
+			glEnableVertexAttribArray(5);
+			glVertexAttribPointer(5, 4, GL_FLOAT, GL_FALSE, sizeof(glm::mat4), (void*)(2 * sizeof(glm::vec4)));
+			glEnableVertexAttribArray(6);
+			glVertexAttribPointer(6, 4, GL_FLOAT, GL_FALSE, sizeof(glm::mat4), (void*)(3 * sizeof(glm::vec4)));
+
+			glVertexAttribDivisor(3, 1);
+			glVertexAttribDivisor(4, 1);
+			glVertexAttribDivisor(5, 1);
+			glVertexAttribDivisor(6, 1);
+
+			glBindVertexArray(0);
+		}
+	}
 }
 
 void GLSaturnApp::clearColor() {
@@ -123,33 +151,35 @@ void GLSaturnApp::beginDrawScene() {
 void GLSaturnApp::drawScene(const float dt) {
 	ImGui::Begin("OpenGL");
 	ImGui::End();
-
-	glBindVertexArray(_vao);
 	static float curTime = 0;
 	curTime += dt;
 	const auto projection = glm::perspective(glm::radians(_camera.zoom()), aspectRatio(), 0.1f, 100.0f);
 	const auto view = _camera.getViewMatrix();
 	
 	float radius = 5.0f; // 旋转半径
-	glm::vec3 pos = glm::vec3(0.0,0.0, -3.0f);
-	glm::mat4 model = glm::mat4(1.0f); // make sure to initialize matrix to identity matrix first
-	model = glm::translate(model, pos);
+	auto model = _saturnPos;
 	model = glm::rotate(model, 0.f, glm::vec3(1.0f, 0.f, 0.f));
 	const float scale = 0.3;
 	model = glm::scale(model, glm::vec3(scale, scale, scale));
 	//draw light source
 	{
-		_program.use();
-		_program.update("projection", projection);
-		_program.update("view", view);
-		_program.update("model", model);
-		_program.update("count", _count * _count);
-		//glDrawElements(GL_TRIANGLES, shape.idxSize(), GL_UNSIGNED_INT, 0);
-		//glDrawArrays(GL_TRIANGLES, 0, shape.idxSize() / 3);
-		//glDrawArraysInstanced(GL_TRIANGLES, 0, shape.idxSize() / 3, 100);
-		glDrawElementsInstanced(GL_TRIANGLES, shape.idxSize(), GL_UNSIGNED_INT, (void*)0, _count * _count);
+		_saturnProgram.use();
+		_saturnProgram.update("projection", projection);
+		_saturnProgram.update("view", view);
+		model = glm::rotate(model, glm::radians(curTime * 5), glm::vec3(1.0, 1.0, 0.0));
+		_saturnProgram.update("model", model);
+		_saturn->draw(_saturnProgram);
 	}
-	glBindVertexArray(0);
+
+	{
+		_rockProgram.use();
+		_rockProgram.update("projection", projection);
+		_rockProgram.update("view", view);
+		model = glm::translate(model, glm::vec3(0.0f, 0.f, 0.0f)); // translate it down so it's at the center of the scene
+		_rockProgram.update("model", model);
+		_rock->draw(_rockProgram, _count);
+	}
+
 	return GLApp::drawScene(dt);
 }
 

@@ -9,7 +9,7 @@ Mesh::Mesh(vector<MeshVertex> vertices, vector<unsigned int> indices, vector<Tex
     setupMesh();
 }
 
-void Mesh::draw(GLProgram &shader) {
+void Mesh::draw(GLProgram &shader, int count) {
     // bind appropriate textures
     unsigned int diffuseNr  = 1;
     unsigned int specularNr = 1;
@@ -38,7 +38,12 @@ void Mesh::draw(GLProgram &shader) {
     
     // draw mesh
     glBindVertexArray(_vao);
-    glDrawElements(GL_TRIANGLES, static_cast<unsigned int>(indices.size()), GL_UNSIGNED_INT, 0);
+    if (count == 1) {
+        glDrawElements(GL_TRIANGLES, static_cast<unsigned int>(indices.size()), GL_UNSIGNED_INT, 0);
+    }else {
+        glDrawElementsInstanced(GL_TRIANGLES, static_cast<unsigned int>(indices.size()), GL_UNSIGNED_INT, 0, count);
+    }
+    
     glBindVertexArray(0);
 
     // always good practice to set everything back to defaults once configured.

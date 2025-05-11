@@ -9,6 +9,7 @@
 #include "Geometry/Sphere.hpp"
 
 class GLImageTexture2D;
+class Model;
 class GLSaturnApp : public GLApp {
 public:
 	virtual ~GLSaturnApp();
@@ -28,11 +29,14 @@ protected:
 	virtual void onKeyBoardEvent(const UINT msg, const WPARAM wParam, const LPARAM lParam) override;
 
 private:
-	void createVertexBuffer();
+	void loadModel();
 
 private:
-	Sphere shape{};
-	GLProgram _program;
+	GLProgram _saturnProgram{};
+	GLProgram _rockProgram{};
+	std::shared_ptr<Model> _saturn;
+	std::shared_ptr<Model> _rock;
+	glm::mat4 _saturnPos{};
 	unsigned int _vbo[2]{};
 	unsigned int _vao{};
 	unsigned int _ebo{};

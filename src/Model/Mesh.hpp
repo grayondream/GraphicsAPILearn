@@ -45,17 +45,18 @@ public:
     Mesh(vector<MeshVertex> vertices, vector<unsigned int> indices, vector<Texture> textures);
 
     // render the mesh
-    void draw(GLProgram &shader);
+    void draw(GLProgram &shader, int count);
 
 public:
     // mesh Data
     vector<MeshVertex>       vertices;
     vector<unsigned int> indices;
     vector<Texture>      textures;
+    unsigned int _vao;
+    
 private:
     // render data 
     unsigned int _vbo, _ebo;
-    unsigned int _vao;
     // initializes all the buffer objects/arrays
     void setupMesh();
 };

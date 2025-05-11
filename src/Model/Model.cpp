@@ -10,9 +10,9 @@ Model::Model(string const &path, bool gamma) : gammaCorrection(gamma){
 }
 
 // draws the model, and thus all its meshes
-void Model::draw(GLProgram &shader){
+void Model::draw(GLProgram &shader, int count){
     for(unsigned int i = 0; i < meshes.size(); i++)
-        meshes[i].draw(shader);
+        meshes[i].draw(shader, count);
 }
 
 void Model::loadModel(string const &path){

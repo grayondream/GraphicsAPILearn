@@ -29,7 +29,7 @@ public:
     Model(string const &path, bool gamma = false);
 
     // draws the model, and thus all its meshes
-    void draw(GLProgram &shader);
+    void draw(GLProgram &shader, int count = 1);
     
 private:
     // loads a model with supported ASSIMP extensions from file and stores the resulting meshes in the meshes vector.
