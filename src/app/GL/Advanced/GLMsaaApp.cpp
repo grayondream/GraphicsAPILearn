@@ -192,11 +192,32 @@ void GLMsaaApp::beginDrawScene() {
 
 void GLMsaaApp::drawFrameBufferMssa() {
 	glBindFramebuffer(GL_FRAMEBUFFER, _screenFrameBuffer);
-	clearColor();
+	glClearColor(0.1, 0.1, 0.1, 1.0);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	glEnable(GL_DEPTH_TEST);
-	_enableMsaa = false;
-	drawGLMssa();
+
+	{
+		glm::vec3 cubePositions[] = {
+			glm::vec3(0.0f,  0.0f,  0.0f),
+		};
+
+		glBindVertexArray(_vao);
+		const auto projection = glm::perspective(glm::radians(_camera.zoom()), aspectRatio(), 0.1f, 100.0f);
+		_program.update("projection", projection);
+		const auto view = _camera.getViewMatrix();
+		_program.update("view", view);
+		glm::mat4 model = glm::mat4(1.0f); // make sure to initialize matrix to identity matrix first
+		model = glm::translate(model, cubePositions[0]);
+		model = glm::scale(model, glm::vec3(2.0f));
+		model = glm::rotate(model, glm::radians(45.f), glm::vec3(1.0f, 0.f, 0.f));
+		model = glm::rotate(model, glm::radians(45.f), glm::vec3(0.0f, 1.f, 0.f));
+		_program.update("model", model);
+
+		glDrawArrays(GL_TRIANGLES, 0, 36);
+
+
+		glBindVertexArray(0);
+	}
 
 	const auto attr = _attribute.winAttr;
 	const auto width = attr.width, height = attr.height;
@@ -204,7 +225,7 @@ void GLMsaaApp::drawFrameBufferMssa() {
 	glBindFramebuffer(GL_DRAW_FRAMEBUFFER, _postFrameBuffer);
 	glBlitFramebuffer(0, 0, width, height, 0, 0, width, height, GL_COLOR_BUFFER_BIT, GL_NEAREST);
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
-	clearColor();
+	glClearColor(0.1, 0.1, 0.1, 1.0);
 	glClear(GL_COLOR_BUFFER_BIT);
     glDisable(GL_DEPTH_TEST);
 
@@ -212,7 +233,8 @@ void GLMsaaApp::drawFrameBufferMssa() {
 	glBindVertexArray(_screenVao);
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, _postTexture); // use the now resolved color attachment as the quad's texture
-    glDrawArrays(GL_TRIANGLES, 0, 6);
+    glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+	glBindVertexArray(0);
 }
 
 void GLMsaaApp::drawGLMssa() {
