@@ -44,6 +44,7 @@ static inline constexpr int GAME_ENABLE_MSAA = true;
  *  MultiInstance                   draw multiple instance
  *  MultiInstance_Saturn            draw multiple instance with saturn model
  *  Msaa                            Multi Sample Anti Aliasing
+ *  BlinnPhong                      Blinn-Phong Lighting Model
  */
 
 namespace EnumUtil = Utils::Enum;
@@ -51,7 +52,7 @@ namespace EnumUtil = Utils::Enum;
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nShowCmd) {
     ConsoleDebugger consoleDebugger{};
     
-    auto type = AppType::Msaa;
+    auto type = AppType::BlinnPhong;
     auto api = GraphicsType::GL;
     LOGI("Start Graphics Learn!!!");
     LOGI("Select {} Application, Render App With {} API", EnumUtil::EnumName(type), EnumUtil::EnumName(api));

@@ -40,5 +40,6 @@ enum class AppType : int{
     MultiInstance,
     MultiInstance_Saturn,
     Msaa,
+    BlinnPhong
 };
 
