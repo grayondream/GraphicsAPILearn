@@ -146,7 +146,7 @@ void GLBlinnPhongApp::drawScene(const float dt) {
 	
 	const auto view = _camera.getViewMatrix();
 	
-	const auto lightPos = glm::vec3(-0.0f, 0.0f, 0.5f);
+	const auto lightPos = glm::vec3(-0.0f, 0.0f, 0.f);
 	//draw object
 	{
 		_texture->texture()->bind(0);

@@ -12,9 +12,15 @@ out vec2 TexCoord;
 out vec4 opos;
 out vec4 Normal;
 
+out VS_OUT {
+    vec3 FragPos;
+    vec3 Normal;
+    vec2 TexCoords;
+} vs_out;
+
 void main(){
-    opos = pos;
-    gl_Position = projection * view * model * pos;
-    TexCoord = textureCoord;
-    Normal = normal;
+    vs_out.FragPos = pos.xyz;
+    vs_out.Normal = normal.xyz;
+    vs_out.TexCoords = textureCoord;
+    gl_Position = projection * view * pos;
 }

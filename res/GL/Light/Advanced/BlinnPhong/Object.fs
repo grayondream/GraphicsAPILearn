@@ -3,27 +3,28 @@ out vec4 FragColor;
   
 uniform sampler2D textureSampler;
 
-in vec2 TexCoord;
-in vec4 opos;
-in vec4 Normal;
+in VS_OUT {
+    vec3 FragPos;
+    vec3 Normal;
+    vec2 TexCoords;
+} fs_in;
 
 uniform vec3 lightPos;
 uniform vec4 lightColor;
 uniform vec3 viewPos;
 uniform bool enableBlinnPhong;
 
-out vec4 color;
-void main(){
-    vec3 color = texture(textureSampler, TexCoord).rgb;
+void main(){           
+    vec3 color = texture(textureSampler, fs_in.TexCoords).rgb;
     // ambient
     vec3 ambient = 0.05 * color;
     // diffuse
-    vec3 lightDir = normalize(lightPos - opos.xyz);
-    vec3 normal = normalize(Normal.xyz);
+    vec3 lightDir = normalize(lightPos - fs_in.FragPos);
+    vec3 normal = normalize(fs_in.Normal);
     float diff = max(dot(lightDir, normal), 0.0);
     vec3 diffuse = diff * color;
     // specular
-    vec3 viewDir = normalize(viewPos - opos.xyz);
+    vec3 viewDir = normalize(viewPos - fs_in.FragPos);
     vec3 reflectDir = reflect(-lightDir, normal);
     float spec = 0.0;
     if(enableBlinnPhong){

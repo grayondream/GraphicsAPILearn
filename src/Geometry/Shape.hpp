@@ -48,7 +48,7 @@ public:
 	}
 
 	std::size_t normalSize() {
-		return _normal.size() * sizeof(Vector3DBase<float>);
+		return _normal.size() * sizeof(Vector4DBase<float>);
 	}
 
 	std::size_t size() {
