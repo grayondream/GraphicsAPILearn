@@ -99,6 +99,16 @@ const GLProgram& GLProgram::update(const std::string& name, const glm::vec4& val
 	return *this;
 }
 
+const GLProgram& GLProgram::update(const std::string& name, const std::vector<glm::vec3>& value) const {
+	glUniform3fv(locate(name), value.size(), &value[0][0]);
+	return *this;
+}
+
+const GLProgram& GLProgram::update(const std::string& name, const std::vector<glm::vec4>& value) const {
+	glUniform4fv(locate(name), value.size(), &value[0][0]);
+	return *this;
+}
+
 std::tuple<unsigned int, unsigned int, unsigned int> GLProgram::compileShader(const std::string vertFile, const std::string fragFile, const std::string geomFile) {
 	if (vertFile.empty() || fragFile.empty()) {
 		LOGI("Empty input for shader file!\nvertex file is {}\nfragment files is", vertFile, fragFile);

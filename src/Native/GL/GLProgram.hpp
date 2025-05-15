@@ -4,6 +4,8 @@
 #include <tuple>
 #include <glm/glm.hpp>
 #include <glad/glad.h>
+#include <vector>
+
 class GLProgram {
 public:
 	~GLProgram();
@@ -32,9 +34,13 @@ public:
 
 	const GLProgram& update(const std::string& name, const glm::vec3& value) const;
 	
-	const GLProgram& update(const std::string& name, const glm::mat4 &value) const;
-
 	const GLProgram& update(const std::string& name, const glm::vec4& value) const;
+
+	const GLProgram& update(const std::string& name, const std::vector<glm::vec3>& value) const;
+
+	const GLProgram& update(const std::string& name, const std::vector<glm::vec4>& value) const;
+
+	const GLProgram& update(const std::string& name, const glm::mat4 &value) const;
 
 private:
 	std::tuple<unsigned int, unsigned int, unsigned int> compileShader(const std::string vertFile, const std::string fragFile, const std::string geomFile);
