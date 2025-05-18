@@ -244,6 +244,7 @@ void GLShadowMapApp::reanderFraemBuffer(){
 	const float near_plane = 1.0f, far_plane = 7.5f;
 	glViewport(0, 0, _attribute.winAttr.width, _attribute.winAttr.height);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	_depthProgram.use();
 	_depthProgram.update("near_plane", near_plane);
 	_depthProgram.update("far_plane", far_plane);
 
