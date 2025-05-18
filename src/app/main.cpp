@@ -46,6 +46,7 @@ static inline constexpr int GAME_ENABLE_MSAA = true;
  *  Msaa                            Multi Sample Anti Aliasing
  *  BlinnPhong                      Blinn-Phong Lighting Model
  *  Gamma                           Gamma Correction
+ *  Shadow_Map                      Shadow Mapping
  */
 
 namespace EnumUtil = Utils::Enum;
@@ -53,7 +54,7 @@ namespace EnumUtil = Utils::Enum;
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nShowCmd) {
     ConsoleDebugger consoleDebugger{};
     
-    auto type = AppType::Gamma;
+    auto type = AppType::Shadow_Map;
     auto api = GraphicsType::GL;
     LOGI("Start Graphics Learn!!!");
     LOGI("Select {} Application, Render App With {} API", EnumUtil::EnumName(type), EnumUtil::EnumName(api));

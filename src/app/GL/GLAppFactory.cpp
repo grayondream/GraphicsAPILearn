@@ -30,6 +30,7 @@
 #include "App/GL/Advanced/GLMsaaApp.hpp"
 #include "App/GL/Light/Advanced/GLBlinnPhongApp.hpp"
 #include "App/GL/Light/Advanced/GLGammaApp.hpp"
+#include "App/GL/Light/Advanced/GLShadowMapApp.hpp"
 
 std::shared_ptr<GLApp> GLAppFactory::create(const AppType type){
 	switch(type){
@@ -97,6 +98,8 @@ std::shared_ptr<GLApp> GLAppFactory::create(const AppType type){
 			return std::make_shared<GLBlinnPhongApp>();
 		case AppType::Gamma:
 			return std::make_shared<GLGammaApp>();
+		case AppType::Shadow_Map:
+			return std::make_shared<GLShadowMapApp>();
 		default:
 			break;	
 	}

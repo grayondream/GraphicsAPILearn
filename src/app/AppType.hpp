@@ -41,6 +41,7 @@ enum class AppType : int{
     MultiInstance_Saturn,
     Msaa,
     BlinnPhong,
-    Gamma
+    Gamma,
+    Shadow_Map,
 };
 
