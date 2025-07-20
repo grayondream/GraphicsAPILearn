@@ -18,10 +18,10 @@ using FileUtils::join;
 using namespace ErrorHandle;
 
 GLShadowApp::~GLShadowApp() {
-	if (_vao != 0) {
-		glDeleteVertexArrays(1, &_vao);
-		glDeleteBuffers(2, _vbo);
-		glDeleteBuffers(1, &_ebo);
+	if (_sphereVao != 0) {
+		glDeleteVertexArrays(1, &_sphereVao);
+		glDeleteBuffers(2, _sphereVbo);
+		glDeleteBuffers(1, &_sphereEbo);
 	}
 
 	glDeleteVertexArrays(1, &_screenVao);
@@ -46,7 +46,7 @@ bool GLShadowApp::init(const HINSTANCE inst, const WindowDesc& param) {
 		ExitIfFailed(valid, "Failed to load texture from file {}", imgFile);
 	}
 
-	createVertexBuffer();
+	createSphereBuffer();
 	createPlaneBuffer();
 	createShadowDepthBuffer();
 	createScreenBuffer();
@@ -71,6 +71,14 @@ void GLShadowApp::compileShader(){
 		auto ret = _depthProgram.init(vfile, ffile);
 		ErrorHandle::ExitIfFailed(ret, "Create OpenGL program failed!");
 	}
+
+	{
+		const auto vfile = join(shaderDir, "Advanced", "Shadow", "Debug.vs");
+		const auto ffile = join(shaderDir, "Advanced", "Shadow", "Debug.fs");
+		auto ret = _debugProgram.init(vfile, ffile);
+		ErrorHandle::ExitIfFailed(ret, "Create OpenGL program failed!");
+	}
+
 }
 
 void GLShadowApp::createShadowDepthBuffer(){
@@ -135,7 +143,7 @@ void GLShadowApp::createScreenBuffer() {
 	_screenVbo[1] = vbos[1];
 }
 
-void GLShadowApp::createVertexBuffer() {
+void GLShadowApp::createSphereBuffer() {
 	unsigned int vbo[2]{}, vao{}, ebo{};
 	glGenVertexArrays(1, &vao);
 	glGenBuffers(2, vbo);
@@ -145,7 +153,7 @@ void GLShadowApp::createVertexBuffer() {
 	{
 		// �󶨵�һ�� VBO�����ö���λ��
 		glBindBuffer(GL_ARRAY_BUFFER, vbo[0]);
-		glBufferData(GL_ARRAY_BUFFER, shape.byteSize(), shape.toGL().data(), GL_STATIC_DRAW);
+		glBufferData(GL_ARRAY_BUFFER, sphere.byteSize(), sphere.toGL().data(), GL_STATIC_DRAW);
 		glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex), nullptr);
 		glEnableVertexAttribArray(0);
 
@@ -154,14 +162,14 @@ void GLShadowApp::createVertexBuffer() {
 
 		// ������������
 		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
-		glBufferData(GL_ELEMENT_ARRAY_BUFFER, shape.idxByteSize(), shape.idx(), GL_STATIC_DRAW);
+		glBufferData(GL_ELEMENT_ARRAY_BUFFER, sphere.idxByteSize(), sphere.idx(), GL_STATIC_DRAW);
 	}
 	glBindVertexArray(0);
 
 	// ��¼ VBO �� EBO
-	_vao = vao;
-	_vbo[0] = vbo[0], _vbo[1] = vbo[1];
-	_ebo = ebo;
+	_sphereVao = vao;
+	_sphereVbo[0] = vbo[0], _sphereVbo[1] = vbo[1];
+	_sphereEbo = ebo;
 }
 
 void GLShadowApp::createPlaneBuffer() {
@@ -207,6 +215,50 @@ void GLShadowApp::beginDrawScene() {
 	return GLApp::beginDrawScene();
 }
 
+void GLShadowApp::renderPlane(GLProgram &program, const glm::mat4 &model){
+	program.use();
+	program.update("model", model);
+	glBindVertexArray(_planeVao);
+	glDrawArrays(GL_TRIANGLES, 0, 6);
+	glBindVertexArray(0);
+}
+
+void GLShadowApp::renderSphere(GLProgram &program, const glm::mat4 &model){
+	program.use();
+	program.update("model", model);
+	glBindVertexArray(_sphereVao);
+	glDrawElements(GL_TRIANGLES, sphere.idxSize(), GL_UNSIGNED_INT, 0);
+	glBindVertexArray(0);
+}
+
+void GLShadowApp::renderScene(GLProgram &program){
+	program.use();
+	renderPlane(program, glm::mat4(1.0f));
+	
+	std::vector<glm::mat4> models;
+	{
+		auto model1 = glm::mat4(1.0f);
+		model1 = glm::translate(model1, glm::vec3(0.0f, 0.0f, 2.0f));
+		models.push_back(model1);
+	}
+
+	{
+		auto model2 = glm::mat4(1.0f);
+		model2 = glm::translate(model2, glm::vec3(0.0f, 0.0f, -2.0f));
+		models.push_back(model2);
+	}
+
+	{
+		auto model3 = glm::mat4(1.0f);
+		model3 = glm::translate(model3, glm::vec3(0.0f, 0.0f, -4.0f));
+		models.push_back(model3);
+	}
+
+	for(auto &model : models){
+		renderSphere(program, model);
+	}
+}
+
 void GLShadowApp::renderScene2FrameBuffer(){
 	const float near_plane = 1.0f, far_plane = 7.5f;
 	glm::vec3 lightPos(-2.0f, 4.0f, -1.0f);
@@ -221,23 +273,11 @@ void GLShadowApp::renderScene2FrameBuffer(){
 	glBindFramebuffer(GL_FRAMEBUFFER, _shadowDepthMapFbo);
 	glClear(GL_DEPTH_BUFFER_BIT);
 	{
-		_shadowProgram.update("model", glm::mat4(1.0f));
-		glBindVertexArray(_planeVao);
-		glDrawArrays(GL_TRIANGLES, 0, 6);
-		glBindVertexArray(0);
+		_texture->texture()->bind();
+		renderScene(_shadowProgram);	
 	}
 
-	{
-		auto model = glm::mat4(1.0f);
-    	model = glm::translate(model, glm::vec3(0.0f, 1.5f, 0.0));
-		_shadowProgram.update("model", model);
-		glBindVertexArray(_vao);
-		glDrawElements(GL_TRIANGLES, shape.idxSize(), GL_UNSIGNED_INT, 0);
-		glBindVertexArray(0);
-	}
-	
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
-	glBindVertexArray(0);	
 }
 
 void GLShadowApp::reanderFraemBuffer(){

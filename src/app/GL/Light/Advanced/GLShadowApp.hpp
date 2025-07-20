@@ -28,22 +28,31 @@ protected:
 
 private:
 	void createShadowDepthBuffer();
-	void createVertexBuffer();
+	void createSphereBuffer();
 	void createPlaneBuffer();
 	void createScreenBuffer();
 	void compileShader();
 	void reanderFraemBuffer();
+	void renderScene(GLProgram &program);
+	void renderPlane(GLProgram &program, const glm::mat4 &model);
+	void renderSphere(GLProgram &program, const glm::mat4 &model);
+
 	void renderScene2FrameBuffer();
 
+
 private:
-	Sphere shape{};
 	GLProgram _shadowProgram{};
 	GLProgram _depthProgram{};
-	unsigned int _vbo[2]{};
-	unsigned int _vao{};
-	unsigned int _ebo{};
+	GLProgram _debugProgram{};
+
+	Sphere sphere{};
+	unsigned int _sphereVbo[2]{};
+	unsigned int _sphereVao{};
+	unsigned int _sphereEbo{};
+
 	unsigned int _planeVbo[3]{};
 	unsigned int _planeVao{};
+
 	unsigned int _shadowDepthMapFbo{};
 	unsigned int _shadowDepthMap{};
 	unsigned int _screenVao{};

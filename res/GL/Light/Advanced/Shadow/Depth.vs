@@ -4,16 +4,9 @@ layout (location = 1) in vec4 inColor;
 layout (location = 2) in vec2 textureCoord;
 layout (location = 3) in vec4 normal;
 
-
-out VS_OUT {
-    vec3 FragPos;
-    vec3 Normal;
-    vec2 TexCoords;
-} vs_out;
+vec2 TexCoords;
 
 void main(){
-    vs_out.FragPos = pos.xyz;
-    vs_out.Normal = normal.xyz;
-    vs_out.TexCoords = textureCoord;
+    TexCoords = textureCoord;
     gl_Position = pos;
 }
