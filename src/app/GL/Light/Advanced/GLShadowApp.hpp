@@ -49,7 +49,7 @@ private:
 	GLProgram _debugProgram{};
 
 	Sphere sphere{};
-	unsigned int _sphereVbo[2]{};
+	unsigned int _sphereVbo[3]{};
 	unsigned int _sphereVao{};
 	unsigned int _sphereEbo{};
 

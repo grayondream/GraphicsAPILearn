@@ -21,10 +21,15 @@ using namespace ErrorHandle;
 GLShadowApp::~GLShadowApp() {
 	if (_sphereVao != 0) {
 		glDeleteVertexArrays(1, &_sphereVao);
-		glDeleteBuffers(2, _sphereVbo);
+		glDeleteBuffers(3, _sphereVbo);
 		glDeleteBuffers(1, &_sphereEbo);
 	}
 
+	if(_planeVao != 0) {
+		glDeleteVertexArrays(1, &_planeVao);
+		glDeleteBuffers(3, _planeVbo);
+	}
+	
 	glDeleteVertexArrays(1, &_screenVao);
 	glDeleteBuffers(2, _screenVbo);
 	glDeleteBuffers(1, &_screenEbo);
@@ -145,9 +150,9 @@ void GLShadowApp::createScreenBuffer() {
 }
 
 void GLShadowApp::createSphereBuffer() {
-	unsigned int vbo[2]{}, vao{}, ebo{};
+	unsigned int vbo[3]{}, vao{}, ebo{};
 	glGenVertexArrays(1, &vao);
-	glGenBuffers(2, vbo);
+	glGenBuffers(3, vbo);
 	glGenBuffers(1, &ebo);
 
 	glBindVertexArray(vao);
@@ -161,6 +166,18 @@ void GLShadowApp::createSphereBuffer() {
 		glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)(sizeof(float) * 4));
 		glEnableVertexAttribArray(1);
 
+		glBindBuffer(GL_ARRAY_BUFFER, vbo[1]);
+		glBufferData(GL_ARRAY_BUFFER, sphere.uvSize(), sphere.uv(), GL_STATIC_DRAW);
+
+		glEnableVertexAttribArray(2);
+		glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), nullptr);
+
+		glBindBuffer(GL_ARRAY_BUFFER, vbo[2]);
+		glBufferData(GL_ARRAY_BUFFER, sphere.normalSize(), sphere.normal(), GL_STATIC_DRAW);
+
+		glEnableVertexAttribArray(3);
+		glVertexAttribPointer(3, 4, GL_FLOAT, GL_FALSE, 4 * sizeof(float), nullptr);
+
 		// ������������
 		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
 		glBufferData(GL_ELEMENT_ARRAY_BUFFER, sphere.idxByteSize(), sphere.idx(), GL_STATIC_DRAW);
@@ -169,7 +186,7 @@ void GLShadowApp::createSphereBuffer() {
 
 	// ��¼ VBO �� EBO
 	_sphereVao = vao;
-	_sphereVbo[0] = vbo[0], _sphereVbo[1] = vbo[1];
+	_sphereVbo[0] = vbo[0], _sphereVbo[1] = vbo[1], _sphereVbo[2] = vbo[2];
 	_sphereEbo = ebo;
 }
 
@@ -227,36 +244,45 @@ void GLShadowApp::renderPlane(GLProgram &program, const glm::mat4 &model){
 void GLShadowApp::renderSphere(GLProgram &program, const glm::mat4 &model){
 	program.use();
 	program.update("model", model);
+	program.update("issphere", 1);
 	glBindVertexArray(_sphereVao);
 	glDrawElements(GL_TRIANGLES, sphere.idxSize(), GL_UNSIGNED_INT, 0);
 	glBindVertexArray(0);
+	program.update("issphere", 0);
 }
 
 void GLShadowApp::renderScene(GLProgram &program){
 	program.use();
-	renderPlane(program, glm::mat4(1.0f));
-	
+	{
+		auto model = glm::mat4(0.5f);
+		model = glm::translate(model, glm::vec3(0.0f, 0.0f, 0.0f));
+		renderPlane(program, model);
+	}
+	float scale = 0.1f;
 	std::vector<glm::mat4> models;
 	{
-		auto model1 = glm::mat4(1.0f);
-		model1 = glm::translate(model1, glm::vec3(0.0f, 0.0f, 2.0f));
-		models.push_back(model1);
+		auto model = glm::mat4(1.0f);
+		model = glm::translate(model, glm::vec3(0.0f, 0.f, 0.0f));
+		model = glm::scale(model, glm::vec3(scale));
+		models.push_back(model);
 	}
 
 	{
-		auto model2 = glm::mat4(1.0f);
-		model2 = glm::translate(model2, glm::vec3(0.0f, 0.0f, -2.0f));
-		models.push_back(model2);
+		auto model = glm::mat4(1.0f);
+		model = glm::translate(model, glm::vec3(0.0f, -0.5f, -1.0f));
+		model = glm::scale(model, glm::vec3(scale));
+		models.push_back(model);
 	}
 
 	{
-		auto model3 = glm::mat4(1.0f);
-		model3 = glm::translate(model3, glm::vec3(0.0f, 0.0f, -4.0f));
-		models.push_back(model3);
+		auto model = glm::mat4(1.0f);
+		model = glm::translate(model, glm::vec3(1.0f, 0.f, -2.0f));
+		model = glm::scale(model, glm::vec3(scale * 2));
+		models.push_back(model);
 	}
 
-	for(auto &model : models){
-		renderSphere(program, model);
+	for (auto i = 0; i < models.size(); i++) {
+		renderSphere(program, models[i]);
 	}
 }
 
@@ -307,11 +333,11 @@ void GLShadowApp::renderScene2Screen(const glm::mat4 &lightSpaceMatrix, const gl
 	_shadowProgram.update("viewPos", attr.pos);
 	_shadowProgram.update("lightPos", lightPos);
 	_shadowProgram.update("lightSpaceMatrix", lightSpaceMatrix);
-	glActiveTexture(GL_TEXTURE0);
+	//glActiveTexture(GL_TEXTURE0);
 	auto woodTexture = GLUtils::Ptr2GLTextureId(_texture->texture()->handle());
-	glBindTexture(GL_TEXTURE_2D, woodTexture);
-	glActiveTexture(GL_TEXTURE1);
-	glBindTexture(GL_TEXTURE_2D, _shadowDepthMap);
+	// glBindTexture(GL_TEXTURE_2D, woodTexture);
+	// glActiveTexture(GL_TEXTURE1);
+	// glBindTexture(GL_TEXTURE_2D, _shadowDepthMap);
 	renderScene(_shadowProgram);
 }
 
