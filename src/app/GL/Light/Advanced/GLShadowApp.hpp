@@ -33,11 +33,12 @@ private:
 	void createScreenBuffer();
 	void compileShader();
 	
-	void renderScene(GLProgram &program);
-	void renderPlane(GLProgram &program, const glm::mat4 &model);
-	void renderSphere(GLProgram &program, const glm::mat4 &model);
+	void renderScene(GLProgram &program, const glm::vec3 &lightPos);
 
-	void renderScene2FrameBuffer(const glm::mat4 &lightSpaceMatrix);
+	void renderPlane(GLProgram &program, const glm::mat4 &model);
+	void renderSphere(GLProgram &program, const glm::mat4 &model, const int type = 1);
+	void renderScene2FrameBuffer(const glm::mat4 &lightSpaceMatrix, const glm::vec3 &lightPos);
+
 
 	void renderScene2Screen(const glm::mat4 &lightSpaceMatrix, const glm::vec3 &lightPos);
 

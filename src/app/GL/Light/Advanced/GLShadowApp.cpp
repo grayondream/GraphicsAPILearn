@@ -241,17 +241,17 @@ void GLShadowApp::renderPlane(GLProgram &program, const glm::mat4 &model){
 	glBindVertexArray(0);
 }
 
-void GLShadowApp::renderSphere(GLProgram &program, const glm::mat4 &model){
+void GLShadowApp::renderSphere(GLProgram &program, const glm::mat4 &model, const int type){
 	program.use();
 	program.update("model", model);
-	program.update("issphere", 1);
+	program.update("type", type);
 	glBindVertexArray(_sphereVao);
 	glDrawElements(GL_TRIANGLES, sphere.idxSize(), GL_UNSIGNED_INT, 0);
 	glBindVertexArray(0);
-	program.update("issphere", 0);
+	program.update("type", 0);
 }
 
-void GLShadowApp::renderScene(GLProgram &program){
+void GLShadowApp::renderScene(GLProgram &program, const glm::vec3 &lightPos){
 	program.use();
 	{
 		auto model = glm::mat4(0.5f);
@@ -284,9 +284,16 @@ void GLShadowApp::renderScene(GLProgram &program){
 	for (auto i = 0; i < models.size(); i++) {
 		renderSphere(program, models[i]);
 	}
+
+	{
+		auto model = glm::mat4(1.0f);
+		model = glm::translate(model, lightPos);
+		model = glm::scale(model, glm::vec3(scale));
+		renderSphere(program, model, 2);
+	}
 }
 
-void GLShadowApp::renderScene2FrameBuffer(const glm::mat4 &lightSpaceMatrix){
+void GLShadowApp::renderScene2FrameBuffer(const glm::mat4 &lightSpaceMatrix, const glm::vec3 &lightPos){
 	
 	_depthProgram.use();
 	_depthProgram.update("lightSpaceMatrix", lightSpaceMatrix);
@@ -295,7 +302,7 @@ void GLShadowApp::renderScene2FrameBuffer(const glm::mat4 &lightSpaceMatrix){
 	glClear(GL_DEPTH_BUFFER_BIT);
 	{
 		_texture->texture()->bind();
-		renderScene(_depthProgram);	
+		renderScene(_depthProgram, lightPos);	
 	}
 
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -338,7 +345,7 @@ void GLShadowApp::renderScene2Screen(const glm::mat4 &lightSpaceMatrix, const gl
 	// glBindTexture(GL_TEXTURE_2D, woodTexture);
 	// glActiveTexture(GL_TEXTURE1);
 	// glBindTexture(GL_TEXTURE_2D, _shadowDepthMap);
-	renderScene(_shadowProgram);
+	renderScene(_shadowProgram, lightPos);
 }
 
 void GLShadowApp::drawScene(const float dt) {
@@ -350,14 +357,14 @@ void GLShadowApp::drawScene(const float dt) {
 	curTime += dt;
 
 	const float near_plane = 1.0f, far_plane = 7.5f;
-	glm::vec3 lightPos(-2.0f, 4.0f, -1.0f);
+	glm::vec3 lightPos = glm::vec3(-1.0f, 1.0f, -2.0f);
 	glm::mat4 lightProjection, lightView;
 	glm::mat4 lightSpaceMatrix;
 	lightProjection = glm::ortho(-10.0f, 10.0f, -10.0f, 10.0f, near_plane, far_plane);
 	lightView = glm::lookAt(lightPos, glm::vec3(0.0f), glm::vec3(0.0, 1.0, 0.0));
 	lightSpaceMatrix = lightProjection * lightView;
 
-	renderScene2FrameBuffer(lightSpaceMatrix);
+	renderScene2FrameBuffer(lightSpaceMatrix, lightPos);
 	renderScene2Screen(lightSpaceMatrix, lightPos);
 	//renderDepthDebug();
 	return GLApp::drawScene(dt);
