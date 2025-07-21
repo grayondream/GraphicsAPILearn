@@ -13,6 +13,7 @@
 #include <Utils/FileUtils.hpp>
 #include "Base/Define.hpp"
 #include "Geometry/Rect.hpp"
+#include "Utils/GL/GLUtils.hpp"
 
 using FileUtils::join;
 using namespace ErrorHandle;
@@ -66,15 +67,15 @@ void GLShadowApp::compileShader(){
 	}
 
 	{
-		const auto vfile = join(shaderDir, "Advanced", "Shadow", "Depth.vs");
-		const auto ffile = join(shaderDir, "Advanced", "Shadow", "Depth.fs");
+		const auto vfile = join(shaderDir, "Advanced", "Shadow", "ShadowMappingDepth.vs");
+		const auto ffile = join(shaderDir, "Advanced", "Shadow", "ShadowMappingDepth.fs");
 		auto ret = _depthProgram.init(vfile, ffile);
 		ErrorHandle::ExitIfFailed(ret, "Create OpenGL program failed!");
 	}
 
 	{
-		const auto vfile = join(shaderDir, "Advanced", "Shadow", "Debug.vs");
-		const auto ffile = join(shaderDir, "Advanced", "Shadow", "Debug.fs");
+		const auto vfile = join(shaderDir, "Advanced", "Shadow", "DebugQuand.vs");
+		const auto ffile = join(shaderDir, "Advanced", "Shadow", "DebugQuand.fs");
 		auto ret = _debugProgram.init(vfile, ffile);
 		ErrorHandle::ExitIfFailed(ret, "Create OpenGL program failed!");
 	}
@@ -259,38 +260,32 @@ void GLShadowApp::renderScene(GLProgram &program){
 	}
 }
 
-void GLShadowApp::renderScene2FrameBuffer(){
-	const float near_plane = 1.0f, far_plane = 7.5f;
-	glm::vec3 lightPos(-2.0f, 4.0f, -1.0f);
-	glm::mat4 lightProjection, lightView;
-	glm::mat4 lightSpaceMatrix;        
-	lightProjection = glm::ortho(-10.0f, 10.0f, -10.0f, 10.0f, near_plane, far_plane);
-	lightView = glm::lookAt(lightPos, glm::vec3(0.0f), glm::vec3(0.0, 1.0, 0.0));
-	lightSpaceMatrix = lightProjection * lightView;
-	_shadowProgram.use();
-	_shadowProgram.update("lightSpaceMatrix", lightSpaceMatrix);
+void GLShadowApp::renderScene2FrameBuffer(const glm::mat4 &lightSpaceMatrix){
+	
+	_depthProgram.use();
+	_depthProgram.update("lightSpaceMatrix", lightSpaceMatrix);
 	glViewport(0, 0, kShadowMapWidth, kShadowMapHeight);
 	glBindFramebuffer(GL_FRAMEBUFFER, _shadowDepthMapFbo);
 	glClear(GL_DEPTH_BUFFER_BIT);
 	{
 		_texture->texture()->bind();
-		renderScene(_shadowProgram);	
+		renderScene(_depthProgram);	
 	}
 
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
-void GLShadowApp::reanderFraemBuffer(){
+void GLShadowApp::renderDepthDebug(){
 	const float near_plane = 1.0f, far_plane = 7.5f;
 	glViewport(0, 0, _attribute.winAttr.width, _attribute.winAttr.height);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-	_depthProgram.use();
-	_depthProgram.update("near_plane", near_plane);
-	_depthProgram.update("far_plane", far_plane);
+	_debugProgram.use();
+	_debugProgram.update("near_plane", near_plane);
+	_debugProgram.update("far_plane", far_plane);
 
 	glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, _shadowDepthMap);
-	_depthProgram.update("textureSampler", 0);
+	_debugProgram.update("depthMap", 0);
 
 	{
 		glBindVertexArray(_screenVao);
@@ -299,6 +294,26 @@ void GLShadowApp::reanderFraemBuffer(){
 	}
 }
 
+void GLShadowApp::renderScene2Screen(const glm::mat4 &lightSpaceMatrix, const glm::vec3 &lightPos){
+	_shadowProgram.use();
+	_shadowProgram.update("diffuseTexture", 0);
+	_shadowProgram.update("shadowMap", 1);
+	auto attr = _camera.getAttr();
+	glm::mat4 projection = glm::perspective(glm::radians(_camera.zoom()), aspectRatio(), 0.1f, 100.0f);
+	glm::mat4 view = _camera.getViewMatrix();
+	_shadowProgram.update("projection", projection);
+	_shadowProgram.update("view", view);
+	// set light uniforms
+	_shadowProgram.update("viewPos", attr.pos);
+	_shadowProgram.update("lightPos", lightPos);
+	_shadowProgram.update("lightSpaceMatrix", lightSpaceMatrix);
+	glActiveTexture(GL_TEXTURE0);
+	auto woodTexture = GLUtils::Ptr2GLTextureId(_texture->texture()->handle());
+	glBindTexture(GL_TEXTURE_2D, woodTexture);
+	glActiveTexture(GL_TEXTURE1);
+	glBindTexture(GL_TEXTURE_2D, _shadowDepthMap);
+	renderScene(_shadowProgram);
+}
 
 void GLShadowApp::drawScene(const float dt) {
 	GLApp::drawScene(dt);
@@ -308,8 +323,17 @@ void GLShadowApp::drawScene(const float dt) {
 	static float curTime = 0;
 	curTime += dt;
 
-	renderScene2FrameBuffer();
-	reanderFraemBuffer();
+	const float near_plane = 1.0f, far_plane = 7.5f;
+	glm::vec3 lightPos(-2.0f, 4.0f, -1.0f);
+	glm::mat4 lightProjection, lightView;
+	glm::mat4 lightSpaceMatrix;
+	lightProjection = glm::ortho(-10.0f, 10.0f, -10.0f, 10.0f, near_plane, far_plane);
+	lightView = glm::lookAt(lightPos, glm::vec3(0.0f), glm::vec3(0.0, 1.0, 0.0));
+	lightSpaceMatrix = lightProjection * lightView;
+
+	renderScene2FrameBuffer(lightSpaceMatrix);
+	renderScene2Screen(lightSpaceMatrix, lightPos);
+	//renderDepthDebug();
 	return GLApp::drawScene(dt);
 }
 

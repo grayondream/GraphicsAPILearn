@@ -32,14 +32,17 @@ private:
 	void createPlaneBuffer();
 	void createScreenBuffer();
 	void compileShader();
-	void reanderFraemBuffer();
+	
 	void renderScene(GLProgram &program);
 	void renderPlane(GLProgram &program, const glm::mat4 &model);
 	void renderSphere(GLProgram &program, const glm::mat4 &model);
 
-	void renderScene2FrameBuffer();
+	void renderScene2FrameBuffer(const glm::mat4 &lightSpaceMatrix);
 
+	void renderScene2Screen(const glm::mat4 &lightSpaceMatrix, const glm::vec3 &lightPos);
 
+	void renderDepthDebug();
+	
 private:
 	GLProgram _shadowProgram{};
 	GLProgram _depthProgram{};
