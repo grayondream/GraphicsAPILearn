@@ -43,7 +43,7 @@ bool GLShadowApp::init(const HINSTANCE inst, const WindowDesc& param) {
 		return false;
 	}
 	
-	_camera = Camera(glm::vec3(0.0f, 0.0f, 3.0f));
+	_camera = Camera(glm::vec3(0.0f, 3.0f, 5.0f), glm::vec3(0.0f, 1.0f, 0.0f), -90);
 	glViewport(0, 0, _attribute.winAttr.width, _attribute.winAttr.height);
 	{
 		const auto imgFile = join(StaticCollector::getImagePath(), "wood.png");
@@ -160,11 +160,12 @@ void GLShadowApp::createSphereBuffer() {
 		// �󶨵�һ�� VBO�����ö���λ��
 		glBindBuffer(GL_ARRAY_BUFFER, vbo[0]);
 		glBufferData(GL_ARRAY_BUFFER, sphere.byteSize(), sphere.toGL().data(), GL_STATIC_DRAW);
-		glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex), nullptr);
 		glEnableVertexAttribArray(0);
-
-		glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)(sizeof(float) * 4));
+		glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex), nullptr);
+		
 		glEnableVertexAttribArray(1);
+		glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)(sizeof(float) * 4));
+		
 
 		glBindBuffer(GL_ARRAY_BUFFER, vbo[1]);
 		glBufferData(GL_ARRAY_BUFFER, sphere.uvSize(), sphere.uv(), GL_STATIC_DRAW);
@@ -253,6 +254,7 @@ void GLShadowApp::renderSphere(GLProgram &program, const glm::mat4 &model, const
 
 void GLShadowApp::renderScene(GLProgram &program, const glm::vec3 &lightPos){
 	program.use();
+	program.update("debug", _enableDebug);
 	{
 		auto model = glm::mat4(0.5f);
 		model = glm::translate(model, glm::vec3(0.0f, 0.0f, 0.0f));
@@ -351,13 +353,14 @@ void GLShadowApp::renderScene2Screen(const glm::mat4 &lightSpaceMatrix, const gl
 void GLShadowApp::drawScene(const float dt) {
 	GLApp::drawScene(dt);
 	ImGui::Begin("OpenGL");
+	ImGui::Checkbox("Enable Debug", &_enableDebug);
 	ImGui::End();
 
 	static float curTime = 0;
 	curTime += dt;
 
 	const float near_plane = 1.0f, far_plane = 7.5f;
-	glm::vec3 lightPos = glm::vec3(-1.0f, 1.0f, -2.0f);
+	glm::vec3 lightPos = glm::vec3(-1.0f, 1.0f, 2.0f);
 	glm::mat4 lightProjection, lightView;
 	glm::mat4 lightSpaceMatrix;
 	lightProjection = glm::ortho(-10.0f, 10.0f, -10.0f, 10.0f, near_plane, far_plane);
@@ -366,7 +369,7 @@ void GLShadowApp::drawScene(const float dt) {
 
 	renderScene2FrameBuffer(lightSpaceMatrix, lightPos);
 	renderScene2Screen(lightSpaceMatrix, lightPos);
-	renderDepthDebug();
+	//renderDepthDebug();
 	return GLApp::drawScene(dt);
 }
 

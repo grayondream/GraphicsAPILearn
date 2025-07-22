@@ -14,6 +14,7 @@ uniform sampler2D shadowMap;
 uniform vec3 lightPos;
 uniform vec3 viewPos;
 uniform int type;
+uniform int debug;
 
 float ShadowCalculation(vec4 fragPosLightSpace)
 {
@@ -57,12 +58,16 @@ void main()
     if(type == 2){
         FragColor = vec4(1.0, 1.0, 1.0, 1.0);
     }
-    // if(type == 1){
-    //     FragColor = vec4(1.0, 0.0, 0.0, 1.0);
-    // }else if(type == 2){
-    //     FragColor = vec4(1.0, 1.0, 1.0, 1.0);
-    // }else{
-    //     FragColor = vec4(0.0, 1.0, 0.0, 1.0);
-    // }
+    
+    if(debug == 1){
+        if(type == 1){
+        FragColor = vec4(1.0, 0.0, 0.0, 1.0);
+        }else if(type == 2){
+            FragColor = vec4(1.0, 1.0, 1.0, 1.0);
+        }else{
+            FragColor = vec4(0.0, 1.0, 0.0, 1.0);
+        }
+    }
+    
     //FragColor = vec4(vec3(color), 1.0);
 }

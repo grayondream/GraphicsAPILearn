@@ -50,6 +50,7 @@ private:
 	GLProgram _depthProgram{};
 	GLProgram _debugProgram{};
 
+	bool _enableDebug{};
 	Cube sphere{};
 	unsigned int _sphereVbo[3]{};
 	unsigned int _sphereVao{};
