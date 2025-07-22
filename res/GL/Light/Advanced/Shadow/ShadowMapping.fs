@@ -54,12 +54,15 @@ void main()
     vec3 lighting = (ambient + (1.0 - shadow) * (diffuse + specular)) * color;    
     
     FragColor = vec4(lighting, 1.0);
-    if(type == 1){
-        FragColor = vec4(1.0, 0.0, 0.0, 1.0);
-    }else if(type == 2){
+    if(type == 2){
         FragColor = vec4(1.0, 1.0, 1.0, 1.0);
-    }else{
-        FragColor = vec4(0.0, 1.0, 0.0, 1.0);
     }
-    
+    // if(type == 1){
+    //     FragColor = vec4(1.0, 0.0, 0.0, 1.0);
+    // }else if(type == 2){
+    //     FragColor = vec4(1.0, 1.0, 1.0, 1.0);
+    // }else{
+    //     FragColor = vec4(0.0, 1.0, 0.0, 1.0);
+    // }
+    //FragColor = vec4(vec3(color), 1.0);
 }

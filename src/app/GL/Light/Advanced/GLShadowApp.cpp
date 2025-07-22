@@ -366,7 +366,7 @@ void GLShadowApp::drawScene(const float dt) {
 
 	renderScene2FrameBuffer(lightSpaceMatrix, lightPos);
 	renderScene2Screen(lightSpaceMatrix, lightPos);
-	//renderDepthDebug();
+	renderDepthDebug();
 	return GLApp::drawScene(dt);
 }
 

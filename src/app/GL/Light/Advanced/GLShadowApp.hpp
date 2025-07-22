@@ -6,6 +6,7 @@
 #include "Geometry/Camera.hpp"
 #include "Geometry/Vertex.hpp"
 #include "Geometry/Sphere.hpp"
+#include "Geometry/Cube.hpp"
 
 class GLImageTexture2D;
 class GLShadowApp : public GLApp {
@@ -49,7 +50,7 @@ private:
 	GLProgram _depthProgram{};
 	GLProgram _debugProgram{};
 
-	Sphere sphere{};
+	Cube sphere{};
 	unsigned int _sphereVbo[3]{};
 	unsigned int _sphereVao{};
 	unsigned int _sphereEbo{};
