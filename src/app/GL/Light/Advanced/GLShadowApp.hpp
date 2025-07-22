@@ -37,7 +37,7 @@ private:
 	void renderScene(GLProgram &program, const glm::vec3 &lightPos);
 
 	void renderPlane(GLProgram &program, const glm::mat4 &model);
-	void renderSphere(GLProgram &program, const glm::mat4 &model, const int type = 1);
+	void renderCube(GLProgram &program, const glm::mat4 &model, const int type = 1);
 	void renderScene2FrameBuffer(const glm::mat4 &lightSpaceMatrix, const glm::vec3 &lightPos);
 
 
@@ -51,10 +51,10 @@ private:
 	GLProgram _debugProgram{};
 
 	bool _enableDebug{};
-	Cube sphere{};
-	unsigned int _sphereVbo[3]{};
-	unsigned int _sphereVao{};
-	unsigned int _sphereEbo{};
+	Cube cube{};
+	unsigned int _cubeVbo[3]{};
+	unsigned int _cubeVao{};
+	unsigned int _cubeEbo{};
 
 	unsigned int _planeVbo[3]{};
 	unsigned int _planeVao{};

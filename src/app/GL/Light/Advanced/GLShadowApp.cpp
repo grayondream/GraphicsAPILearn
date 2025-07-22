@@ -19,10 +19,10 @@ using FileUtils::join;
 using namespace ErrorHandle;
 
 GLShadowApp::~GLShadowApp() {
-	if (_sphereVao != 0) {
-		glDeleteVertexArrays(1, &_sphereVao);
-		glDeleteBuffers(3, _sphereVbo);
-		glDeleteBuffers(1, &_sphereEbo);
+	if (_cubeVao != 0) {
+		glDeleteVertexArrays(1, &_cubeVao);
+		glDeleteBuffers(3, _cubeVbo);
+		glDeleteBuffers(1, &_cubeEbo);
 	}
 
 	if(_planeVao != 0) {
@@ -159,7 +159,7 @@ void GLShadowApp::createSphereBuffer() {
 	{
 		// �󶨵�һ�� VBO�����ö���λ��
 		glBindBuffer(GL_ARRAY_BUFFER, vbo[0]);
-		glBufferData(GL_ARRAY_BUFFER, sphere.byteSize(), sphere.toGL().data(), GL_STATIC_DRAW);
+		glBufferData(GL_ARRAY_BUFFER, cube.byteSize(), cube.toGL().data(), GL_STATIC_DRAW);
 		glEnableVertexAttribArray(0);
 		glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex), nullptr);
 		
@@ -168,27 +168,27 @@ void GLShadowApp::createSphereBuffer() {
 		
 
 		glBindBuffer(GL_ARRAY_BUFFER, vbo[1]);
-		glBufferData(GL_ARRAY_BUFFER, sphere.uvSize(), sphere.uv(), GL_STATIC_DRAW);
+		glBufferData(GL_ARRAY_BUFFER, cube.uvSize(), cube.uv(), GL_STATIC_DRAW);
 
 		glEnableVertexAttribArray(2);
 		glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), nullptr);
 
 		glBindBuffer(GL_ARRAY_BUFFER, vbo[2]);
-		glBufferData(GL_ARRAY_BUFFER, sphere.normalSize(), sphere.normal(), GL_STATIC_DRAW);
+		glBufferData(GL_ARRAY_BUFFER, cube.normalSize(), cube.normal(), GL_STATIC_DRAW);
 
 		glEnableVertexAttribArray(3);
 		glVertexAttribPointer(3, 4, GL_FLOAT, GL_FALSE, 4 * sizeof(float), nullptr);
 
 		// ������������
 		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
-		glBufferData(GL_ELEMENT_ARRAY_BUFFER, sphere.idxByteSize(), sphere.idx(), GL_STATIC_DRAW);
+		glBufferData(GL_ELEMENT_ARRAY_BUFFER, cube.idxByteSize(), cube.idx(), GL_STATIC_DRAW);
 	}
 	glBindVertexArray(0);
 
 	// ��¼ VBO �� EBO
-	_sphereVao = vao;
-	_sphereVbo[0] = vbo[0], _sphereVbo[1] = vbo[1], _sphereVbo[2] = vbo[2];
-	_sphereEbo = ebo;
+	_cubeVao = vao;
+	_cubeVbo[0] = vbo[0], _cubeVbo[1] = vbo[1], _cubeVbo[2] = vbo[2];
+	_cubeEbo = ebo;
 }
 
 void GLShadowApp::createPlaneBuffer() {
@@ -242,12 +242,12 @@ void GLShadowApp::renderPlane(GLProgram &program, const glm::mat4 &model){
 	glBindVertexArray(0);
 }
 
-void GLShadowApp::renderSphere(GLProgram &program, const glm::mat4 &model, const int type){
+void GLShadowApp::renderCube(GLProgram &program, const glm::mat4 &model, const int type){
 	program.use();
 	program.update("model", model);
 	program.update("type", type);
-	glBindVertexArray(_sphereVao);
-	glDrawElements(GL_TRIANGLES, sphere.idxSize(), GL_UNSIGNED_INT, 0);
+	glBindVertexArray(_cubeVao);
+	glDrawElements(GL_TRIANGLES, cube.idxSize(), GL_UNSIGNED_INT, 0);
 	glBindVertexArray(0);
 	program.update("type", 0);
 }
@@ -284,14 +284,14 @@ void GLShadowApp::renderScene(GLProgram &program, const glm::vec3 &lightPos){
 	}
 
 	for (auto i = 0; i < models.size(); i++) {
-		renderSphere(program, models[i]);
+		renderCube(program, models[i]);
 	}
 
 	{
 		auto model = glm::mat4(1.0f);
 		model = glm::translate(model, lightPos);
 		model = glm::scale(model, glm::vec3(scale));
-		renderSphere(program, model, 2);
+		renderCube(program, model, 2);
 	}
 }
 
