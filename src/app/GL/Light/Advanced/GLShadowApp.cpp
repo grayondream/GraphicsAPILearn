@@ -258,11 +258,12 @@ void GLShadowApp::renderScene(GLProgram &program, const glm::vec3 &lightPos){
 	program.update("debug", _enableDebug);
 	program.update("enableBias", _enableShadowBias);
 	{
-		auto model = glm::mat4(0.5f);
+		auto model = glm::mat4(1.0f);
+		model = glm::scale(model, glm::vec3(0.5f));
 		model = glm::translate(model, glm::vec3(0.0f, 0.0f, 0.0f));
 		renderPlane(program, model);
 	}
-	float scale = 0.5f;
+	float scale = 0.25f;
 	std::vector<glm::mat4> models;
 	{
 		auto model = glm::mat4(1.0f);
@@ -363,8 +364,10 @@ void GLShadowApp::drawScene(const float dt) {
 	GLApp::drawScene(dt);
 	ImGui::Begin("OpenGL");
 	ImGui::Checkbox("Enable Debug", &_enableDebug);
+	ImGui::Checkbox("Enable DepthMap", &_enableDepthMap);
 	ImGui::Checkbox("Enable Bias", &_enableShadowBias);
 	ImGui::Checkbox("Enable CullFace", &_enableCullFace);
+	
 	ImGui::End();
 
 	static float curTime = 0;
@@ -374,13 +377,17 @@ void GLShadowApp::drawScene(const float dt) {
 	glm::vec3 lightPos = glm::vec3(-1.0f, 3.0f, 1.0f);
 	glm::mat4 lightProjection, lightView;
 	glm::mat4 lightSpaceMatrix;
-	lightProjection = glm::ortho(-10.0f, 10.0f, -10.0f, 10.0f, near_plane, far_plane);
+	float width = 10;
+	lightProjection = glm::ortho(-1 * width, width, -1 * width, width, near_plane, far_plane);
 	lightView = glm::lookAt(lightPos, glm::vec3(0.0f), glm::vec3(0.0, 1.0, 0.0));
 	lightSpaceMatrix = lightProjection * lightView;
 
 	renderScene2FrameBuffer(lightSpaceMatrix, lightPos);
 	renderScene2Screen(lightSpaceMatrix, lightPos);	
-	//renderDepthDebug();
+	if (_enableDepthMap) {
+		renderDepthDebug();
+	}
+	
 	return GLApp::drawScene(dt);
 }
 

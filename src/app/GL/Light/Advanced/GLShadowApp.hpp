@@ -47,6 +47,7 @@ private:
 	GLProgram _depthProgram{};
 	GLProgram _debugProgram{};
 
+	bool _enableDepthMap{};
 	bool _enableDebug{};
 	bool _enableShadowBias{};
 	bool _enableCullFace{};

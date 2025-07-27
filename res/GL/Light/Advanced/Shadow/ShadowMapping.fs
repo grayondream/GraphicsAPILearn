@@ -47,7 +47,7 @@ void main()
 {           
     vec3 color = texture(diffuseTexture, fs_in.TexCoords).rgb;
     vec3 normal = normalize(fs_in.Normal);
-    vec3 lightColor = vec3(0.3);
+    vec3 lightColor = vec3(1.0);
     // ambient
     vec3 ambient = 0.3 * lightColor;
     // diffuse
@@ -67,7 +67,7 @@ void main()
     
     FragColor = vec4(lighting, 1.0);
     if(type == 2){
-        FragColor = vec4(1.0, 1.0, 1.0, 1.0);
+        FragColor = vec4(lightColor, 1.0);
     }
     
     if(debug == 1){

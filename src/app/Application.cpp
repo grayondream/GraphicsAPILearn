@@ -142,7 +142,7 @@ void Application::onMouseUp(const UINT msg, WPARAM btnState, int x, int y) {
     _mouseClicked = false;
     _lastx = x;
     _lasty = y;
-    LOGI("onMouseDown {} [{}, {}]", _mouseClicked, _lastx, _lasty);
+    LOGI("onMouseUp {} [{}, {}]", _mouseClicked, _lastx, _lasty);
 }
 
 void Application::onMouseMove(WPARAM btnState, int x, int y) {
