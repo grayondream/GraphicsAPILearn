@@ -31,9 +31,9 @@ protected:
     virtual void endDrawScene(){}
     
     virtual void onResize(const UINT msg, const WPARAM wParam, const LPARAM lParam);
-    virtual void onMouseDown(const UINT msg, WPARAM btnState, int x, int y){}
-    virtual void onMouseUp(const UINT msg, WPARAM btnState, int x, int y){}
-    virtual void onMouseMove(WPARAM btnState, int x, int y){}
+    virtual void onMouseDown(const UINT msg, WPARAM btnState, int x, int y);
+    virtual void onMouseUp(const UINT msg, WPARAM btnState, int x, int y);
+    virtual void onMouseMove(WPARAM btnState, int x, int y);
     virtual void onMouseScroll(const UINT msg, const WPARAM wParam, const LPARAM lParam){}
     virtual void onKeyBoardEvent(const UINT msg, const WPARAM wParam, const LPARAM lParam);
     float aspectRatio() {
@@ -58,4 +58,7 @@ protected:
     GameTimer _timer{};
     bool _uiInitialized{ false };
     bool _running{ false };
+
+    int _lastx, _lasty;
+    bool _mouseClicked{};
 };

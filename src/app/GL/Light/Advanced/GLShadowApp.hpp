@@ -20,9 +20,6 @@ protected:
 	virtual void beginDrawScene();
 	virtual void drawScene(const float dt);
 	virtual void endDrawScene();
-
-	virtual void onMouseDown(const UINT msg, WPARAM btnState, int x, int y);
-	virtual void onMouseUp(const UINT msg, WPARAM btnState, int x, int y);
 	virtual void onMouseMove(WPARAM btnState, int x, int y);
 	virtual void onMouseScroll(const UINT msg, const WPARAM wParam, const LPARAM lParam);
 	virtual void onKeyBoardEvent(const UINT msg, const WPARAM wParam, const LPARAM lParam) override;
@@ -68,7 +65,6 @@ private:
 	float _curTime{};
 	Camera _camera{};
 	bool _clicked{};
-	bool _mouseClicked{ false };
 	Point2D _lastPos{0.0, 0.0};
 	glm::vec4 _lightColor{1.0, 1.0, 1.0, 1.0};
 	std::shared_ptr<GLImageTexture2D> _texture{};

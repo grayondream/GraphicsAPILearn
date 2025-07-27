@@ -6,7 +6,7 @@ Camera::Camera(const Vec3 pos, const Vec3 up, const float yam, const float pitch
 	_attr.worldUp = up;
 
 	_opt.speed = 0.3f;
-	_opt.sensitivity = 0.1f;
+	_opt.sensitivity = 0.01f;
 	_opt.zoom = 60.f;
 	_angle.pitch = pitch;
 	_angle.yaw = yam;

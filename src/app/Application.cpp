@@ -131,6 +131,23 @@ void Application::calcFrameRate() {
     timePassed += 1.0f;
 }
 
+void Application::onMouseDown(const UINT msg, WPARAM btnState, int x, int y) {
+    _mouseClicked = true;
+    _lastx = x;
+    _lasty = y;
+    LOGI("onMouseDown {} [{}, {}]", _mouseClicked, _lastx, _lasty);
+}
+
+void Application::onMouseUp(const UINT msg, WPARAM btnState, int x, int y) {
+    _mouseClicked = false;
+    _lastx = x;
+    _lasty = y;
+    LOGI("onMouseDown {} [{}, {}]", _mouseClicked, _lastx, _lasty);
+}
+
+void Application::onMouseMove(WPARAM btnState, int x, int y) {
+}
+
 void Application::onResize(const UINT msg, const WPARAM wParam, const LPARAM lParam) {
     if (LOWORD(lParam) != 0 && HIWORD(lParam) != 0) {
         _attribute.winAttr.width = LOWORD(lParam);
@@ -237,7 +254,7 @@ LRESULT Application::msgProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) 
     case WM_RBUTTONDOWN:
         onMouseDown(msg, wParam, GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
         return 0;
-    case WM_LBUTTONUP:
+    case WM_LBUTTONUP: 
     case WM_MBUTTONUP:
     case WM_RBUTTONUP:
         onMouseUp(msg, wParam, GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));

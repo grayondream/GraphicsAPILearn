@@ -404,39 +404,19 @@ void GLShadowApp::onKeyBoardEvent(const UINT msg, const WPARAM wParam, const LPA
 	return GLApp::onKeyBoardEvent(msg, wParam, lParam);
 }
 
-void GLShadowApp::onMouseDown(const UINT msg, WPARAM btnState, int x, int y) {
-	switch (msg) {
-	case WM_LBUTTONDOWN:
-		_mouseClicked = true; break;
-	}
-	
-	return GLApp::onMouseDown(msg, btnState, x, y);
-}
-
-void GLShadowApp::onMouseUp(const UINT msg, WPARAM btnState, int x, int y) {
-	switch (msg) {
-	case WM_LBUTTONUP:
-		_mouseClicked = false; break;
-	}
-	
-	return GLApp::onMouseUp(msg, btnState, x, y);
-}
-
 void GLShadowApp::onMouseMove(WPARAM btnState, int x, int y) {
+	// 仅在鼠标被点击时处理移动事件
 	if (!_mouseClicked) {
 		return GLApp::onMouseMove(btnState, x, y);
 	}
 
-	if (!_clicked) {
-		_clicked = true;
-		_lastPos = { (float)x, (float)y };
-		return GLApp::onMouseMove(btnState, x, y);
-	}
+	// 计算偏移量
+	const float offx = x - _lastx;
+	const float offy = y - _lasty;
 
-	const float offx = x - _lastPos.x;
-	const float offy = y - _lastPos.y;
+	// 更新摄像机
 	_camera.processMouseMove(offx, offy);
-	_lastPos = { (float)x, (float)y };
+
 	return GLApp::onMouseMove(btnState, x, y);
 }
 
