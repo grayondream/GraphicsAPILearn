@@ -6,11 +6,9 @@
 #include "App/AppFactory.hpp"
 #include "App/IApplication.hpp"
 #include "Utils/EnumUtil.hpp"
+#include "Base/Constexpr.hpp"
 
-static inline constexpr int GAME_WIN_WIDTH = 720;
-static inline constexpr int GAME_WIN_HEIGHT = 480;
-static inline constexpr int GAME_ENABLE_MSAA = true;
-
+using namespace Constexpr;
 /*
  * Application List:
  * Base: Draw a empty window
@@ -61,6 +59,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nShowCmd) {
     LOGI("Select {} Application, Render App With {} API", EnumUtil::EnumName(type), EnumUtil::EnumName(api));
     auto app = AppFactory::create(api, type);
     assert(app);
-    app->init(hInstance, { {GAME_WIN_WIDTH, GAME_WIN_HEIGHT, "Hello Grapgic!"}, GAME_ENABLE_MSAA});
+    app->init(hInstance, { {GetWindowWidth(), GetWindowHeight(), "Hello Grapgic!"}, GetEnableMsaa()});
     return app->run(nShowCmd);
 }

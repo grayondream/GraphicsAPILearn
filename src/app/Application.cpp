@@ -54,7 +54,7 @@ void Application::createMainWindow(const HINSTANCE hInstance){
         CLASS_NAME,
         _attribute.winAttr.title.c_str(),
         WS_OVERLAPPEDWINDOW,
-        400, 400,
+        100, 100,
         _attribute.winAttr.width, _attribute.winAttr.height,
         NULL, NULL, hInstance, NULL
     );

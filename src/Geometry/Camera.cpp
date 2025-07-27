@@ -5,7 +5,7 @@ Camera::Camera(const Vec3 pos, const Vec3 up, const float yam, const float pitch
 	_attr.front = glm::vec3(0.0f, 0.0f, -1.0f);
 	_attr.worldUp = up;
 
-	_opt.speed = 0.1f;
+	_opt.speed = 0.3f;
 	_opt.sensitivity = 0.1f;
 	_opt.zoom = 60.f;
 	_angle.pitch = pitch;
@@ -51,7 +51,7 @@ Camera& Camera::processMouseMove(const float xoff, const float yoff) {
 
 Camera& Camera::processMouseScrool(const float offset) {
 	_opt.zoom -= offset / 20.0;
-	_opt.zoom = std::max(std::min(_opt.zoom, 100.0f), 0.1f);
+	_opt.zoom = std::max(std::min(_opt.zoom, 200.0f), 0.1f);
 	return *this;
 }
 

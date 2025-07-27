@@ -11,10 +11,11 @@
 #include "imgui.h"
 #include "Geometry/Plane.hpp"
 #include <Utils/FileUtils.hpp>
-#include "Base/Define.hpp"
 #include "Geometry/Rect.hpp"
 #include "Utils/GL/GLUtils.hpp"
+#include "Base/Constexpr.hpp"
 
+using namespace Constexpr;
 using FileUtils::join;
 using namespace ErrorHandle;
 
@@ -94,7 +95,7 @@ void GLShadowApp::createShadowDepthBuffer(){
 	unsigned int depthMap;
 	glGenTextures(1, &depthMap);
 	glBindTexture(GL_TEXTURE_2D, depthMap);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, kShadowMapWidth, kShadowMapHeight, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, GetShadowMapWidth(), GetShadowMapHeight(), 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT); 
@@ -264,7 +265,7 @@ void GLShadowApp::renderScene(GLProgram &program, const glm::vec3 &lightPos){
 	std::vector<glm::mat4> models;
 	{
 		auto model = glm::mat4(1.0f);
-		model = glm::translate(model, glm::vec3(0.0f, 0.f, 0.0f));
+		model = glm::translate(model, glm::vec3(0.0f, 0.f, 1.0f));
 		model = glm::scale(model, glm::vec3(scale));
 		models.push_back(model);
 	}
@@ -299,7 +300,7 @@ void GLShadowApp::renderScene2FrameBuffer(const glm::mat4 &lightSpaceMatrix, con
 	
 	_depthProgram.use();
 	_depthProgram.update("lightSpaceMatrix", lightSpaceMatrix);
-	glViewport(0, 0, kShadowMapWidth, kShadowMapHeight);
+	glViewport(0, 0, GetShadowMapWidth(), GetShadowMapHeight());
 	glBindFramebuffer(GL_FRAMEBUFFER, _shadowDepthMapFbo);
 	glClear(GL_DEPTH_BUFFER_BIT);
 	{
@@ -342,11 +343,11 @@ void GLShadowApp::renderScene2Screen(const glm::mat4 &lightSpaceMatrix, const gl
 	_shadowProgram.update("viewPos", attr.pos);
 	_shadowProgram.update("lightPos", lightPos);
 	_shadowProgram.update("lightSpaceMatrix", lightSpaceMatrix);
-	//glActiveTexture(GL_TEXTURE0);
+	glActiveTexture(GL_TEXTURE0);
 	auto woodTexture = GLUtils::Ptr2GLTextureId(_texture->texture()->handle());
-	// glBindTexture(GL_TEXTURE_2D, woodTexture);
-	// glActiveTexture(GL_TEXTURE1);
-	// glBindTexture(GL_TEXTURE_2D, _shadowDepthMap);
+	glBindTexture(GL_TEXTURE_2D, woodTexture);
+	glActiveTexture(GL_TEXTURE1);
+	glBindTexture(GL_TEXTURE_2D, _shadowDepthMap);
 	renderScene(_shadowProgram, lightPos);
 }
 

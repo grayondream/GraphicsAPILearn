@@ -11,9 +11,10 @@
 #include "imgui.h"
 #include "Geometry/Plane.hpp"
 #include <Utils/FileUtils.hpp>
-#include "Base/Define.hpp"
+#include <Base/Constexpr.hpp>
 #include "Geometry/Rect.hpp"
 
+using namespace Constexpr;
 using FileUtils::join;
 using namespace ErrorHandle;
 
@@ -80,7 +81,7 @@ void GLShadowMapApp::createShadowDepthBuffer(){
 	unsigned int depthMap;
 	glGenTextures(1, &depthMap);
 	glBindTexture(GL_TEXTURE_2D, depthMap);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, kShadowMapWidth, kShadowMapHeight, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, GetShadowMapWidth(), GetShadowMapHeight(), 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT); 
@@ -217,7 +218,7 @@ void GLShadowMapApp::renderScene2FrameBuffer(){
 	lightSpaceMatrix = lightProjection * lightView;
 	_shadowProgram.use();
 	_shadowProgram.update("lightSpaceMatrix", lightSpaceMatrix);
-	glViewport(0, 0, kShadowMapWidth, kShadowMapHeight);
+	glViewport(0, 0, GetShadowMapWidth(), GetShadowMapHeight());
 	glBindFramebuffer(GL_FRAMEBUFFER, _shadowDepthMapFbo);
 	glClear(GL_DEPTH_BUFFER_BIT);
 	{

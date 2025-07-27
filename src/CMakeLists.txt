@@ -32,6 +32,8 @@ if(NOT ENABLE_DX12)
     remove_excluded_sources(ALL_HPP_FILES ${RAPP_PATH}/DX12/)
 endif()
 
+message(STATUS "All source files: ${ALL_CPP_FILES}")
+
 add_executable(${PROJECT_NAME} WIN32 
 ${ALL_CPP_FILES} 
 ${ALL_HPP_FILES}
