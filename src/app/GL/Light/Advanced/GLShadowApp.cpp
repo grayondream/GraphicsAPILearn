@@ -261,25 +261,25 @@ void GLShadowApp::renderScene(GLProgram &program, const glm::vec3 &lightPos){
 		model = glm::translate(model, glm::vec3(0.0f, 0.0f, 0.0f));
 		renderPlane(program, model);
 	}
-	float scale = 0.1f;
+	float scale = 0.5f;
 	std::vector<glm::mat4> models;
 	{
 		auto model = glm::mat4(1.0f);
-		model = glm::translate(model, glm::vec3(0.0f, 0.f, 1.0f));
+		model = glm::translate(model, glm::vec3(0.0f, 0.f, 2.0f));
 		model = glm::scale(model, glm::vec3(scale));
 		models.push_back(model);
 	}
 
 	{
 		auto model = glm::mat4(1.0f);
-		model = glm::translate(model, glm::vec3(0.0f, -0.5f, -1.0f));
+		model = glm::translate(model, glm::vec3(0.0f, -0.2f, 0.0f));
 		model = glm::scale(model, glm::vec3(scale));
 		models.push_back(model);
 	}
 
 	{
 		auto model = glm::mat4(1.0f);
-		model = glm::translate(model, glm::vec3(1.0f, 0.f, -2.0f));
+		model = glm::translate(model, glm::vec3(1.0f, 0.f, 1.0f));
 		model = glm::scale(model, glm::vec3(scale * 2));
 		models.push_back(model);
 	}
@@ -309,11 +309,11 @@ void GLShadowApp::renderScene2FrameBuffer(const glm::mat4 &lightSpaceMatrix, con
 	}
 
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	glViewport(0, 0, _attribute.winAttr.width, _attribute.winAttr.height);
 }
 
 void GLShadowApp::renderDepthDebug(){
 	const float near_plane = 1.0f, far_plane = 7.5f;
-	glViewport(0, 0, _attribute.winAttr.width, _attribute.winAttr.height);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	_debugProgram.use();
 	_debugProgram.update("near_plane", near_plane);
@@ -361,7 +361,7 @@ void GLShadowApp::drawScene(const float dt) {
 	curTime += dt;
 
 	const float near_plane = 1.0f, far_plane = 7.5f;
-	glm::vec3 lightPos = glm::vec3(-1.0f, 1.0f, 2.0f);
+	glm::vec3 lightPos = glm::vec3(-1.0f, 3.0f, 1.0f);
 	glm::mat4 lightProjection, lightView;
 	glm::mat4 lightSpaceMatrix;
 	lightProjection = glm::ortho(-10.0f, 10.0f, -10.0f, 10.0f, near_plane, far_plane);
@@ -369,7 +369,7 @@ void GLShadowApp::drawScene(const float dt) {
 	lightSpaceMatrix = lightProjection * lightView;
 
 	renderScene2FrameBuffer(lightSpaceMatrix, lightPos);
-	renderScene2Screen(lightSpaceMatrix, lightPos);
+	renderScene2Screen(lightSpaceMatrix, lightPos);	
 	//renderDepthDebug();
 	return GLApp::drawScene(dt);
 }
