@@ -306,7 +306,14 @@ void GLShadowApp::renderScene2FrameBuffer(const glm::mat4 &lightSpaceMatrix, con
 	glClear(GL_DEPTH_BUFFER_BIT);
 	{
 		_texture->texture()->bind();
+		if (_enableCullFace) {
+			glCullFace(GL_FRONT);
+		}
+
 		renderScene(_depthProgram, lightPos);	
+		if (_enableCullFace) {
+			glCullFace(GL_BACK);
+		}
 	}
 
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -357,6 +364,7 @@ void GLShadowApp::drawScene(const float dt) {
 	ImGui::Begin("OpenGL");
 	ImGui::Checkbox("Enable Debug", &_enableDebug);
 	ImGui::Checkbox("Enable Bias", &_enableShadowBias);
+	ImGui::Checkbox("Enable CullFace", &_enableCullFace);
 	ImGui::End();
 
 	static float curTime = 0;

@@ -49,6 +49,7 @@ private:
 
 	bool _enableDebug{};
 	bool _enableShadowBias{};
+	bool _enableCullFace{};
 	Cube cube{};
 	unsigned int _cubeVbo[3]{};
 	unsigned int _cubeVao{};
