@@ -51,6 +51,8 @@ private:
 	bool _enableDebug{};
 	bool _enableShadowBias{};
 	bool _enableCullFace{};
+	bool _enableSimplePCF{};
+
 	Cube cube{};
 	unsigned int _cubeVbo[3]{};
 	unsigned int _cubeVao{};

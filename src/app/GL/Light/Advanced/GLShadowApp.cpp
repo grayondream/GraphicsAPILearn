@@ -259,6 +259,7 @@ void GLShadowApp::renderScene(GLProgram &program, const glm::vec3 &lightPos){
 	program.use();
 	program.update("debug", _enableDebug);
 	program.update("enableBias", _enableShadowBias);
+	program.update("enableSimplePCF", _enableSimplePCF);
 	{
 		auto model = glm::mat4(1.0f);
 		model = glm::scale(model, glm::vec3(0.5f));
@@ -369,6 +370,7 @@ void GLShadowApp::drawScene(const float dt) {
 	ImGui::Checkbox("Enable DepthMap", &_enableDepthMap);
 	ImGui::Checkbox("Enable Bias", &_enableShadowBias);
 	ImGui::Checkbox("Enable CullFace", &_enableCullFace);
+	ImGui::Checkbox("Enable SimplePCF", &_enableSimplePCF);
 	
 	ImGui::End();
 
