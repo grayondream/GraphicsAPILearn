@@ -51,6 +51,7 @@ private:
 	GLProgram _debugProgram{};
 
 	bool _enableDebug{};
+	bool _enableShadowBias{};
 	Cube cube{};
 	unsigned int _cubeVbo[3]{};
 	unsigned int _cubeVao{};

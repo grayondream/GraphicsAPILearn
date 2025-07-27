@@ -256,6 +256,7 @@ void GLShadowApp::renderCube(GLProgram &program, const glm::mat4 &model, const i
 void GLShadowApp::renderScene(GLProgram &program, const glm::vec3 &lightPos){
 	program.use();
 	program.update("debug", _enableDebug);
+	program.update("enableBias", _enableShadowBias);
 	{
 		auto model = glm::mat4(0.5f);
 		model = glm::translate(model, glm::vec3(0.0f, 0.0f, 0.0f));
@@ -355,6 +356,7 @@ void GLShadowApp::drawScene(const float dt) {
 	GLApp::drawScene(dt);
 	ImGui::Begin("OpenGL");
 	ImGui::Checkbox("Enable Debug", &_enableDebug);
+	ImGui::Checkbox("Enable Bias", &_enableShadowBias);
 	ImGui::End();
 
 	static float curTime = 0;
