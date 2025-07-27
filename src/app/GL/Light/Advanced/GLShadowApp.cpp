@@ -416,7 +416,8 @@ void GLShadowApp::onMouseMove(WPARAM btnState, int x, int y) {
 
 	// 更新摄像机
 	_camera.processMouseMove(offx, offy);
-
+	_lastx = x;
+	_lasty = y;
 	return GLApp::onMouseMove(btnState, x, y);
 }
 
