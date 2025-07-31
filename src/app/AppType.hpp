@@ -43,6 +43,7 @@ enum class AppType : int{
     BlinnPhong,
     Gamma,
     Shadow_Map,
-    Shadow
+    Shadow,
+    Shadow_PointLight
 };
 

@@ -46,7 +46,7 @@ using namespace Constexpr;
  *  Gamma                           Gamma Correction
  *  Shadow_Map                      Shadow Mapping
  *  Shadow                          Render Shadow 
- *  Shadow_Point                    Render Point light shadow
+ *  Shadow_PointLight               Render Point light shadow
  */
 
 namespace EnumUtil = Utils::Enum;
@@ -54,7 +54,7 @@ namespace EnumUtil = Utils::Enum;
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nShowCmd) {
     ConsoleDebugger consoleDebugger{};
     
-    auto type = AppType::Shadow;
+    auto type = AppType::Shadow_PointLight;
     auto api = GraphicsType::GL;
     LOGI("Start Graphics Learn!!!");
     LOGI("Select {} Application, Render App With {} API", EnumUtil::EnumName(type), EnumUtil::EnumName(api));
