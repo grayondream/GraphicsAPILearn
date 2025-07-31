@@ -15,6 +15,8 @@
 
 # Graphics API Learn
 
+[简体中文](README_zh.md)
+
 &emsp;&emsp;The project is a graphics API learning initiative aimed at understanding the principles, implementations, and applications of different graphics APIs. The goal is to support various platforms and graphics APIs, with expected support for Windows, macOS, Linux, and graphics APIs such as OpenGL, DirectX, Metal, and Vulkan.
 
 ## Environment
