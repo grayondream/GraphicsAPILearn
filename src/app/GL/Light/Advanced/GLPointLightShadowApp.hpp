@@ -39,11 +39,6 @@ private:
 private:
 	GLProgram _shadowProgram{};
 	GLProgram _depthProgram{};
-
-	bool _enableDepthMap{};
-	bool _enableDebug{};
-	bool _enableShadowBias{};
-	bool _enableCullFace{};
 	bool _enableSimplePCF{};
 	bool _enableShadow{};
 	float _far = 25.0;

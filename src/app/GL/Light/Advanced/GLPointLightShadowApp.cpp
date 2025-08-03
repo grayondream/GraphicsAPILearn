@@ -34,7 +34,7 @@ bool GLPointLightShadowApp::init(const HINSTANCE inst, const WindowDesc& param) 
 		return false;
 	}
 	
-	_camera = Camera(glm::vec3(0.0f, 0.0f, 3.0f));
+	_camera = Camera(glm::vec3(-1.f, 0.0f, 1.0f));
 	glViewport(0, 0, _attribute.winAttr.width, _attribute.winAttr.height);
 	{
 		const auto imgFile = join(StaticCollector::getImagePath(), "wood.png");
@@ -169,7 +169,7 @@ void GLPointLightShadowApp::renderScene(GLProgram &program, const glm::vec3 &lig
 	std::vector<glm::mat4> models;
 	{
 		glm::mat4 model = glm::mat4(1.0f);
-    	model = glm::scale(model, glm::vec3(5.0f));
+    	model = glm::scale(model, glm::vec3(10.0f));
 		glDisable(GL_CULL_FACE);
 		program.update("reverse_normals", 1);
 		renderCube(program, model);
@@ -211,6 +211,15 @@ void GLPointLightShadowApp::renderScene(GLProgram &program, const glm::vec3 &lig
     	model = glm::rotate(model, glm::radians(60.0f), glm::normalize(glm::vec3(1.0, 0.0, 1.0)));
     	model = glm::scale(model, glm::vec3(0.75f));
 		models.push_back(model);
+	}
+
+	{
+		auto model = glm::mat4(1.0f);
+		model = glm::scale(model, glm::vec3(0.1f));
+		model = glm::translate(model, lightPos);
+		program.update("light", 1);
+		renderCube(program, model);
+		program.update("light", 0);
 	}
 
 	for (auto i = 0; i < models.size(); i++) {
@@ -262,7 +271,6 @@ void GLPointLightShadowApp::renderScene2Screen(GLProgram& program, const glm::ve
 	program.update("view", view);
 	program.update("lightPos", lightPos);
 	program.update("viewPos", attr.pos);
-	_enableShadow = true;
 	program.update("shadows", _enableShadow); // enable/disable shadows by pressing 'SPACE'
 	program.update("far_plane", _far);
 
@@ -275,17 +283,22 @@ void GLPointLightShadowApp::renderScene2Screen(GLProgram& program, const glm::ve
 }
 
 void GLPointLightShadowApp::drawScene(const float dt) {
+	static float curTime = 0;
+	curTime += dt;
+	glm::vec3 lightPos = glm::vec3(0.0f, 0.0f, 0.0f);
+	lightPos.z = static_cast<float>(sin(curTime) * 10.0);
 	GLApp::drawScene(dt);
+	auto pos = _camera.getAttr().pos;
 	ImGui::Begin("OpenGL");
-	ImGui::Checkbox("Enable Debug", &_enableDebug);
+	ImGui::Checkbox("Enable PCF", &_enableSimplePCF);
+	ImGui::Checkbox("Enable Shadow", &_enableShadow);
+	ImGui::Text("Camera Pos: (%.2f, %.2f, %.2f)", pos.x, pos.y, pos.z);
+	ImGui::Text("Light Pos: (%.2f, %.2f, %.2f)", lightPos.x, lightPos.y, lightPos.z);
 	ImGui::End();
 
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-	static float curTime = 0;
-	curTime += dt;
-
-	glm::vec3 lightPos = glm::vec3(0.0f, 0.0f, 0.0f);
-	lightPos.z = static_cast<float>(sin(dt * 0.5) * 3.0);
+	
+	
 	renderScene2FrameBuffer(_depthProgram,lightPos);
 	renderScene2Screen(_shadowProgram,lightPos);
 	return GLApp::drawScene(dt);
