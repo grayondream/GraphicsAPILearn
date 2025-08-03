@@ -44,6 +44,7 @@ enum class AppType : int{
     Gamma,
     Shadow_Map,
     Shadow,
-    Shadow_PointLight
+    Shadow_PointLight,
+    NormalMap,
 };
 
