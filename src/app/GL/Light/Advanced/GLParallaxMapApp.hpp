@@ -35,6 +35,7 @@ private:
 	unsigned int _vao{};
 	unsigned int _vbo{};
 	bool _enableDisp{};
+	bool _enableSteep{};
 	float _heightScale{0.1};
 	std::shared_ptr<GLImageTexture2D> _brick{};
 	std::shared_ptr<GLImageTexture2D> _brickNormal{};
