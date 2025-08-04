@@ -47,7 +47,8 @@ using namespace Constexpr;
  *  Shadow_Map                      Shadow Mapping
  *  Shadow                          Render Shadow 
  *  Shadow_PointLight               Render Point light shadow
- *  NormalMap                       renture object with normal map
+ *  NormalMap                       render object with normal map
+ *  ParallaxMap                     render object with parallax map
  */
 
 namespace EnumUtil = Utils::Enum;
@@ -55,7 +56,7 @@ namespace EnumUtil = Utils::Enum;
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nShowCmd) {
     ConsoleDebugger consoleDebugger{};
     
-    auto type = AppType::NormalMap;
+    auto type = AppType::ParallaxMap;
     auto api = GraphicsType::GL;
     LOGI("Start Graphics Learn!!!");
     LOGI("Select {} Application, Render App With {} API", EnumUtil::EnumName(type), EnumUtil::EnumName(api));

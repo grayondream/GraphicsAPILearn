@@ -1,4 +1,4 @@
-#include "GLNormalMapApp.hpp"
+#include "GLParallaxMapApp.hpp"
 #include "Native/GL/GLProgram.hpp"
 #include "Config/StaticCollector.hpp"
 #include "EH/ErrorHandle.hpp"
@@ -18,12 +18,12 @@ using namespace Constexpr;
 using FileUtils::join;
 using namespace ErrorHandle;
 
-GLNormalMapApp::~GLNormalMapApp() {
+GLParallaxMapApp::~GLParallaxMapApp() {
 
 }
 
 static std::pair<unsigned int, unsigned int> CreateRectBuffer(){
-	// positions
+    // positions
 	glm::vec3 pos1(-1.0f,  1.0f, 0.0f);
 	glm::vec3 pos2(-1.0f, -1.0f, 0.0f);
 	glm::vec3 pos3( 1.0f, -1.0f, 0.0f);
@@ -31,7 +31,7 @@ static std::pair<unsigned int, unsigned int> CreateRectBuffer(){
 	// texture coordinates
 	glm::vec2 uv1(0.0f, 1.0f);
 	glm::vec2 uv2(0.0f, 0.0f);
-	glm::vec2 uv3(1.0f, 0.0f);  
+	glm::vec2 uv3(1.0f, 0.0f);
 	glm::vec2 uv4(1.0f, 1.0f);
 	// normal vector
 	glm::vec3 nm(0.0f, 0.0f, 1.0f);
@@ -51,10 +51,12 @@ static std::pair<unsigned int, unsigned int> CreateRectBuffer(){
 	tangent1.x = f * (deltaUV2.y * edge1.x - deltaUV1.y * edge2.x);
 	tangent1.y = f * (deltaUV2.y * edge1.y - deltaUV1.y * edge2.y);
 	tangent1.z = f * (deltaUV2.y * edge1.z - deltaUV1.y * edge2.z);
+	tangent1 = glm::normalize(tangent1);
 
 	bitangent1.x = f * (-deltaUV2.x * edge1.x + deltaUV1.x * edge2.x);
 	bitangent1.y = f * (-deltaUV2.x * edge1.y + deltaUV1.x * edge2.y);
 	bitangent1.z = f * (-deltaUV2.x * edge1.z + deltaUV1.x * edge2.z);
+	bitangent1 = glm::normalize(bitangent1);
 
 	// triangle 2
 	// ----------
@@ -68,13 +70,15 @@ static std::pair<unsigned int, unsigned int> CreateRectBuffer(){
 	tangent2.x = f * (deltaUV2.y * edge1.x - deltaUV1.y * edge2.x);
 	tangent2.y = f * (deltaUV2.y * edge1.y - deltaUV1.y * edge2.y);
 	tangent2.z = f * (deltaUV2.y * edge1.z - deltaUV1.y * edge2.z);
+	tangent2 = glm::normalize(tangent2);
 
 
 	bitangent2.x = f * (-deltaUV2.x * edge1.x + deltaUV1.x * edge2.x);
 	bitangent2.y = f * (-deltaUV2.x * edge1.y + deltaUV1.x * edge2.y);
 	bitangent2.z = f * (-deltaUV2.x * edge1.z + deltaUV1.x * edge2.z);
+	bitangent2 = glm::normalize(bitangent2);
 
-	unsigned int quadVAO, quadVBO;
+
 	float quadVertices[] = {
 		// positions            // normal         // texcoords  // tangent                          // bitangent
 		pos1.x, pos1.y, pos1.z, nm.x, nm.y, nm.z, uv1.x, uv1.y, tangent1.x, tangent1.y, tangent1.z, bitangent1.x, bitangent1.y, bitangent1.z,
@@ -86,6 +90,7 @@ static std::pair<unsigned int, unsigned int> CreateRectBuffer(){
 		pos4.x, pos4.y, pos4.z, nm.x, nm.y, nm.z, uv4.x, uv4.y, tangent2.x, tangent2.y, tangent2.z, bitangent2.x, bitangent2.y, bitangent2.z
 	};
 	// configure plane VAO
+	unsigned int quadVAO, quadVBO;
 	glGenVertexArrays(1, &quadVAO);
 	glGenBuffers(1, &quadVBO);
 	glBindVertexArray(quadVAO);
@@ -104,7 +109,7 @@ static std::pair<unsigned int, unsigned int> CreateRectBuffer(){
 	return {quadVAO, quadVBO};
 }
 
-bool GLNormalMapApp::init(const HINSTANCE inst, const WindowDesc& param) {
+bool GLParallaxMapApp::init(const HINSTANCE inst, const WindowDesc& param) {
 	if (!GLApp::init(inst, param)) {
 		return false;
 	}
@@ -127,16 +132,17 @@ static std::shared_ptr<GLImageTexture2D> CreateTexture(const std::string &imgnam
 	return texture;
 }
 
-void GLNormalMapApp::createTextures(){
-	_brick = CreateTexture("brickwall.jpg");
-	_brickNormal = CreateTexture("brickwall_normal.jpg");
+void GLParallaxMapApp::createTextures(){
+	_brick = CreateTexture("bricks2.jpg");
+	_brickNormal = CreateTexture("bricks2_normal.jpg");
+	_brickDisp = CreateTexture("bricks2_disp.jpg");
 }
 
-void GLNormalMapApp::compileShader(){
-	const auto shaderDir = join(StaticCollector::getGLShaderPath(), "Light", "Advanced", "NormalMap");
+void GLParallaxMapApp::compileShader(){
+	const auto shaderDir = join(StaticCollector::getGLShaderPath(), "Light", "Advanced", "ParallaxMap");
 	{
-		const auto vfile = join(shaderDir, "NormalMap.vs");
-		const auto ffile = join(shaderDir, "NormalMap.fs");
+		const auto vfile = join(shaderDir, "ParallaxMap.vs");
+		const auto ffile = join(shaderDir, "ParallaxMap.fs");
 		auto ret = _program.init(vfile, ffile);
 		ErrorHandle::ExitIfFailed(ret, "Create OpenGL program failed!");
 	}
@@ -148,20 +154,22 @@ static void RenderRect(unsigned int vao){
     glBindVertexArray(0);
 }
 
-void GLNormalMapApp::drawScene(const float dt) {
+void GLParallaxMapApp::drawScene(const float dt) {
 	GLApp::drawScene(dt);
 	ImGui::Begin("OpenGL");
-	ImGui::Checkbox("Enable Normal Map", &_enableNormalMap);
+	ImGui::Checkbox("Enable Normal Map", &_enableDisp);
+	ImGui::InputFloat("My Float", &_heightScale, 0.1f, 1.0f, "%.2f");
 	ImGui::End();
 	
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-	glm::vec3 lightPos(0.0f, 0.0f, 1.0f);
+	glm::vec3 lightPos(1.0f, 1.0f, 1.0f);
 	const auto attr = _camera.getAttr();
 	glm::mat4 projection = glm::perspective(glm::radians(_camera.zoom()), aspectRatio(), 0.1f, 100.0f);
 	glm::mat4 view = _camera.getViewMatrix();
 	_program.use();
 	_program.update("diffuseMap", 0);
     _program.update("normalMap", 1);
+	_program.update("depthMap", 2);
 	_program.update("projection", projection);
 	_program.update("view", view);
 	// render normal-mapped quad
@@ -170,18 +178,17 @@ void GLNormalMapApp::drawScene(const float dt) {
 	_program.update("model", model);
 	_program.update("viewPos", attr.pos);
 	_program.update("lightPos", lightPos);
-	_program.update("enableNM", _enableNormalMap);
-	const auto diffuseMap = GLUtils::Ptr2GLTextureId(_brick->texture()->handle());
-	const auto normalMap = GLUtils::Ptr2GLTextureId(_brickNormal->texture()->handle());
+	_program.update("heightScale", _heightScale);
+	_program.update("enableDisp", _enableDisp);
 	_brick->texture()->bind(0);
 	_brickNormal->texture()->bind(1);
+	_brickDisp->texture()->bind(2);
 	RenderRect(_vao);
 	
 	
 	model = glm::mat4(1.0f);
 	model = glm::translate(model, lightPos);
 	model = glm::scale(model, glm::vec3(0.1f));
-	model = glm::translate(model, glm::vec3(10.0, 10.0, 0.0));
 	_program.update("model", model);
 	RenderRect(_vao);
 
@@ -189,7 +196,7 @@ void GLNormalMapApp::drawScene(const float dt) {
 	return GLApp::drawScene(dt);
 }
 
-void GLNormalMapApp::onKeyBoardEvent(const UINT msg, const WPARAM wParam, const LPARAM lParam) {
+void GLParallaxMapApp::onKeyBoardEvent(const UINT msg, const WPARAM wParam, const LPARAM lParam) {
 	switch (msg) {
 	case WM_KEYDOWN:
 		break;
@@ -213,7 +220,7 @@ void GLNormalMapApp::onKeyBoardEvent(const UINT msg, const WPARAM wParam, const 
 	return GLApp::onKeyBoardEvent(msg, wParam, lParam);
 }
 
-void GLNormalMapApp::onMouseMove(WPARAM btnState, int x, int y) {
+void GLParallaxMapApp::onMouseMove(WPARAM btnState, int x, int y) {
 	// 仅在鼠标被点击时处理移动事件
 	if (!_mouseClicked) {
 		return GLApp::onMouseMove(btnState, x, y);
@@ -230,7 +237,7 @@ void GLNormalMapApp::onMouseMove(WPARAM btnState, int x, int y) {
 	return GLApp::onMouseMove(btnState, x, y);
 }
 
-void GLNormalMapApp::onMouseScroll(const UINT msg, const WPARAM wParam, const LPARAM lParam) {
+void GLParallaxMapApp::onMouseScroll(const UINT msg, const WPARAM wParam, const LPARAM lParam) {
 	int zDelta = GET_WHEEL_DELTA_WPARAM(wParam);
 	_camera.processMouseScrool(zDelta);
 	return GLApp::onMouseScroll(msg, wParam, lParam);

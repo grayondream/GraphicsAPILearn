@@ -34,6 +34,8 @@
 #include "App/GL/Light/Advanced/GLShadowApp.hpp"
 #include "App/GL/Light/Advanced/GLPointLightShadowApp.hpp"
 #include "App/GL/Light/Advanced/GLNormalMapApp.hpp"
+#include "App/GL/Light/Advanced/GLParallaxMapApp.hpp"
+#include "Light/Advanced/GLParallaxMapApp.hpp"
 #include <memory>
 
 std::shared_ptr<GLApp> GLAppFactory::create(const AppType type){
@@ -110,6 +112,8 @@ std::shared_ptr<GLApp> GLAppFactory::create(const AppType type){
 			return std::make_shared<GLPointLightShadowApp>();
 		case AppType::NormalMap:
 			return std::make_shared<GLNormalMapApp>();
+		case AppType::ParallaxMap:
+			return std::make_shared<GLParallaxMapApp>();
 		default:
 			break;	
 	}
