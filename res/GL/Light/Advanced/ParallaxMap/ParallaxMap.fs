@@ -16,6 +16,7 @@ uniform sampler2D depthMap;
 uniform float heightScale;
 uniform bool enableDisp;
 uniform bool enableSteep;
+uniform bool enableOcclusion;
 
 vec2 ParallaxMapping(vec2 texCoords, vec3 viewDir)
 { 
@@ -49,6 +50,20 @@ vec2 ParallaxMappingSteep(vec2 texCoords, vec3 viewDir)
         currentDepthMapValue = texture(depthMap, currentTexCoords).r;  
         // get depth of next layer
         currentLayerDepth += layerDepth;  
+    }
+    
+    if(enableOcclusion){
+        vec2 prevTexCoords = currentTexCoords + deltaTexCoords;
+
+        // get depth after and before collision for linear interpolation
+        float afterDepth  = currentDepthMapValue - currentLayerDepth;
+        float beforeDepth = texture(depthMap, prevTexCoords).r - currentLayerDepth + layerDepth;
+    
+        // interpolation of texture coordinates
+        float weight = afterDepth / (afterDepth - beforeDepth);
+        vec2 finalTexCoords = prevTexCoords * weight + currentTexCoords * (1.0 - weight);
+
+        return finalTexCoords;
     }
     
     return currentTexCoords;

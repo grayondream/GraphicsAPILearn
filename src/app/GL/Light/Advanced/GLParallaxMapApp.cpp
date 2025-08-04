@@ -159,6 +159,7 @@ void GLParallaxMapApp::drawScene(const float dt) {
 	ImGui::Begin("OpenGL");
 	ImGui::Checkbox("Enable Normal Map", &_enableDisp);
 	ImGui::Checkbox("Enable Steep", &_enableSteep);
+	ImGui::Checkbox("Enable Occlusion", &_enableOcclusion);
 	ImGui::InputFloat("My Float", &_heightScale, 0.1f, 1.0f, "%.2f");
 	ImGui::End();
 	
@@ -182,6 +183,7 @@ void GLParallaxMapApp::drawScene(const float dt) {
 	_program.update("heightScale", _heightScale);
 	_program.update("enableDisp", _enableDisp);
 	_program.update("enableSteep", _enableSteep);
+	_program.update("enableOcclusion", _enableOcclusion);
 	_brick->texture()->bind(0);
 	_brickNormal->texture()->bind(1);
 	_brickDisp->texture()->bind(2);
