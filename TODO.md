@@ -39,7 +39,10 @@
 | **Gamma**                    | Gamma correction implementation.                                      | ✅️     |
 | **Shadow_Map**               | Shadow mapping implementation.                                        | ✅️     |
 | **Shadow**                   | Render shadow implementation.                                         | ✅️     |
-| **Shadow_Point**             | Render point light shadow implementation.                            |      |
+| **Shadow_PointLight**             | Render point light shadow implementation.                            |  ✅️    |
+| **NormalMap**             | Render normal map.                            |   ✅️   |
+| **ParallaxMap**             | Render parallax map.                            |   ✅️   |
+| **Hdr**                     | Render hdr with multiple light source |   ✅️ |
 
 ### DirectX
 

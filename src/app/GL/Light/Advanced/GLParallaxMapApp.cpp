@@ -160,7 +160,7 @@ void GLParallaxMapApp::drawScene(const float dt) {
 	ImGui::Checkbox("Enable Normal Map", &_enableDisp);
 	ImGui::Checkbox("Enable Steep", &_enableSteep);
 	ImGui::Checkbox("Enable Occlusion", &_enableOcclusion);
-	ImGui::InputFloat("My Float", &_heightScale, 0.1f, 1.0f, "%.2f");
+	ImGui::InputFloat("Height Scale", &_heightScale, 0.1f, 1.0f, "%.2f");
 	ImGui::End();
 	
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);

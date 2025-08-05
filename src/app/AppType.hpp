@@ -47,5 +47,6 @@ enum class AppType : int{
     Shadow_PointLight,
     NormalMap,
     ParallaxMap,
+    Hdr,
 };
 

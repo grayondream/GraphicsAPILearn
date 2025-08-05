@@ -49,6 +49,7 @@ using namespace Constexpr;
  *  Shadow_PointLight               Render Point light shadow
  *  NormalMap                       render object with normal map
  *  ParallaxMap                     render object with parallax map
+ *  Hdr                             render hdr scene
  */
 
 namespace EnumUtil = Utils::Enum;
@@ -56,7 +57,7 @@ namespace EnumUtil = Utils::Enum;
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nShowCmd) {
     ConsoleDebugger consoleDebugger{};
     
-    auto type = AppType::ParallaxMap;
+    auto type = AppType::Hdr;
     auto api = GraphicsType::GL;
     LOGI("Start Graphics Learn!!!");
     LOGI("Select {} Application, Render App With {} API", EnumUtil::EnumName(type), EnumUtil::EnumName(api));
