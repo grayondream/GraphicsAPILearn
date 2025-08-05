@@ -72,14 +72,8 @@ void GLBloomApp::compileShader(){
 	}
 }
 
-void GLBloomApp::drawScene(const float dt) {
-	auto pos = _camera.getAttr().pos;
-	ImGui::Begin("OpenGL");
-	ImGui::Checkbox("Enable Hdr", &_enableHdr);
-	ImGui::InputFloat("Exposure", &_exposure, 0.1f, 4.0f, "%.2f");
-	ImGui::Text("Camera Pos: (%.2f, %.2f, %.2f)", pos.x, pos.y, pos.z);
-
-	glm::vec3 cubePositions[] = {
+static auto GetCubePositions() {
+	std::vector<glm::vec3> cubePositions = {
 	  glm::vec3(0.0f,  0.0f,  0.0f),
 	  glm::vec3(2.0f,  5.0f, -15.0f),
 	  glm::vec3(-1.5f, -2.2f, -2.5f),
@@ -92,25 +86,55 @@ void GLBloomApp::drawScene(const float dt) {
 	  glm::vec3(-1.3f,  1.0f, -1.5f)
 	};
 
+	return cubePositions;
+}
+
+void GLBloomApp::drawScene(const float dt) {
+	auto pos = _camera.getAttr().pos;
+	ImGui::Begin("OpenGL");
+	ImGui::End();
+
+	GLApp::drawScene(dt);
 	glBindVertexArray(cube_->getVao());
-	for (int i = 0; i < 10; i++) {
+	
+	auto cubePositions = GetCubePositions();
+	static float curTime = 0;
+	curTime += dt;
+	const auto projection = glm::perspective(glm::radians(_camera.zoom()), aspectRatio(), 0.1f, 100.0f);
+	const auto view = _camera.getViewMatrix();
+	for (int i = 0; i < cubePositions.size(); i++) {
 		glm::mat4 model = glm::mat4(1.0f); // make sure to initialize matrix to identity matrix first
-		glm::mat4 view = glm::mat4(1.0f);
-		glm::mat4 projection = glm::mat4(1.0f);
+		
 		model = glm::translate(model, cubePositions[i]);
-		view = glm::translate(view, glm::vec3(0.0f, 0.0f, -3.0f));
-		projection = glm::perspective(glm::radians(45.0f), aspectRatio(), 0.1f, 100.0f);
+		float angle = 20.0f * (i + 1) * curTime;
+		model = glm::rotate(model, glm::radians(angle), glm::vec3(1.0f, 0.3f, 0.5f));
+		_program.use();
+		_program.update("model", model);
+		_program.update("view", view);
+		_program.update("projection", projection);
+		brick_->texture()->bind(0);
+		_program.update("textureSampler", 0);
+		//glDrawArrays(GL_TRIANGLES, 0, 36);
+		glDrawElements(GL_TRIANGLES, cube_->idxSize(), GL_UNSIGNED_INT, 0);
+	}
+	
+	glBindVertexArray(0);
+
+	glBindVertexArray(plane_->getVao());
+	{
+		glm::mat4 model = glm::mat4(1.0f); // make sure to initialize matrix to identity matrix first
+
+		model = glm::translate(model, glm::vec3(0.0));
+		_program.use();
 		_program.update("model", model);
 		_program.update("view", view);
 		_program.update("projection", projection);
 		wood_->texture()->bind(0);
 		_program.update("textureSampler", 0);
-		glDrawElements(GL_TRIANGLES, cube_->idxSize(), GL_UNSIGNED_INT, 0);
+		//glDrawArrays(GL_TRIANGLES, 0, 36);
+		glDrawArrays(GL_TRIANGLES, 0, 6);
 	}
 	glBindVertexArray(0);
-	ImGui::End();
-	
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 }
 
 void GLBloomApp::onKeyBoardEvent(const UINT msg, const WPARAM wParam, const LPARAM lParam) {

@@ -92,6 +92,7 @@ void GLCubeApp::drawScene(const float dt) {
 		_program.update("view", view);
 		_program.update("projection", projection);
 		glDrawArrays(GL_TRIANGLES, 0, 36);
+		//glDrawElements(GL_TRIANGLES, cube_->idxSize(), GL_UNSIGNED_INT, 0);
 	}
 	
 	glBindVertexArray(0);
