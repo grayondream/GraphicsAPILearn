@@ -11,16 +11,14 @@
 #include "Base/Log.hpp"
 #include "imgui.h"
 #include <Utils/FileUtils.hpp>
+#include "Native/GL/GLCube.hpp"
+
 using FileUtils::join;
 
 using namespace ErrorHandle;
 
 GLCubeApp::~GLCubeApp() {
-	if (_vao != 0) {
-		glDeleteVertexArrays(1, &_vao);
-		glDeleteBuffers(2, _vbo);
-	}
-
+	cube_->destroy();
 	_program.destroy();
 }
 
@@ -38,37 +36,14 @@ bool GLCubeApp::init(const HINSTANCE inst, const WindowDesc& param) {
 	_texture = std::make_shared<GLImageTexture2D>(imgFile);
 	const auto valid = _texture->load().texture()->valid();
 	ExitIfFailed(valid, "Failed to load texture from file {}", imgFile);
-	createVertexBuffer();
+	initializeCube();
 	//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 	return true;
 }
 
-void GLCubeApp::createVertexBuffer() {
-	Cube shape{};
-	unsigned int vbo[2]{}, vao{}, ebo{};
-	glGenVertexArrays(1, &vao);
-	glGenBuffers(2, vbo);
-
-	glBindVertexArray(vao);
-	{
-		glBindBuffer(GL_ARRAY_BUFFER, vbo[0]);
-		glBufferData(GL_ARRAY_BUFFER, shape.byteSize(), shape.toGL().data(), GL_STATIC_DRAW);
-
-		glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex), nullptr);
-		glEnableVertexAttribArray(0);
-
-		glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)(sizeof(float) * 4));
-		glEnableVertexAttribArray(1);
-
-		glBindBuffer(GL_ARRAY_BUFFER, vbo[1]);
-		glBufferData(GL_ARRAY_BUFFER, shape.uvSize(), shape.uv(), GL_STATIC_DRAW);
-
-		glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), nullptr);
-		glEnableVertexAttribArray(2);
-	}
-	glBindVertexArray(0);
-	_vao = vao;
-	_vbo[0] = vbo[0], _vbo[1] = vbo[1];
+void GLCubeApp::initializeCube() {
+	cube_ = std::make_shared<GLCube>();
+	cube_->init();
 }
 
 void GLCubeApp::clearColor() {
@@ -83,7 +58,7 @@ void GLCubeApp::beginDrawScene() {
 
 void GLCubeApp::drawScene(const float dt) {
 	GLApp::drawScene(dt);
-	glBindVertexArray(_vao);
+	glBindVertexArray(cube_->getVao());
 	ImGui::Begin("OpenGL");
 	static int count{ 1 };
 	ImGui::SetNextItemWidth(200);

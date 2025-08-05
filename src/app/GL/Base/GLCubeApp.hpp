@@ -5,6 +5,7 @@
 #include <array>
 
 class GLImageTexture2D;
+class GLCube;
 class GLCubeApp : public GLApp {
 public:
 	virtual ~GLCubeApp();
@@ -18,11 +19,10 @@ protected:
 	virtual void endDrawScene();
 
 private:
-	void createVertexBuffer();
+	void initializeCube();
 
 private:
 	std::shared_ptr<GLImageTexture2D> _texture{};
 	GLProgram _program{};
-	unsigned int _vbo[2]{};
-	unsigned int _vao{};
+	std::shared_ptr<GLCube> cube_;
 };
