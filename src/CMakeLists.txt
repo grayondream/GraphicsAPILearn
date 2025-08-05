@@ -4,6 +4,8 @@ set(RENDER_TRACY_PATH "${RENDER_SOURCE_PATH}/Tracy" CACHE STRING "tracy file's p
 set(RENDER_BASE_PATH "${RENDER_SOURCE_PATH}/Base" CACHE STRING "base file's path")
 set(RENDER_CONFIG_PATH "${RENDER_SOURCE_PATH}/Config" CACHE STRING "config file's path")
 
+set(PROJECT_NAME renderLearn)
+
 set(DX_SRC_FILES "" CACHE STRING "all source files")
 
 add_subdirectory(${RAPP_PATH})
