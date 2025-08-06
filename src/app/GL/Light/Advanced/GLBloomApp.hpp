@@ -27,9 +27,10 @@ private:
 	void compileShader();
 	void initShapes();
 	void createTextures();
-
+	void extractBrightPart();
+	
 private:
-	GLProgram _program;
+	GLProgram _bloomProgram;
 
 	float _curTime{};
 	Camera _camera{};
