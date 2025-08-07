@@ -28,46 +28,47 @@ public:
 
     // 窗口生命周期管理
     bool initialize();
-    void shutdown();
+    GLFWWindow& shutdown();
 
     // 事件和帧管理
-    void pollEvents();
-    void beginFrame();
-    void endFrame();
+    GLFWWindow& pollEvents();
+    GLFWWindow& beginFrame();
+    GLFWWindow& endFrame();
 
     // 窗口状态
     bool shouldClose() const;
-    void setShouldClose(bool value);
+    GLFWWindow& setShouldClose(bool value);
 
     // 属性访问
     GLFWWindowProperties getProperties() const { return m_properties; }
     void setProperties(const GLFWWindowProperties& properties) { m_properties = properties; }
 
     // 属性设置接口
-    void setTitle(const std::string& title);
-    void setSize(unsigned int width, unsigned int height);
-    void setPosition(int x, int y);
-    void setVsync(bool enabled);
-    void setFullscreen(bool enabled);
-    void updateFrameRate(float fs);
-    
+    GLFWWindow& setTitle(const std::string& title);
+    GLFWWindow& setSize(unsigned int width, unsigned int height);
+    GLFWWindow& setPosition(int x, int y);
+    GLFWWindow& setVsync(bool enabled);
+    GLFWWindow& setFullscreen(bool enabled);
+    GLFWWindow& updateFrameRate(float fs);
+    GLFWWindow& setUserPointer(void* pointer);
+    void* getUserPointer() const;
+
     // 输入状态查询
     bool isKeyPressed(int key) const;
     bool isMouseButtonPressed(int button) const;
     void getMousePosition(double& x, double& y) const;
-    void getMouseDelta(double& dx, double& dy) const;
 
     // 回调设置接口
-    void setKeyCallback(const KeyCallback& callback) { m_keyCallback = callback; }
-    void setMouseButtonCallback(const MouseButtonCallback& callback) { m_mouseButtonCallback = callback; }
-    void setMouseMoveCallback(const MouseMoveCallback& callback) { m_mouseMoveCallback = callback; }
-    void setMouseScrollCallback(const MouseScrollCallback& callback) { m_mouseScrollCallback = callback; }
-    void setWindowResizeCallback(const WindowResizeCallback& callback) { m_windowResizeCallback = callback; }
+    GLFWWindow& setKeyCallback(const KeyCallback& callback);
+    GLFWWindow& setMouseButtonCallback(const MouseButtonCallback& callback);
+    GLFWWindow& setMouseMoveCallback(const MouseMoveCallback& callback);
+    GLFWWindow& setMouseScrollCallback(const MouseScrollCallback& callback);
+    GLFWWindow& setWindowResizeCallback(const WindowResizeCallback& callback);
 
     // ImGui相关
     bool initializeImGui();
-    void shutdownImGui();
-    void renderImGui();
+    GLFWWindow& shutdownImGui();
+    GLFWWindow& renderImGui();
 
     // 获取原生窗口指针
     GLFWwindow* getNativeGLFWWindow() const { return m_window; }
@@ -76,19 +77,12 @@ private:
 
 private:
     GLFWwindow* m_window;
+    void* m_userPointer;
+
     GLFWWindowProperties m_properties;
     bool m_initialized;
     bool m_imguiInitialized;
-
-    // 鼠标状态
-    double m_mouseX;
-    double m_mouseY;
-    double m_lastMouseX;
-    double m_lastMouseY;
-    double m_mouseDeltaX;
-    double m_mouseDeltaY;
-    bool m_firstMouse;
-
+    
     // 回调函数存储
     KeyCallback m_keyCallback;
     MouseButtonCallback m_mouseButtonCallback;

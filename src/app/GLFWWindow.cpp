@@ -38,24 +38,7 @@ void GLFWWindow::staticMouseMoveCallback(GLFWwindow* window, double xpos, double
     if (!instance) {
         return;
     }
-    // 更新鼠标位置和 delta
-    instance->m_lastMouseX = instance->m_mouseX;
-    instance->m_lastMouseY = instance->m_mouseY;
-    instance->m_mouseX = xpos;
-    instance->m_mouseY = ypos;
     
-    // 首次鼠标输入不计算 delta
-    if (instance->m_firstMouse) {
-        instance->m_lastMouseX = xpos;
-        instance->m_lastMouseY = ypos;
-        instance->m_firstMouse = false;
-    }
-    
-    // 计算 delta (Y轴反转，符合常规图形应用习惯)
-    instance->m_mouseDeltaX = xpos - instance->m_lastMouseX;
-    instance->m_mouseDeltaY = instance->m_lastMouseY - ypos;
-    
-    // 调用用户回调
     if (instance->m_mouseMoveCallback) {
         instance->m_mouseMoveCallback(xpos, ypos);
     }
@@ -79,11 +62,6 @@ void GLFWWindow::staticWindowResizeCallback(GLFWwindow* window, int width, int h
 
     GLFWWindow* instance = static_cast<GLFWWindow*>(glfwGetWindowUserPointer(window));
     if (instance) {
-        // 更新内部尺寸记录
-        instance->m_properties.width = width;
-        instance->m_properties.height = height;
-        
-        // 调用用户回调
         if (instance->m_windowResizeCallback) {
             instance->m_windowResizeCallback(width, height);
         }
@@ -92,14 +70,20 @@ void GLFWWindow::staticWindowResizeCallback(GLFWwindow* window, int width, int h
 
 // 构造函数
 GLFWWindow::GLFWWindow(const GLFWWindowProperties& properties)
-    : m_properties(properties), m_window(nullptr), m_initialized(false), m_imguiInitialized(false),
-      m_firstMouse(true), m_mouseX(0), m_mouseY(0),
-      m_lastMouseX(0), m_lastMouseY(0),
-      m_mouseDeltaX(0), m_mouseDeltaY(0) {}
+    : m_properties(properties), m_window(nullptr), m_initialized(false), m_imguiInitialized(false) {}
 
 // 析构函数
 GLFWWindow::~GLFWWindow() {
     shutdown();
+}
+
+GLFWWindow& GLFWWindow::setUserPointer(void* pointer) {
+    m_userPointer = pointer;
+    return *this;
+}
+
+void* GLFWWindow::getUserPointer() const {
+    return m_userPointer;
 }
 
 // 初始化窗口
@@ -151,18 +135,38 @@ bool GLFWWindow::initialize() {
     glfwSetScrollCallback(m_window, staticMouseScrollCallback);
     glfwSetWindowSizeCallback(m_window, staticWindowResizeCallback);
 
-    // 初始化鼠标状态
-    m_firstMouse = true;
-    glfwGetCursorPos(m_window, &m_mouseX, &m_mouseY);
-    m_lastMouseX = m_mouseX;
-    m_lastMouseY = m_mouseY;
-
     m_initialized = true;
     return true;
 }
 
+GLFWWindow& GLFWWindow::setMouseMoveCallback(const MouseMoveCallback& callback) {
+    m_mouseMoveCallback = callback;
+    return *this;
+}
+
+GLFWWindow& GLFWWindow::setMouseScrollCallback(const MouseScrollCallback& callback) {
+    m_mouseScrollCallback = callback;
+    return *this;
+}
+
+GLFWWindow& GLFWWindow::setMouseButtonCallback(const MouseButtonCallback& callback) {
+    m_mouseButtonCallback = callback;
+    return *this;
+}
+
+GLFWWindow& GLFWWindow::setWindowResizeCallback(const WindowResizeCallback& callback) {
+    m_windowResizeCallback = callback;
+    return *this;
+}
+
+
+GLFWWindow& GLFWWindow::setKeyCallback(const KeyCallback& callback) {
+    m_keyCallback = callback;
+    return *this;
+}
+
 // 关闭窗口
-void GLFWWindow::shutdown() {
+GLFWWindow& GLFWWindow::shutdown() {
     if (m_imguiInitialized) {
         shutdownImGui();
     }
@@ -173,33 +177,35 @@ void GLFWWindow::shutdown() {
     }
 
     m_initialized = false;
+    return *this;
 }
 
-void GLFWWindow::updateFrameRate(float fs){
+GLFWWindow& GLFWWindow::updateFrameRate(float fs){
     const auto title = m_properties.title;
     const auto newTitle = title + " - " + std::to_string(fs) + " FPS";
     glfwSetWindowTitle(m_window, newTitle.c_str());
+    return *this;
 }
 
 // 轮询事件
-void GLFWWindow::pollEvents() {
+GLFWWindow& GLFWWindow::pollEvents() {
     if (!m_initialized) {
-        return;
+        return *this;
     }
     glfwPollEvents();
+    return *this;
 }
 
 // 开始帧
-void GLFWWindow::beginFrame() {
-    // 重置鼠标 delta
-    m_mouseDeltaX = 0.0;
-    m_mouseDeltaY = 0.0;
+GLFWWindow& GLFWWindow::beginFrame() {
     newImGuiFrame();
+    return *this;
 }
 
 // 结束帧（交换缓冲区）
-void GLFWWindow::endFrame() {
+GLFWWindow& GLFWWindow::endFrame() {
     // 由具体图形API实现缓冲区交换
+    return *this;
 }
 
 // 窗口是否应该关闭
@@ -208,55 +214,65 @@ bool GLFWWindow::shouldClose() const {
 }
 
 // 设置窗口关闭状态
-void GLFWWindow::setShouldClose(bool value) {
+GLFWWindow& GLFWWindow::setShouldClose(bool value) {
     if (!m_initialized) {
-        return;
+        return *this;
     }
 
     glfwSetWindowShouldClose(m_window, value ? GLFW_TRUE : GLFW_FALSE);
+    return *this;
 }
 
 // 设置窗口标题
-void GLFWWindow::setTitle(const std::string& title) {
+GLFWWindow& GLFWWindow::setTitle(const std::string& title) {
     if (m_initialized && !title.empty()) {
         m_properties.title = title;
         glfwSetWindowTitle(m_window, title.c_str());
     }
+
+    return *this;
 }
 
 // 设置窗口大小
-void GLFWWindow::setSize(unsigned int width, unsigned int height) {
+GLFWWindow& GLFWWindow::setSize(unsigned int width, unsigned int height) {
     if (m_initialized && width > 0 && height > 0) {
         m_properties.width = width;
         m_properties.height = height;
         glfwSetWindowSize(m_window, width, height);
     }
+
+    return *this;
 }
 
 // 设置窗口位置
-void GLFWWindow::setPosition(int x, int y) {
+GLFWWindow& GLFWWindow::setPosition(int x, int y) {
     if (m_initialized) {
         m_properties.xPos = x;
         m_properties.yPos = y;
         glfwSetWindowPos(m_window, x, y);
     }
+
+    return *this;
 }
 
 // 设置垂直同步
-void GLFWWindow::setVsync(bool enabled) {
+GLFWWindow& GLFWWindow::setVsync(bool enabled) {
     if (m_initialized) {
         m_properties.vsync = enabled;
         // 实际VSync控制由具体图形API实现
     }
+
+    return *this;
 }
 
 // 设置全屏模式
-void GLFWWindow::setFullscreen(bool enabled) {
+GLFWWindow& GLFWWindow::setFullscreen(bool enabled) {
     if (!m_initialized) {
-        return;
+        return *this;
     }
 
     //TODO:
+    return *this;
 }
 
 // 检查按键是否按下
@@ -277,12 +293,6 @@ void GLFWWindow::getMousePosition(double& x, double& y) const {
         x = 0.0;
         y = 0.0;
     }
-}
-
-// 获取鼠标移动增量
-void GLFWWindow::getMouseDelta(double& dx, double& dy) const {
-    dx = m_mouseDeltaX;
-    dy = m_mouseDeltaY;
 }
 
 // 初始化ImGui
@@ -315,12 +325,14 @@ bool GLFWWindow::initializeImGui() {
 }
 
 // 关闭ImGui
-void GLFWWindow::shutdownImGui() {
+GLFWWindow& GLFWWindow::shutdownImGui() {
     if (m_imguiInitialized) {
         ImGui_ImplGlfw_Shutdown();
         ImGui::DestroyContext();
         m_imguiInitialized = false;
     }
+
+    return *this;
 }
 
 // 开始ImGui帧
@@ -332,11 +344,12 @@ void GLFWWindow::newImGuiFrame() {
 }
 
 // 渲染ImGui
-void GLFWWindow::renderImGui() {
+GLFWWindow& GLFWWindow::renderImGui() {
     if (!m_imguiInitialized) {
-        return;
+        return *this;
     }
 
     ImGui::Render();
+    return *this;
 }
     

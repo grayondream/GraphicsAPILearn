@@ -16,12 +16,19 @@ public:
     Application();
     virtual ~Application();
 
-    virtual bool init(const GLFWWindowProperties& properties) override;
+    virtual bool init(const GLFWWindowProperties& properties) override final;
 
-    virtual int run() override; 
+    virtual int run() override final; 
 
-    void exit();
+    void exit() override final;
 
+public:
+    virtual void onMouseMove(double x, double y);
+    virtual void onMouseScroll(double xoffset, double yoffset);
+    virtual void onMouseButton(int button, int action, int mods);
+    virtual void onKeyPress(int key, int scancode, int action, int mods);
+    virtual void onWindowResize(int width, int height);
+    
 protected:
     void render();
     virtual void clearColor() {}
@@ -30,8 +37,8 @@ protected:
     virtual void endDrawScene(){}
 
 private:
-    void calcFrameRate();
     void updateFrameRate();
+    void initInputEvent();
     
 protected:
     std::unique_ptr<GLFWWindow> m_window{};

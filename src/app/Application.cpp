@@ -31,6 +31,8 @@ bool Application::init(const GLFWWindowProperties& properties){
     LOGI("Create Main Windows successed");
     LOGI("Window title: {}", properties.title.c_str());
     LOGI("Window properties: pos({}, {}), size({}, {})", properties.xPos, properties.yPos, properties.width, properties.height);
+    m_window->setUserPointer(this);
+    initInputEvent();
     return true;
 }
 
@@ -41,18 +43,47 @@ static auto CalcWindowFrameRate() {
 
     auto currentTime = std::chrono::high_resolution_clock::now();
     frameCount++;
-
-    // 计算时间差（秒）
     std::chrono::duration<float> elapsed = currentTime - lastTime;
-
-    // 每0.5秒更新一次帧率，避免频繁波动
     if (elapsed.count() >= 0.5f) {
-        fps = frameCount / elapsed.count();  // 帧数/时间 = 帧率
-        frameCount = 0;                      // 重置帧数计数
-        lastTime = currentTime;              // 更新时间戳
+        fps = frameCount / elapsed.count();  
+        frameCount = 0;                      
+        lastTime = currentTime;              
     }
 
     return fps;
+}
+
+void Application::onKeyPress(int key, int scancode, int action, int mods){
+    LOGI("Key press: {}, {}, {}, {}", key, scancode, action, mods);
+}
+
+void Application::onMouseMove(double x, double y){
+    //LOGI("Mouse move: {}, {}", x, y);
+}
+
+void Application::onMouseScroll(double xoffset, double yoffset){
+    LOGI("Mouse scroll: {}, {}", xoffset, yoffset);
+}
+
+void Application::onMouseButton(int button, int action, int mods){
+    LOGI("Mouse button: {}, action: {}, mods: {}", button, action, mods);
+}
+void Application::onWindowResize(int width, int height){
+    LOGI("Window resize: {} {}", width, height);
+}
+
+void Application::initInputEvent(){
+    m_window->setKeyCallback([this](int key, int scancode, int action, int mods){
+        onKeyPress(key, scancode, action, mods);
+    }).setMouseMoveCallback([this](double x, double y){
+        onMouseMove(x, y);
+    }).setMouseScrollCallback([this](double xoffset, double yoffset){
+        onMouseScroll(xoffset, yoffset);
+    }).setMouseButtonCallback([this](int button, int action, int mods){
+        onMouseButton(button, action, mods);
+    }).setWindowResizeCallback([this](int width, int height){
+        onWindowResize(width, height);
+    });
 }
 
 void Application::updateFrameRate(){
@@ -67,6 +98,7 @@ int Application::run(){
         m_window->pollEvents();
         render();
         m_window->endFrame();
+        std::this_thread::yield();
     }
 
     return 0;
@@ -79,14 +111,9 @@ void Application::exit() {
 }
 
 void Application::render() {
-    calcFrameRate();
     beginDrawScene();
     drawScene(0.0);
     endDrawScene();
-}
-
-void Application::calcFrameRate() {
-
 }
 
 void Application::beginDrawScene() {
