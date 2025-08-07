@@ -66,8 +66,7 @@ using namespace Constexpr;
 //     return app->run(nShowCmd);
 // }
 
-
-#include "GLFWWindow.hpp"
+#include "Application.hpp"
 #include <iostream>
 #include <chrono>
 #include <thread>
@@ -77,31 +76,11 @@ int main(int argc, char **argv) {
     GLFWWindowProperties props(
         "Pure Window (No Graphics API)",
         800, 600,  // 宽高
-        200, 200,  // 位置
-        true,      // 可 resize
-        false      // 窗口模式
-    );
+        200, 200 );
 
     // 创建窗口实例
-    GLFWWindow window(props);
-
-    // 初始化窗口（仅创建原生窗口，无任何图形API）
-    if (!window.initialize()) {
-        std::cerr << "Failed to initialize window" << std::endl;
-        return -1;
-    }
-
-    // 主循环（仅处理窗口事件，无渲染逻辑）
-    std::cout << "Window running - press ESC to close, F1 to toggle fullscreen" << std::endl;
-    while (!window.shouldClose()) {
-        // 轮询事件（必须调用，否则窗口无响应）
-        window.pollEvents();
-
-        // 简单延迟，避免CPU占用过高
-        std::this_thread::sleep_for(std::chrono::milliseconds(10));
-    }
-
-    // 销毁窗口
-    window.shutdown();
-    return 0;
+    Application app;
+    // 初始化应用
+    app.init(props);
+    return app.run();
 }

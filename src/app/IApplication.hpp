@@ -11,4 +11,6 @@ public:
     virtual bool init(const GLFWWindowProperties& properties) = 0;
 
     virtual int run() = 0; 
+
+    virtual void exit() = 0;
 };

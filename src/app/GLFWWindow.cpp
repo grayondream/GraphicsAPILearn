@@ -175,6 +175,12 @@ void GLFWWindow::shutdown() {
     m_initialized = false;
 }
 
+void GLFWWindow::updateFrameRate(float fs){
+    const auto title = m_properties.title;
+    const auto newTitle = title + " - " + std::to_string(fs) + " FPS";
+    glfwSetWindowTitle(m_window, newTitle.c_str());
+}
+
 // 轮询事件
 void GLFWWindow::pollEvents() {
     if (!m_initialized) {

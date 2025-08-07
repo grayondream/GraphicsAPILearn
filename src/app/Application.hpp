@@ -1,7 +1,8 @@
 #pragma once
 #include <string>
-#include "Base/GameTimer.hpp"
 #include "IApplication.hpp"
+#include "GLFWWindow.hpp"
+#include <memory>
 
 class Application : public IApplication{
 public:
@@ -15,11 +16,9 @@ public:
     Application();
     virtual ~Application();
 
-    virtual bool init(const HINSTANCE, const WindowDesc& param) override;
+    virtual bool init(const GLFWWindowProperties& properties) override;
 
-    virtual int run(const int nShowCmd) override; 
-
-    LRESULT msgProc(const HWND hwnd, const UINT msg, const WPARAM wParam, const LPARAM lParam);
+    virtual int run() override; 
 
     void exit();
 
@@ -29,36 +28,12 @@ protected:
     virtual void beginDrawScene();
     virtual void drawScene(const float dt){}
     virtual void endDrawScene(){}
-    
-    virtual void onResize(const UINT msg, const WPARAM wParam, const LPARAM lParam);
-    virtual void onMouseDown(const UINT msg, WPARAM btnState, int x, int y);
-    virtual void onMouseUp(const UINT msg, WPARAM btnState, int x, int y);
-    virtual void onMouseMove(WPARAM btnState, int x, int y);
-    virtual void onMouseScroll(const UINT msg, const WPARAM wParam, const LPARAM lParam){}
-    virtual void onKeyBoardEvent(const UINT msg, const WPARAM wParam, const LPARAM lParam);
-    float aspectRatio() {
-        return _attribute.winAttr.width * 1.0 / _attribute.winAttr.height;
-    }
-
-    HWND winId() {
-        return _winId;
-    }
-
-    void initImGUI();
 
 private:
-    void createMainWindow(const HINSTANCE instance);
     void calcFrameRate();
+    void updateFrameRate();
     
-
 protected:
-    WindowDesc _attribute{};
-    State _state{};
-    HWND _winId{};
-    GameTimer _timer{};
-    bool _uiInitialized{ false };
-    bool _running{ false };
-
-    int _lastx, _lasty;
-    bool _mouseClicked{};
+    std::unique_ptr<GLFWWindow> m_window{};
+    State m_state{};
 };

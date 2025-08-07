@@ -49,7 +49,8 @@ public:
     void setPosition(int x, int y);
     void setVsync(bool enabled);
     void setFullscreen(bool enabled);
-
+    void updateFrameRate(float fs);
+    
     // 输入状态查询
     bool isKeyPressed(int key) const;
     bool isMouseButtonPressed(int button) const;

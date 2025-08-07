@@ -24,6 +24,7 @@ message(STATUS "All source files: ${ALL_CPP_FILES}")
 add_executable(${PROJECT_NAME}
     ${RAPP_PATH}/main.cpp
     ${RAPP_PATH}/GLFWWindow.cpp
+    ${RAPP_PATH}/Application.cpp
     ${IMGUI_SRC_FILES}
 )
 
