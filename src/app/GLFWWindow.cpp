@@ -1,6 +1,4 @@
 #include "GLFWWindow.hpp"
-#include "imgui.h"
-#include "imgui_impl_glfw.h"
 #include <iostream>
 #include <glad/glad.h>
 #include <glfw/glfw3.h>
@@ -72,7 +70,7 @@ void GLFWWindow::staticWindowResizeCallback(GLFWwindow* window, int width, int h
 
 // 构造函数
 GLFWWindow::GLFWWindow(const GLFWWindowProperties& properties)
-    : m_properties(properties), m_window(nullptr), m_initialized(false), m_imguiInitialized(false) {}
+    : m_properties(properties), m_window(nullptr), m_initialized(false) {}
 
 // 析构函数
 GLFWWindow::~GLFWWindow() {
@@ -98,18 +96,6 @@ bool GLFWWindow::initialize() {
     if (!glfwInit()) {
         return false;
     }
-
-    // 配置GLFW窗口 hints（不指定图形API，保持通用）
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
-    glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API); // 不创建默认上下文
-    glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
-    glfwWindowHint(GLFW_VISIBLE, GLFW_TRUE);
-    glfwWindowHint(GLFW_DECORATED, GLFW_TRUE);
-
-#ifdef __APPLE__
-    glfwWindowHint(GLFW_COCOA_RETINA_FRAMEBUFFER, GLFW_TRUE);
-#endif
 
     // 创建窗口
     m_window = glfwCreateWindow(
@@ -169,10 +155,6 @@ GLFWWindow& GLFWWindow::setKeyCallback(const KeyCallback& callback) {
 
 // 关闭窗口
 GLFWWindow& GLFWWindow::shutdown() {
-    if (m_imguiInitialized) {
-        shutdownImGui();
-    }
-
     if (m_window) {
         glfwDestroyWindow(m_window);
         m_window = nullptr;
@@ -193,6 +175,18 @@ bool GLFWWindow::initGLContext() {
     if (!m_initialized) {
         return true;
     }
+    
+    // 配置GLFW窗口 hints（不指定图形API，保持通用）
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+    glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API); // 不创建默认上下文
+    glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
+    glfwWindowHint(GLFW_VISIBLE, GLFW_TRUE);
+    glfwWindowHint(GLFW_DECORATED, GLFW_TRUE);
+
+#ifdef __APPLE__
+    glfwWindowHint(GLFW_COCOA_RETINA_FRAMEBUFFER, GLFW_TRUE);
+#endif
 
     glfwMakeContextCurrent(m_window);
     if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
@@ -223,7 +217,6 @@ GLFWWindow& GLFWWindow::pollEvents() {
 
 // 开始帧
 GLFWWindow& GLFWWindow::beginFrame() {
-    newImGuiFrame();
     return *this;
 }
 
@@ -318,63 +311,5 @@ void GLFWWindow::getMousePosition(double& x, double& y) const {
         x = 0.0;
         y = 0.0;
     }
-}
-
-// 初始化ImGui
-bool GLFWWindow::initializeImGui() {
-    if (m_imguiInitialized || !m_initialized) {
-        return m_imguiInitialized;
-    }
-
-    // 初始化ImGui上下文
-    IMGUI_CHECKVERSION();
-    ImGui::CreateContext();
-    ImGuiIO& io = ImGui::GetIO(); (void)io;
-    
-    // 配置ImGui
-    io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // 启用键盘导航
-    io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // 启用游戏手柄导航
-
-    // 设置ImGui样式
-    ImGui::StyleColorsDark();
-
-    // 初始化GLFW后端（不绑定特定渲染API）
-    if (!ImGui_ImplGlfw_InitForOther(m_window, true)) {
-        std::cerr << "Failed to initialize ImGui GLFW backend" << std::endl;
-        ImGui::DestroyContext();
-        return false;
-    }
-
-    m_imguiInitialized = true;
-    return true;
-}
-
-// 关闭ImGui
-GLFWWindow& GLFWWindow::shutdownImGui() {
-    if (m_imguiInitialized) {
-        ImGui_ImplGlfw_Shutdown();
-        ImGui::DestroyContext();
-        m_imguiInitialized = false;
-    }
-
-    return *this;
-}
-
-// 开始ImGui帧
-void GLFWWindow::newImGuiFrame() {
-    if (m_imguiInitialized) {
-        ImGui_ImplGlfw_NewFrame();
-        ImGui::NewFrame();
-    }
-}
-
-// 渲染ImGui
-GLFWWindow& GLFWWindow::renderImGui() {
-    if (!m_imguiInitialized) {
-        return *this;
-    }
-
-    ImGui::Render();
-    return *this;
 }
     

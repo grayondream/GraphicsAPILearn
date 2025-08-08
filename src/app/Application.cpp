@@ -19,6 +19,10 @@ Application::~Application() {
     if (m_window) {
         m_window->shutdown();
     }
+
+    if (m_imguiWindow) {
+        m_imguiWindow->destroy();
+    }
 }
 
 bool Application::init(const GLFWWindowProperties& properties){
@@ -122,7 +126,9 @@ void Application::exit() {
 
 void Application::render() {
     beginDrawScene();
+    m_imguiWindow->newFrame();
     drawScene(0.0);
+    m_imguiWindow->render();
     endDrawScene();
 }
 

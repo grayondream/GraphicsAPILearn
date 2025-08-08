@@ -69,15 +69,8 @@ public:
     GLFWWindow& setMouseScrollCallback(const MouseScrollCallback& callback);
     GLFWWindow& setWindowResizeCallback(const WindowResizeCallback& callback);
 
-    // ImGui相关
-    bool initializeImGui();
-    GLFWWindow& shutdownImGui();
-    GLFWWindow& renderImGui();
-
     // 获取原生窗口指针
     GLFWwindow* getNativeGLFWWindow() const { return m_window; }
-private:
-    void newImGuiFrame();
 
 private:
     GLFWwindow* m_window;
@@ -85,7 +78,6 @@ private:
 
     GLFWWindowProperties m_properties;
     bool m_initialized;
-    bool m_imguiInitialized;
     
     // 回调函数存储
     KeyCallback m_keyCallback;

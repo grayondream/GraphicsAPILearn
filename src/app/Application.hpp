@@ -3,6 +3,7 @@
 #include "IApplication.hpp"
 #include "GLFWWindow.hpp"
 #include <memory>
+#include "ImGuiWindow.hpp"
 
 class Application : public IApplication{
 public:
@@ -43,4 +44,5 @@ private:
     
 protected:
     std::unique_ptr<GLFWWindow> m_window{};
+    std::unique_ptr<ImGuiWindow> m_imguiWindow{};
 };

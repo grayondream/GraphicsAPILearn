@@ -21,6 +21,7 @@ message(STATUS "All source files: ${ALL_CPP_FILES}")
 #${ALL_HPP_FILES}
 #${GLAD_SRC_FILES}
 #${IMGUI_SRC_FILES}
+#message(FATAL_ERROR "IMGUI ${GLAD_SRC_FILES}")
 
 add_executable(${PROJECT_NAME}
     ${RAPP_PATH}/main.cpp
@@ -28,6 +29,8 @@ add_executable(${PROJECT_NAME}
     ${RAPP_PATH}/Application.cpp
     ${RENDER_UTILS_PATH}/EventUtils.cpp
     ${RAPP_PATH}/GL/GLApp.cpp
+    ${RAPP_PATH}/GL/ImGuiOpenglWindow.cpp
+    ${RAPP_PATH}/ImGuiWindow.cpp
     ${IMGUI_SRC_FILES}
     ${GLAD_SRC_FILES}
 )

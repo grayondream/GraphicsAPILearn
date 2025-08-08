@@ -2,6 +2,8 @@
 #include "EH/ErrorHandle.hpp"
 #include "Base/Log.hpp"
 #include <GL/gl.h>
+#include "ImGuiOpenglWindow.hpp"
+#include <imgui.h>
 
 using namespace ErrorHandle;
 
@@ -33,6 +35,8 @@ bool GLApp::initGraphics() {
     glViewport(0, 0, width, height);
     // 启用深度测试
     glEnable(GL_DEPTH_TEST);
+    m_imguiWindow = std::make_unique<ImGuiOpenglWindow>();
+    m_imguiWindow->init(m_window->getNativeGLFWWindow());
     return true;
 }
 
@@ -46,10 +50,10 @@ void GLApp::beginDrawScene() {
 }
 
 void GLApp::drawScene(const float dt) {
-    // ImGui::Begin("OpenGL");
-    // ImGuiIO& io = ImGui::GetIO();
-    // ImGui::Text("Hello Graphic! %.1f FPS", io.Framerate);  // Display current FPS
-    // ImGui::End();
+    ImGui::Begin("OpenGL");
+    ImGuiIO& io = ImGui::GetIO();
+    ImGui::Text("Hello Graphic! %.1f FPS", io.Framerate);  // Display current FPS
+    ImGui::End();
 
     return Application::drawScene(dt);
 }
