@@ -11,3 +11,8 @@ enum class Key : int32_t{
     Space
 };
 
+enum class KeyAction : int32_t{
+    None,
+    Press,
+    Release
+};

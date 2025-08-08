@@ -66,7 +66,7 @@ using namespace Constexpr;
 //     return app->run(nShowCmd);
 // }
 
-#include "Application.hpp"
+#include "App/GL/GLApp.hpp"
 #include <iostream>
 #include <chrono>
 #include <thread>
@@ -79,7 +79,7 @@ int main(int argc, char **argv) {
         200, 200 );
 
     // 创建窗口实例
-    Application app;
+    GLApp app;
     // 初始化应用
     app.init(props);
     return app.run();

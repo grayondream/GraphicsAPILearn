@@ -4,6 +4,7 @@ set(RENDER_TRACY_PATH "${RENDER_SOURCE_PATH}/Tracy" CACHE STRING "tracy file's p
 set(RENDER_BASE_PATH "${RENDER_SOURCE_PATH}/Base" CACHE STRING "base file's path")
 set(RENDER_CONFIG_PATH "${RENDER_SOURCE_PATH}/Config" CACHE STRING "config file's path")
 set(RENDER_NATIVE_PATH "${RENDER_SOURCE_PATH}/Native" CACHE STRING "native file's path")
+set(RENDER_UTILS_PATH "${RENDER_SOURCE_PATH}/Utils" CACHE STRING "utils file's path")
 
 set(PROJECT_NAME renderLearn)
 
@@ -25,7 +26,10 @@ add_executable(${PROJECT_NAME}
     ${RAPP_PATH}/main.cpp
     ${RAPP_PATH}/GLFWWindow.cpp
     ${RAPP_PATH}/Application.cpp
+    ${RENDER_UTILS_PATH}/EventUtils.cpp
+    ${RAPP_PATH}/GL/GLApp.cpp
     ${IMGUI_SRC_FILES}
+    ${GLAD_SRC_FILES}
 )
 
 include_directories(${RENDER_NATIVE_PATH})

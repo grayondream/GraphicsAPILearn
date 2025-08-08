@@ -30,7 +30,8 @@ public:
     virtual void onWindowResize(int width, int height);
     
 protected:
-    void render();
+    virtual bool initGraphics() { return true; }
+    virtual void render();
     virtual void clearColor() {}
     virtual void beginDrawScene();
     virtual void drawScene(const float dt){}
@@ -42,5 +43,4 @@ private:
     
 protected:
     std::unique_ptr<GLFWWindow> m_window{};
-    State m_state{};
 };

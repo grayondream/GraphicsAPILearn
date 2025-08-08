@@ -2,7 +2,9 @@
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
 #include <iostream>
+#include <glad/glad.h>
 #include <glfw/glfw3.h>
+#include "Base/Log.hpp"
 
 // 静态回调函数实现
 void GLFWWindow::staticKeyCallback(GLFWwindow* window, int key, int scancode, int action, int mods) {
@@ -186,6 +188,29 @@ GLFWWindow& GLFWWindow::updateFrameRate(float fs){
     glfwSetWindowTitle(m_window, newTitle.c_str());
     return *this;
 }
+
+bool GLFWWindow::initGLContext() {
+    if (!m_initialized) {
+        return true;
+    }
+
+    glfwMakeContextCurrent(m_window);
+    if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
+        LOGE("Failed to initialize GLAD");
+        return false;
+    }
+
+    return true;
+}
+
+GLFWWindow& GLFWWindow::swapBuffers() {
+    if (!m_initialized) {
+        return *this;
+    }
+    glfwSwapBuffers(m_window);
+    return *this;
+}
+
 
 // 轮询事件
 GLFWWindow& GLFWWindow::pollEvents() {

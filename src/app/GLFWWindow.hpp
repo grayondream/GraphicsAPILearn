@@ -28,10 +28,14 @@ public:
 
     // 窗口生命周期管理
     bool initialize();
-    GLFWWindow& shutdown();
 
+    GLFWWindow& shutdown();
+    bool initGLContext();
+    
     // 事件和帧管理
     GLFWWindow& pollEvents();
+    GLFWWindow& swapBuffers();
+
     GLFWWindow& beginFrame();
     GLFWWindow& endFrame();
 

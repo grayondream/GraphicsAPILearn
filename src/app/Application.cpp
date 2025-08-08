@@ -9,10 +9,10 @@
 #include "EH/ErrorHandle.hpp"
 #include "Base/Log.hpp"
 #include <imgui.h>
-
+#include "Utils/EventUtils.hpp"
 
 namespace eh = ErrorHandle;
-
+using namespace Utils::Event;
 Application::Application() {}
 
 Application::~Application() {
@@ -24,7 +24,7 @@ Application::~Application() {
 bool Application::init(const GLFWWindowProperties& properties){
     m_window = std::make_unique<GLFWWindow>(properties);
     if(!m_window->initialize()){
-        LOGI("GLFWWindow init failed");
+        LOGE("GLFWWindow init failed");
         return false;
     }
     
@@ -33,6 +33,11 @@ bool Application::init(const GLFWWindowProperties& properties){
     LOGI("Window properties: pos({}, {}), size({}, {})", properties.xPos, properties.yPos, properties.width, properties.height);
     m_window->setUserPointer(this);
     initInputEvent();
+    if(!initGraphics()){
+        LOGE("initGraphics failed");
+        return false;
+    }
+
     return true;
 }
 
@@ -55,6 +60,11 @@ static auto CalcWindowFrameRate() {
 
 void Application::onKeyPress(int key, int scancode, int action, int mods){
     LOGI("Key press: {}, {}, {}, {}", key, scancode, action, mods);
+    const auto keyCode = ConvertKeyCode(key);
+    const auto keyAction = ConvertKeyAction(action);
+    if(keyCode == Key::Esc && keyAction == KeyAction::Press){
+        exit();
+    }
 }
 
 void Application::onMouseMove(double x, double y){
