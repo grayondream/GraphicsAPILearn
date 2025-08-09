@@ -33,13 +33,11 @@ void GLBloomApp::initShapes() {
 	plane_->init();
 }
 
-bool GLBloomApp::init(const HINSTANCE inst, const WindowDesc& param) {
-	if (!GLApp::init(inst, param)) {
+bool GLBloomApp::initApp() {
+	if (!GLCameraBaseApp::initApp()) {
 		return false;
 	}
 	
-	_camera = Camera(glm::vec3(0.0f, 0.0f, 3.0f));
-	glViewport(0, 0, _attribute.winAttr.width, _attribute.winAttr.height);
 	createTextures();
 	compileShader();
 	initShapes();
@@ -186,12 +184,12 @@ void GLBloomApp::drawScene(const float dt) {
 		model = glm::translate(model, cubePositions[i]);
 		float angle = 20.0f * (i + 1) * curTime;
 		model = glm::rotate(model, glm::radians(angle), glm::vec3(1.0f, 0.3f, 0.5f));
-		_program.use();
-		_program.update("model", model);
-		_program.update("view", view);
-		_program.update("projection", projection);
+		_bloomProgram.use();
+		_bloomProgram.update("model", model);
+		_bloomProgram.update("view", view);
+		_bloomProgram.update("projection", projection);
 		brick_->texture()->bind(0);
-		_program.update("textureSampler", 0);
+		_bloomProgram.update("textureSampler", 0);
 		//glDrawArrays(GL_TRIANGLES, 0, 36);
 		glDrawElements(GL_TRIANGLES, cube_->idxSize(), GL_UNSIGNED_INT, 0);
 	}
@@ -203,61 +201,14 @@ void GLBloomApp::drawScene(const float dt) {
 		glm::mat4 model = glm::mat4(1.0f); // make sure to initialize matrix to identity matrix first
 
 		model = glm::translate(model, glm::vec3(0.0));
-		_program.use();
-		_program.update("model", model);
-		_program.update("view", view);
-		_program.update("projection", projection);
+		_bloomProgram.use();
+		_bloomProgram.update("model", model);
+		_bloomProgram.update("view", view);
+		_bloomProgram.update("projection", projection);
 		wood_->texture()->bind(0);
-		_program.update("textureSampler", 0);
+		_bloomProgram.update("textureSampler", 0);
 		//glDrawArrays(GL_TRIANGLES, 0, 36);
 		glDrawArrays(GL_TRIANGLES, 0, 6);
 	}
 	glBindVertexArray(0);
-}
-
-void GLBloomApp::onKeyBoardEvent(const UINT msg, const WPARAM wParam, const LPARAM lParam) {
-	switch (msg) {
-	case WM_KEYDOWN:
-		break;
-	case WM_KEYUP:
-		break;
-	case WM_CHAR:
-		const char ch = static_cast<char>(wParam);
-		switch (wParam) {
-		case 'w':
-			_camera.processKeyboardEvent(Camera::Movement::Forward, 0.5); break;
-		case 's':
-			_camera.processKeyboardEvent(Camera::Movement::Backward, 0.5); break;
-		case 'd':
-			_camera.processKeyboardEvent(Camera::Movement::Right, 0.5); break;
-		case 'a':
-			_camera.processKeyboardEvent(Camera::Movement::Left, 0.5); break;
-		}
-		break;
-	}
-
-	return GLApp::onKeyBoardEvent(msg, wParam, lParam);
-}
-
-void GLBloomApp::onMouseMove(WPARAM btnState, int x, int y) {
-	// 仅在鼠标被点击时处理移动事件
-	if (!_mouseClicked) {
-		return GLApp::onMouseMove(btnState, x, y);
-	}
-
-	// 计算偏移量
-	const float offx = x - _lastx;
-	const float offy = y - _lasty;
-
-	// 更新摄像机
-	_camera.processMouseMove(offx, offy);
-	_lastx = x;
-	_lasty = y;
-	return GLApp::onMouseMove(btnState, x, y);
-}
-
-void GLBloomApp::onMouseScroll(const UINT msg, const WPARAM wParam, const LPARAM lParam) {
-	int zDelta = GET_WHEEL_DELTA_WPARAM(wParam);
-	_camera.processMouseScrool(zDelta);
-	return GLApp::onMouseScroll(msg, wParam, lParam);
 }

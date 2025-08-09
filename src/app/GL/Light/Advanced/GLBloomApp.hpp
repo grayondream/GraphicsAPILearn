@@ -1,5 +1,5 @@
 #pragma once
-#include "App/GL/GLApp.hpp"
+#include "App/GL/Base/GLCameraBaseApp.hpp"
 #include "Native/GL/GLProgram.hpp"
 #include <memory>
 #include <array>
@@ -11,17 +11,13 @@
 class GLImageTexture2D;
 class GLPlane;
 class GLCube;
-class GLBloomApp : public GLApp {
+class GLBloomApp : public GLCameraBaseApp {
 public:
 	virtual ~GLBloomApp();
-public:
-	virtual bool init(const HINSTANCE, const WindowDesc& param) override;
 
 protected:
+	virtual bool initApp() override;
 	virtual void drawScene(const float dt);
-	virtual void onMouseMove(WPARAM btnState, int x, int y);
-	virtual void onMouseScroll(const UINT msg, const WPARAM wParam, const LPARAM lParam);
-	virtual void onKeyBoardEvent(const UINT msg, const WPARAM wParam, const LPARAM lParam) override;
 
 private:
 	void compileShader();
@@ -31,12 +27,7 @@ private:
 	
 private:
 	GLProgram _bloomProgram;
-
-	float _curTime{};
-	Camera _camera{};
-	bool _clicked{};
-	Point2D _lastPos{0.0, 0.0};
-	
+	float _curTime{};	
 	bool _enableHdr = true;
 	float _exposure = 0.5f;
 	std::shared_ptr<GLImageTexture2D> wood_{};

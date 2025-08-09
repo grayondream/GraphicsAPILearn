@@ -32,7 +32,7 @@ enum class AppType : int{
     CullFace,
     FrameBuffer,
     SkyBox,
-    AdvancedGLSL,
+    AdvancedShader,
     UniformBuffer,
     SimpleGeometry,
     Explode,

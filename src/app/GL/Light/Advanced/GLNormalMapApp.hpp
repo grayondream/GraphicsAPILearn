@@ -1,5 +1,5 @@
 #pragma once
-#include "App/GL/GLApp.hpp"
+#include "App/GL/Base/GLCameraBaseApp.hpp"
 #include "Native/GL/GLProgram.hpp"
 #include <memory>
 #include <array>
@@ -9,17 +9,13 @@
 #include "Geometry/Cube.hpp"
 
 class GLImageTexture2D;
-class GLNormalMapApp : public GLApp {
+class GLNormalMapApp : public GLCameraBaseApp {
 public:
 	virtual ~GLNormalMapApp();
-public:
-	virtual bool init(const HINSTANCE, const WindowDesc& param) override;
 
 protected:
+	virtual bool initApp() override;
 	virtual void drawScene(const float dt);
-	virtual void onMouseMove(WPARAM btnState, int x, int y);
-	virtual void onMouseScroll(const UINT msg, const WPARAM wParam, const LPARAM lParam);
-	virtual void onKeyBoardEvent(const UINT msg, const WPARAM wParam, const LPARAM lParam) override;
 
 private:
 	void compileShader();
@@ -27,11 +23,7 @@ private:
 
 private:
 	GLProgram _program;
-
 	float _curTime{};
-	Camera _camera{};
-	bool _clicked{};
-	Point2D _lastPos{0.0, 0.0};
 	unsigned int _vao{};
 	unsigned int _vbo{};
 	bool _enableNormalMap{};

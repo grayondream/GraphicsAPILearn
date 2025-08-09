@@ -67,14 +67,13 @@ void GLFrameBufferApp::loadTexture() {
 }
 
 void GLFrameBufferApp::initGLEnv() {
-	glViewport(0, 0, _attribute.winAttr.width, _attribute.winAttr.height);
 	//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 	glEnable(GL_DEPTH_TEST);
 	//glDepthFunc(GL_LESS);
 }
 
-bool GLFrameBufferApp::init(const HINSTANCE inst, const WindowDesc& param) {
-	if (!GLApp::init(inst, param)) {
+bool GLFrameBufferApp::initApp() {
+	if (!GLApp::initApp()) {
 		return false;
 	}
 
@@ -95,8 +94,8 @@ void GLFrameBufferApp::createFrameBuffer() {
 	glBindFramebuffer(GL_FRAMEBUFFER, frameBuffer);
 	glGenTextures(1, &frameTexture);
 	glBindTexture(GL_TEXTURE_2D, frameTexture);
-	const auto attr = _attribute.winAttr;
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, attr.width, attr.height, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
+	const auto prop = m_window->getProperties();
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, prop.width, prop.height, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, frameTexture, 0);
@@ -104,7 +103,7 @@ void GLFrameBufferApp::createFrameBuffer() {
 	unsigned int rbo{};
 	glGenRenderbuffers(1, &rbo);
 	glBindRenderbuffer(GL_RENDERBUFFER, rbo);
-	glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, attr.width, attr.height);
+	glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, prop.width, prop.height);
 	glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_FRAMEBUFFER, rbo);
 	auto ret = glCheckFramebufferStatus(GL_FRAMEBUFFER);
 	ErrorHandle::ExitIfFailed(ret == GL_FRAMEBUFFER_COMPLETE, "Failed to create frame buffer and bind it into render buffer");
@@ -209,14 +208,6 @@ void GLFrameBufferApp::createScreenBuffer() {
 	_screenVbo[1] = vbos[1];
 }
 
-void GLFrameBufferApp::clearColor() {
-	return GLApp::clearColor();
-}
-
-void GLFrameBufferApp::beginDrawScene() {
-	return GLApp::beginDrawScene();
-}
-
 static std::vector<glm::vec3> initializeCubePositions() {
 	std::vector<glm::vec3> positions;
 	float spacing = 1.1f; // ��������Ϊ 2.0f��ʹ�������������һ��
@@ -309,74 +300,4 @@ void GLFrameBufferApp::drawScene(const float dt) {
 	glBindVertexArray(0);
 	glEnable(GL_DEPTH_TEST);
 	return GLApp::drawScene(dt);
-}
-
-void GLFrameBufferApp::endDrawScene() {
-	return GLApp::endDrawScene();
-}
-
-void GLFrameBufferApp::onKeyBoardEvent(const UINT msg, const WPARAM wParam, const LPARAM lParam) {
-	switch (msg) {
-	case WM_KEYDOWN:
-		break;
-	case WM_KEYUP:
-		break;
-	case WM_CHAR:
-		const char ch = static_cast<char>(wParam);
-		switch (wParam) {
-		case 'w':
-			_camera.processKeyboardEvent(Camera::Movement::Forward, 0.5); break;
-		case 's':
-			_camera.processKeyboardEvent(Camera::Movement::Backward, 0.5); break;
-		case 'd':
-			_camera.processKeyboardEvent(Camera::Movement::Right, 0.5); break;
-		case 'a':
-			_camera.processKeyboardEvent(Camera::Movement::Left, 0.5); break;
-		}
-		break;
-	}
-
-	return GLApp::onKeyBoardEvent(msg, wParam, lParam);
-}
-
-void GLFrameBufferApp::onMouseDown(const UINT msg, WPARAM btnState, int x, int y) {
-	switch (msg) {
-	case WM_LBUTTONDOWN:
-		_mouseClicked = true; break;
-	}
-
-	return GLApp::onMouseDown(msg, btnState, x, y);
-}
-
-void GLFrameBufferApp::onMouseUp(const UINT msg, WPARAM btnState, int x, int y) {
-	switch (msg) {
-	case WM_LBUTTONUP:
-		_mouseClicked = false; break;
-	}
-
-	return GLApp::onMouseUp(msg, btnState, x, y);
-}
-
-void GLFrameBufferApp::onMouseMove(WPARAM btnState, int x, int y) {
-	if (!_mouseClicked) {
-		return GLApp::onMouseMove(btnState, x, y);
-	}
-
-	if (!_clicked) {
-		_clicked = true;
-		_lastPos = { (float)x, (float)y };
-		return GLApp::onMouseMove(btnState, x, y);
-	}
-
-	const float offx = x - _lastPos.x;
-	const float offy = y - _lastPos.y;
-	_camera.processMouseMove(offx, offy);
-	_lastPos = { (float)x, (float)y };
-	return GLApp::onMouseMove(btnState, x, y);
-}
-
-void GLFrameBufferApp::onMouseScroll(const UINT msg, const WPARAM wParam, const LPARAM lParam) {
-	int zDelta = GET_WHEEL_DELTA_WPARAM(wParam);
-	_camera.processMouseScrool(zDelta);
-	return GLApp::onMouseScroll(msg, wParam, lParam);
 }

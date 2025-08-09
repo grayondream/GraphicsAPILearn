@@ -25,8 +25,8 @@ GLCullFaceApp::~GLCullFaceApp() {
 	_program.destroy();
 }
 
-bool GLCullFaceApp::init(const HINSTANCE inst, const WindowDesc& param) {
-	if (!GLApp::init(inst, param)) {
+bool GLCullFaceApp::initApp() {
+	if (!GLApp::initApp()) {
 		return false;
 	}
 
@@ -40,8 +40,6 @@ bool GLCullFaceApp::init(const HINSTANCE inst, const WindowDesc& param) {
 }
 
 void GLCullFaceApp::initGLEnv() {
-	_camera = Camera(glm::vec3(0.0f, 0.0f, 1.0f), glm::vec3(0.0f, 1.0f, 0.0f), -90, 5);
-	glViewport(0, 0, _attribute.winAttr.width, _attribute.winAttr.height);
 	glEnable(GL_DEPTH_TEST);
 	glDepthFunc(GL_LESS);
 	glEnable(GL_BLEND);
@@ -149,14 +147,6 @@ void GLCullFaceApp::createPlaneBuffer() {
 	_planeVbo[0] = vbo[0], _planeVbo[1] = vbo[1];
 }
 
-void GLCullFaceApp::clearColor() {
-	return GLApp::clearColor();
-}
-
-void GLCullFaceApp::beginDrawScene() {
-	return GLApp::beginDrawScene();
-}
-
 static std::vector<glm::vec3> initializeCubePositions() {
 	std::vector<glm::vec3> positions;
 	float spacing = 1.1f; // ��������Ϊ 2.0f��ʹ�������������һ��
@@ -210,74 +200,4 @@ void GLCullFaceApp::drawScene(const float dt) {
 
 	glBindVertexArray(0);
 	return GLApp::drawScene(dt);
-}
-
-void GLCullFaceApp::endDrawScene() {
-	return GLApp::endDrawScene();
-}
-
-void GLCullFaceApp::onKeyBoardEvent(const UINT msg, const WPARAM wParam, const LPARAM lParam) {
-	switch (msg) {
-	case WM_KEYDOWN:
-		break;
-	case WM_KEYUP:
-		break;
-	case WM_CHAR:
-		const char ch = static_cast<char>(wParam);
-		switch (wParam) {
-		case 'w':
-			_camera.processKeyboardEvent(Camera::Movement::Forward, 0.5); break;
-		case 's':
-			_camera.processKeyboardEvent(Camera::Movement::Backward, 0.5); break;
-		case 'd':
-			_camera.processKeyboardEvent(Camera::Movement::Right, 0.5); break;
-		case 'a':
-			_camera.processKeyboardEvent(Camera::Movement::Left, 0.5); break;
-		}
-		break;
-	}
-
-	return GLApp::onKeyBoardEvent(msg, wParam, lParam);
-}
-
-void GLCullFaceApp::onMouseDown(const UINT msg, WPARAM btnState, int x, int y) {
-	switch (msg) {
-	case WM_LBUTTONDOWN:
-		_mouseClicked = true; break;
-	}
-
-	return GLApp::onMouseDown(msg, btnState, x, y);
-}
-
-void GLCullFaceApp::onMouseUp(const UINT msg, WPARAM btnState, int x, int y) {
-	switch (msg) {
-	case WM_LBUTTONUP:
-		_mouseClicked = false; break;
-	}
-
-	return GLApp::onMouseUp(msg, btnState, x, y);
-}
-
-void GLCullFaceApp::onMouseMove(WPARAM btnState, int x, int y) {
-	if (!_mouseClicked) {
-		return GLApp::onMouseMove(btnState, x, y);
-	}
-
-	if (!_clicked) {
-		_clicked = true;
-		_lastPos = { (float)x, (float)y };
-		return GLApp::onMouseMove(btnState, x, y);
-	}
-
-	const float offx = x - _lastPos.x;
-	const float offy = y - _lastPos.y;
-	_camera.processMouseMove(offx, offy);
-	_lastPos = { (float)x, (float)y };
-	return GLApp::onMouseMove(btnState, x, y);
-}
-
-void GLCullFaceApp::onMouseScroll(const UINT msg, const WPARAM wParam, const LPARAM lParam) {
-	int zDelta = GET_WHEEL_DELTA_WPARAM(wParam);
-	_camera.processMouseScrool(zDelta);
-	return GLApp::onMouseScroll(msg, wParam, lParam);
 }

@@ -29,13 +29,12 @@ GLPointLightShadowApp::~GLPointLightShadowApp() {
 	_shadowProgram.destroy();
 }
 
-bool GLPointLightShadowApp::init(const HINSTANCE inst, const WindowDesc& param) {
-	if (!GLApp::init(inst, param)) {
+bool GLPointLightShadowApp::initApp() {
+	if (!GLCameraBaseApp::initApp()) {
 		return false;
 	}
 	
 	_camera = Camera(glm::vec3(-1.f, 0.0f, 1.0f));
-	glViewport(0, 0, _attribute.winAttr.width, _attribute.winAttr.height);
 	{
 		const auto imgFile = join(StaticCollector::getImagePath(), "wood.png");
 		_texture = std::make_shared<GLImageTexture2D>(imgFile);
@@ -144,15 +143,6 @@ void GLPointLightShadowApp::createCubeBuffer() {
 	_cubeEbo = ebo;
 }
 
-
-void GLPointLightShadowApp::clearColor() {
-	return GLApp::clearColor();
-}
-
-void GLPointLightShadowApp::beginDrawScene() {
-	return GLApp::beginDrawScene();
-}
-
 void GLPointLightShadowApp::renderCube(GLProgram &program, const glm::mat4 &model, const int type){
 	program.use();
 	program.update("model", model);
@@ -256,7 +246,8 @@ void GLPointLightShadowApp::renderScene2FrameBuffer(GLProgram& program, const gl
 	}
 
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
-	glViewport(0, 0, _attribute.winAttr.width, _attribute.winAttr.height);
+	auto attr = m_window->getProperties();
+	glViewport(0, 0, attr.width, attr.height);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 }
 
@@ -302,55 +293,4 @@ void GLPointLightShadowApp::drawScene(const float dt) {
 	renderScene2FrameBuffer(_depthProgram,lightPos);
 	renderScene2Screen(_shadowProgram,lightPos);
 	return GLApp::drawScene(dt);
-}
-
-void GLPointLightShadowApp::endDrawScene() {
-	return GLApp::endDrawScene();
-}
-
-void GLPointLightShadowApp::onKeyBoardEvent(const UINT msg, const WPARAM wParam, const LPARAM lParam) {
-	switch (msg) {
-	case WM_KEYDOWN:
-		break;
-	case WM_KEYUP:
-		break;
-	case WM_CHAR:
-		const char ch = static_cast<char>(wParam);
-		switch (wParam) {
-		case 'w':
-			_camera.processKeyboardEvent(Camera::Movement::Forward, 0.5); break;
-		case 's':
-			_camera.processKeyboardEvent(Camera::Movement::Backward, 0.5); break;
-		case 'd':
-			_camera.processKeyboardEvent(Camera::Movement::Right, 0.5); break;
-		case 'a':
-			_camera.processKeyboardEvent(Camera::Movement::Left, 0.5); break;
-		}
-		break;
-	}
-
-	return GLApp::onKeyBoardEvent(msg, wParam, lParam);
-}
-
-void GLPointLightShadowApp::onMouseMove(WPARAM btnState, int x, int y) {
-	// 仅在鼠标被点击时处理移动事件
-	if (!_mouseClicked) {
-		return GLApp::onMouseMove(btnState, x, y);
-	}
-
-	// 计算偏移量
-	const float offx = x - _lastx;
-	const float offy = y - _lasty;
-
-	// 更新摄像机
-	_camera.processMouseMove(offx, offy);
-	_lastx = x;
-	_lasty = y;
-	return GLApp::onMouseMove(btnState, x, y);
-}
-
-void GLPointLightShadowApp::onMouseScroll(const UINT msg, const WPARAM wParam, const LPARAM lParam) {
-	int zDelta = GET_WHEEL_DELTA_WPARAM(wParam);
-	_camera.processMouseScrool(zDelta);
-	return GLApp::onMouseScroll(msg, wParam, lParam);
 }

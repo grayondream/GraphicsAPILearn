@@ -15,29 +15,29 @@
 #include "App/GL/Light/LightSource/GLLightSourceSpot.hpp"
 #include "App/GL/Light/LightSource/GLLightSourceMult.hpp"
 #include "App/GL/Model/GLLoadModelApp.hpp"
-// #include "App/GL/Advanced/GLDepthTestApp.hpp"
-// #include "App/GL/Advanced/GLTemplateTestApp.hpp"
-// #include "App/GL/Advanced/GLBlendApp.hpp"
-// #include "App/GL/Advanced/GLCullFaceApp.hpp"
-// #include "App/GL/Advanced/GLFrameBufferApp.hpp"
-// #include "App/GL/Advanced/GLSkyboxApp.hpp"
-// #include "App/GL/Advanced/GLAdvancedGLSLApp.hpp"
-// #include "App/GL/Advanced/GLUniformBufferApp.hpp"
-// #include "App/GL/Advanced/Geomtery/GLSimpleGemoteryApp.hpp"
-// #include "App/GL/Advanced/Geomtery/GLExplodeApp.hpp"
-// #include "App/GL/Advanced/Geomtery/GLNormalLine.hpp"
-// #include "App/GL/Advanced/Instance/GLMultieInstanceApp.hpp"
-// #include "App/GL/Advanced/Instance/GLSaturnApp.hpp"
-// #include "App/GL/Advanced/GLMsaaApp.hpp"
-// #include "App/GL/Light/Advanced/GLBlinnPhongApp.hpp"
-// #include "App/GL/Light/Advanced/GLGammaApp.hpp"
-// #include "App/GL/Light/Advanced/GLShadowMapApp.hpp"
-// #include "App/GL/Light/Advanced/GLShadowApp.hpp"
-// #include "App/GL/Light/Advanced/GLPointLightShadowApp.hpp"
-// #include "App/GL/Light/Advanced/GLNormalMapApp.hpp"
-// #include "App/GL/Light/Advanced/GLParallaxMapApp.hpp"
-// #include "App/GL/Light/Advanced/GLHdrApp.hpp"
-// #include "App/GL/Light/Advanced/GLBloomApp.hpp"
+#include "App/GL/Advanced/GLDepthTestApp.hpp"
+#include "App/GL/Advanced/GLTemplateTestApp.hpp"
+#include "App/GL/Advanced/GLBlendApp.hpp"
+#include "App/GL/Advanced/GLCullFaceApp.hpp"
+#include "App/GL/Advanced/GLFrameBufferApp.hpp"
+#include "App/GL/Advanced/GLSkyboxApp.hpp"
+#include "App/GL/Advanced/GLAdvancedGLSLApp.hpp"
+#include "App/GL/Advanced/GLUniformBufferApp.hpp"
+#include "App/GL/Advanced/Geomtery/GLSimpleGemoteryApp.hpp"
+#include "App/GL/Advanced/Geomtery/GLExplodeApp.hpp"
+#include "App/GL/Advanced/Geomtery/GLNormalLine.hpp"
+#include "App/GL/Advanced/Instance/GLMultieInstanceApp.hpp"
+#include "App/GL/Advanced/Instance/GLSaturnApp.hpp"
+#include "App/GL/Advanced/GLMsaaApp.hpp"
+#include "App/GL/Light/Advanced/GLBlinnPhongApp.hpp"
+#include "App/GL/Light/Advanced/GLGammaApp.hpp"
+#include "App/GL/Light/Advanced/GLShadowMapApp.hpp"
+#include "App/GL/Light/Advanced/GLShadowApp.hpp"
+#include "App/GL/Light/Advanced/GLPointLightShadowApp.hpp"
+#include "App/GL/Light/Advanced/GLNormalMapApp.hpp"
+#include "App/GL/Light/Advanced/GLParallaxMapApp.hpp"
+#include "App/GL/Light/Advanced/GLHdrApp.hpp"
+#include "App/GL/Light/Advanced/GLBloomApp.hpp"
 
 #include <memory>
 
@@ -75,52 +75,52 @@ std::shared_ptr<IApplication> GLAppFactory::create(const AppType type){
 			return std::make_shared<GLLightSourceMult>();
 		case AppType::LoadModel:
 			return std::make_shared<GLLoadModelApp>();
-		// case AppType::DepthTest:
-		// 	return std::make_shared<GLDepthTestApp>();
-		// case AppType::TemplateTest:
-		// 	return std::make_shared<GLTemplateTestApp>();
-		// case AppType::Blend:
-		// 	return std::make_shared<GLBlendApp>();
-		// case AppType::CullFace:
-		// 	return std::make_shared<GLCullFaceApp>();
-		// case AppType::FrameBuffer:
-		// 	return std::make_shared<GLFrameBufferApp>();
-		// case AppType::SkyBox:
-		// 	return std::make_shared<GLSkyboxApp>();
-		// case AppType::AdvancedGLSL:
-		// 	return std::make_shared<GLAdvancedGLSLApp>();
-		// case AppType::UniformBuffer:
-		// 	return std::make_shared<GLUniformBufferApp>();
-		// case AppType::SimpleGeometry:
-		// 	return std::make_shared<GLSimpleGemoteryApp>();
-		// case AppType::Explode:
-		// 	return std::make_shared<GLExplodeApp>();
-		// case AppType::NormalLine:
-		// 	return std::make_shared<GLNormalLine>();
-		// case AppType::MultiInstance:
-		// 	return std::make_shared<GLMultieInstanceApp>();
-		// case AppType::MultiInstance_Saturn:
-		// 	return std::make_shared<GLSaturnApp>();
-		// case AppType::Msaa:
-		// 	return std::make_shared<GLMsaaApp>();
-		// case AppType::BlinnPhong:
-		// 	return std::make_shared<GLBlinnPhongApp>();
-		// case AppType::Gamma:
-		// 	return std::make_shared<GLGammaApp>();
-		// case AppType::Shadow_Map:
-		// 	return std::make_shared<GLShadowMapApp>();
-		// case AppType::Shadow:
-		// 	return std::make_shared<GLShadowApp>();
-		// case AppType::Shadow_PointLight:
-		// 	return std::make_shared<GLPointLightShadowApp>();
-		// case AppType::NormalMap:
-		// 	return std::make_shared<GLNormalMapApp>();
-		// case AppType::ParallaxMap:
-		// 	return std::make_shared<GLParallaxMapApp>();
-		// case AppType::Hdr:
-		// 	return std::make_shared<GLHdrApp>();
-		// case AppType::Bloom:
-		// 	return std::make_shared<GLBloomApp>();
+		case AppType::DepthTest:
+			return std::make_shared<GLDepthTestApp>();
+		case AppType::TemplateTest:
+			return std::make_shared<GLTemplateTestApp>();
+		case AppType::Blend:
+			return std::make_shared<GLBlendApp>();
+		case AppType::CullFace:
+			return std::make_shared<GLCullFaceApp>();
+		case AppType::FrameBuffer:
+			return std::make_shared<GLFrameBufferApp>();
+		case AppType::SkyBox:
+			return std::make_shared<GLSkyboxApp>();
+		case AppType::AdvancedShader:
+			return std::make_shared<GLAdvancedGLSLApp>();
+		case AppType::UniformBuffer:
+			return std::make_shared<GLUniformBufferApp>();
+		case AppType::SimpleGeometry:
+			return std::make_shared<GLSimpleGemoteryApp>();
+		case AppType::Explode:
+			return std::make_shared<GLExplodeApp>();
+		case AppType::NormalLine:
+			return std::make_shared<GLNormalLine>();
+		case AppType::MultiInstance:
+			return std::make_shared<GLMultieInstanceApp>();
+		case AppType::MultiInstance_Saturn:
+			return std::make_shared<GLSaturnApp>();
+		case AppType::Msaa:
+			return std::make_shared<GLMsaaApp>();
+		case AppType::BlinnPhong:
+			return std::make_shared<GLBlinnPhongApp>();
+		case AppType::Gamma:
+			return std::make_shared<GLGammaApp>();
+		case AppType::Shadow_Map:
+			return std::make_shared<GLShadowMapApp>();
+		case AppType::Shadow:
+			return std::make_shared<GLShadowApp>();
+		case AppType::Shadow_PointLight:
+			return std::make_shared<GLPointLightShadowApp>();
+		case AppType::NormalMap:
+			return std::make_shared<GLNormalMapApp>();
+		case AppType::ParallaxMap:
+			return std::make_shared<GLParallaxMapApp>();
+		case AppType::Hdr:
+			return std::make_shared<GLHdrApp>();
+		case AppType::Bloom:
+			return std::make_shared<GLBloomApp>();
 			
 		default:
 			break;	

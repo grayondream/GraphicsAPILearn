@@ -140,17 +140,16 @@ static auto CreateRenderFrame(const int width, const int height){
 	return std::pair(colorBuffer, hdrFBO);
 }
 
-bool GLHdrApp::init(const HINSTANCE inst, const WindowDesc& param) {
-	if (!GLApp::init(inst, param)) {
+bool GLHdrApp::initApp() {
+	if (!GLCameraBaseApp::initApp()) {
 		return false;
 	}
 	
-	_camera = Camera(glm::vec3(0.0f, 0.0f, 3.0f));
-	glViewport(0, 0, _attribute.winAttr.width, _attribute.winAttr.height);
 	createTextures();
 	compileShader();
 	std::tie(_vao, _vbo) = CreateRectBuffer();
-	std::tie(_colorBuffer, _hdrFBO) = CreateRenderFrame(_attribute.winAttr.width, _attribute.winAttr.height);
+	auto attr = m_window->getProperties();
+	std::tie(_colorBuffer, _hdrFBO) = CreateRenderFrame(attr.width, attr.height);
 	std::tie(_screenVao, _screenVbo) = CreateScreenVao();
 	glEnable(GL_DEPTH_TEST);
 	//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
@@ -260,51 +259,4 @@ void GLHdrApp::drawScene(const float dt) {
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	render2FrameBuffer();
 	renderHdr();
-}
-
-void GLHdrApp::onKeyBoardEvent(const UINT msg, const WPARAM wParam, const LPARAM lParam) {
-	switch (msg) {
-	case WM_KEYDOWN:
-		break;
-	case WM_KEYUP:
-		break;
-	case WM_CHAR:
-		const char ch = static_cast<char>(wParam);
-		switch (wParam) {
-		case 'w':
-			_camera.processKeyboardEvent(Camera::Movement::Forward, 0.5); break;
-		case 's':
-			_camera.processKeyboardEvent(Camera::Movement::Backward, 0.5); break;
-		case 'd':
-			_camera.processKeyboardEvent(Camera::Movement::Right, 0.5); break;
-		case 'a':
-			_camera.processKeyboardEvent(Camera::Movement::Left, 0.5); break;
-		}
-		break;
-	}
-
-	return GLApp::onKeyBoardEvent(msg, wParam, lParam);
-}
-
-void GLHdrApp::onMouseMove(WPARAM btnState, int x, int y) {
-	// 仅在鼠标被点击时处理移动事件
-	if (!_mouseClicked) {
-		return GLApp::onMouseMove(btnState, x, y);
-	}
-
-	// 计算偏移量
-	const float offx = x - _lastx;
-	const float offy = y - _lasty;
-
-	// 更新摄像机
-	_camera.processMouseMove(offx, offy);
-	_lastx = x;
-	_lasty = y;
-	return GLApp::onMouseMove(btnState, x, y);
-}
-
-void GLHdrApp::onMouseScroll(const UINT msg, const WPARAM wParam, const LPARAM lParam) {
-	int zDelta = GET_WHEEL_DELTA_WPARAM(wParam);
-	_camera.processMouseScrool(zDelta);
-	return GLApp::onMouseScroll(msg, wParam, lParam);
 }

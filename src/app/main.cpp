@@ -32,7 +32,7 @@ using namespace Constexpr;
  *  CullFace                        Cull Face Test
  *  FrameBuffer                     Frame Buffer Test
  *  SkyBox                          Render a skybox around the camera
- *  AdvancedGLSL                    Advanced GLSL Test
+ *  AdvancedShader                    Advanced Shader Test
  *  UniformBuffer                   Uniform Buffer Test
  *  SimpleGeometry                  Simple Geometry Test
  *  Explode                         Explode Geometry Test
@@ -54,7 +54,7 @@ using namespace Constexpr;
 namespace EnumUtil = Utils::Enum;
 
 int main(int argc, char **argv) {
-    auto type = AppType::LoadModel;
+    auto type = AppType::Hdr;
     auto api = GraphicsType::GL;
     LOGI("Start Graphics Learn!!!");
     LOGI("Select {} Application, Render App With {} API", EnumUtil::EnumName(type), EnumUtil::EnumName(api));

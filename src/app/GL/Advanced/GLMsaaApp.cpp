@@ -26,13 +26,11 @@ GLMsaaApp::~GLMsaaApp() {
 	_program.destroy();
 }
 
-bool GLMsaaApp::init(const HINSTANCE inst, const WindowDesc& param) {
-	if (!GLApp::init(inst, param)) {
+bool GLMsaaApp::initApp() {
+	if (!GLApp::initApp()) {
 		return false;
 	}
 	
-	_camera = Camera(glm::vec3(0.0f, 0.0f, 3.0f));
-	glViewport(0, 0, _attribute.winAttr.width, _attribute.winAttr.height);
 	{
 		const auto vfile = join(StaticCollector::getGLShaderPath(), "Advanced", "MSAA", "Cube.vs");
 		const auto ffile = join(StaticCollector::getGLShaderPath(), "Advanced", "MSAA", "Cube.fs");
@@ -129,8 +127,8 @@ void GLMsaaApp::createFrameBuffer() {
     glGenFramebuffers(1, &framebuffer);
     glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
 
-	const auto attr = _attribute.winAttr;
-	const auto width = attr.width, height = attr.height;
+	const auto prop = m_window->getProperties();
+	const auto width = prop.width, height = prop.height;
 	unsigned int textureColorBufferMultiSampled;
     glGenTextures(1, &textureColorBufferMultiSampled);
     glBindTexture(GL_TEXTURE_2D_MULTISAMPLE, textureColorBufferMultiSampled);
@@ -160,8 +158,8 @@ void GLMsaaApp::createPostFrameBuffer() {
     glGenFramebuffers(1, &intermediateFBO);
     glBindFramebuffer(GL_FRAMEBUFFER, intermediateFBO);
 
-	const auto attr = _attribute.winAttr;
-	const auto width = attr.width, height = attr.height;
+	const auto prop = m_window->getProperties();
+	const auto width = prop.width, height = prop.height;
     // create a color attachment texture
     unsigned int screenTexture;
     glGenTextures(1, &screenTexture);
@@ -178,10 +176,6 @@ void GLMsaaApp::createPostFrameBuffer() {
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	_postFrameBuffer = intermediateFBO;
 	_postTexture = screenTexture;
-}
-
-void GLMsaaApp::clearColor() {
-	return GLApp::clearColor();
 }
 
 void GLMsaaApp::beginDrawScene() {
@@ -219,7 +213,7 @@ void GLMsaaApp::drawFrameBufferMssa() {
 		glBindVertexArray(0);
 	}
 
-	const auto attr = _attribute.winAttr;
+	const auto attr = m_window->getProperties();
 	const auto width = attr.width, height = attr.height;
 	glBindFramebuffer(GL_READ_FRAMEBUFFER, _screenFrameBuffer);
 	glBindFramebuffer(GL_DRAW_FRAMEBUFFER, _postFrameBuffer);
@@ -281,74 +275,4 @@ void GLMsaaApp::drawScene(const float dt) {
 	}
 	
 	return GLApp::drawScene(dt);
-}
-
-void GLMsaaApp::endDrawScene() {
-	return GLApp::endDrawScene();
-}
-
-void GLMsaaApp::onKeyBoardEvent(const UINT msg, const WPARAM wParam, const LPARAM lParam) {
-	switch (msg) {
-	case WM_KEYDOWN:
-		break;
-	case WM_KEYUP:
-		break;
-	case WM_CHAR:
-		const char ch = static_cast<char>(wParam);
-		switch (wParam) {
-		case 'w':
-			_camera.processKeyboardEvent(Camera::Movement::Forward, 0.5); break;
-		case 's':
-			_camera.processKeyboardEvent(Camera::Movement::Backward, 0.5); break;
-		case 'd':
-			_camera.processKeyboardEvent(Camera::Movement::Right, 0.5); break;
-		case 'a':
-			_camera.processKeyboardEvent(Camera::Movement::Left, 0.5); break;
-		}
-		break;
-	}
-
-	return GLApp::onKeyBoardEvent(msg, wParam, lParam);
-}
-
-void GLMsaaApp::onMouseDown(const UINT msg, WPARAM btnState, int x, int y) {
-	switch (msg) {
-	case WM_LBUTTONDOWN:
-		_mouseClicked = true; break;
-	}
-	
-	return GLApp::onMouseDown(msg, btnState, x, y);
-}
-
-void GLMsaaApp::onMouseUp(const UINT msg, WPARAM btnState, int x, int y) {
-	switch (msg) {
-	case WM_LBUTTONUP:
-		_mouseClicked = false; break;
-	}
-	
-	return GLApp::onMouseUp(msg, btnState, x, y);
-}
-
-void GLMsaaApp::onMouseMove(WPARAM btnState, int x, int y) {
-	if (!_mouseClicked) {
-		return GLApp::onMouseMove(btnState, x, y);
-	}
-
-	if (!_clicked) {
-		_clicked = true;
-		_lastPos = { (float)x, (float)y };
-		return GLApp::onMouseMove(btnState, x, y);
-	}
-
-	const float offx = x - _lastPos.x;
-	const float offy = y - _lastPos.y;
-	_camera.processMouseMove(offx, offy);
-	_lastPos = { (float)x, (float)y };
-	return GLApp::onMouseMove(btnState, x, y);
-}
-
-void GLMsaaApp::onMouseScroll(const UINT msg, const WPARAM wParam, const LPARAM lParam) {
-	int zDelta = GET_WHEEL_DELTA_WPARAM(wParam);
-	_camera.processMouseScrool(zDelta);
-	return GLApp::onMouseScroll(msg, wParam, lParam);
 }

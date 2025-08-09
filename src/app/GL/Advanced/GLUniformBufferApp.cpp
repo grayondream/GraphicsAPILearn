@@ -26,13 +26,11 @@ GLUniformBufferApp::~GLUniformBufferApp() {
 	}
 }
 
-bool GLUniformBufferApp::init(const HINSTANCE inst, const WindowDesc& param) {
-	if (!GLApp::init(inst, param)) {
+bool GLUniformBufferApp::initApp() {
+	if (!GLCameraBaseApp::initApp()) {
 		return false;
 	}
 	
-	_camera = Camera(glm::vec3(0.0f, 0.0f, 3.0f));
-	glViewport(0, 0, _attribute.winAttr.width, _attribute.winAttr.height);
 	const auto vfile = join(StaticCollector::getGLShaderPath(), "Advanced", "UniformBuffer", "Cube.vert");
 	const auto ffile = join(StaticCollector::getGLShaderPath(), "Advanced", "UniformBuffer", "Cube.frag");
 	for(int i = 0;i < 4;i ++) {
@@ -101,14 +99,6 @@ unsigned int GLUniformBufferApp::createUniformBuffer() {
 	return uboMatrices;
 }
 
-void GLUniformBufferApp::clearColor() {
-	return GLApp::clearColor();
-}
-
-void GLUniformBufferApp::beginDrawScene() {
-	return GLApp::beginDrawScene();
-}
-
 void GLUniformBufferApp::drawScene(const float dt) {
 	glBindVertexArray(_vao);
 	ImGui::Begin("OpenGL");
@@ -145,74 +135,4 @@ void GLUniformBufferApp::drawScene(const float dt) {
 
 	glBindVertexArray(0);
 	return GLApp::drawScene(dt);
-}
-
-void GLUniformBufferApp::endDrawScene() {
-	return GLApp::endDrawScene();
-}
-
-void GLUniformBufferApp::onKeyBoardEvent(const UINT msg, const WPARAM wParam, const LPARAM lParam) {
-	switch (msg) {
-	case WM_KEYDOWN:
-		break;
-	case WM_KEYUP:
-		break;
-	case WM_CHAR:
-		const char ch = static_cast<char>(wParam);
-		switch (wParam) {
-		case 'w':
-			_camera.processKeyboardEvent(Camera::Movement::Forward, 0.5); break;
-		case 's':
-			_camera.processKeyboardEvent(Camera::Movement::Backward, 0.5); break;
-		case 'd':
-			_camera.processKeyboardEvent(Camera::Movement::Right, 0.5); break;
-		case 'a':
-			_camera.processKeyboardEvent(Camera::Movement::Left, 0.5); break;
-		}
-		break;
-	}
-
-	return GLApp::onKeyBoardEvent(msg, wParam, lParam);
-}
-
-void GLUniformBufferApp::onMouseDown(const UINT msg, WPARAM btnState, int x, int y) {
-	switch (msg) {
-	case WM_LBUTTONDOWN:
-		_mouseClicked = true; break;
-	}
-	
-	return GLApp::onMouseDown(msg, btnState, x, y);
-}
-
-void GLUniformBufferApp::onMouseUp(const UINT msg, WPARAM btnState, int x, int y) {
-	switch (msg) {
-	case WM_LBUTTONUP:
-		_mouseClicked = false; break;
-	}
-	
-	return GLApp::onMouseUp(msg, btnState, x, y);
-}
-
-void GLUniformBufferApp::onMouseMove(WPARAM btnState, int x, int y) {
-	if (!_mouseClicked) {
-		return GLApp::onMouseMove(btnState, x, y);
-	}
-
-	if (!_clicked) {
-		_clicked = true;
-		_lastPos = { (float)x, (float)y };
-		return GLApp::onMouseMove(btnState, x, y);
-	}
-
-	const float offx = x - _lastPos.x;
-	const float offy = y - _lastPos.y;
-	_camera.processMouseMove(offx, offy);
-	_lastPos = { (float)x, (float)y };
-	return GLApp::onMouseMove(btnState, x, y);
-}
-
-void GLUniformBufferApp::onMouseScroll(const UINT msg, const WPARAM wParam, const LPARAM lParam) {
-	int zDelta = GET_WHEEL_DELTA_WPARAM(wParam);
-	_camera.processMouseScrool(zDelta);
-	return GLApp::onMouseScroll(msg, wParam, lParam);
 }

@@ -1,6 +1,6 @@
 
 #pragma once
-#include "App/GL/GLApp.hpp"
+#include "App/GL/Base/GLCameraBaseApp.hpp"
 #include "Native/GL/GLProgram.hpp"
 #include <memory>
 #include <array>
@@ -9,24 +9,15 @@
 
 class GLImageTexture2D;
 class GLImageTexture3D;
-class GLSkyboxApp : public GLApp {
+class GLSkyboxApp : public GLCameraBaseApp {
 public:
 	virtual ~GLSkyboxApp();
-public:
-	virtual bool init(const HINSTANCE, const WindowDesc& param) override;
 
-protected:
-	virtual void clearColor();
+	protected:
+	virtual bool initApp() override;
 	virtual void beginDrawScene();
 	virtual void drawScene(const float dt);
-	virtual void endDrawScene();
-
-	virtual void onMouseDown(const UINT msg, WPARAM btnState, int x, int y);
-	virtual void onMouseUp(const UINT msg, WPARAM btnState, int x, int y);
-	virtual void onMouseMove(WPARAM btnState, int x, int y);
-	virtual void onMouseScroll(const UINT msg, const WPARAM wParam, const LPARAM lParam);
-	virtual void onKeyBoardEvent(const UINT msg, const WPARAM wParam, const LPARAM lParam) override;
-
+	
 private:
 	void createVertexBuffer();
 	void drawCube();
@@ -42,10 +33,6 @@ private:
 	unsigned int _skyVao{};
 	unsigned int _skyVbo{};
 	float _curTime{};
-	Camera _camera{};
-	bool _clicked{};
-	bool _mouseClicked{ false };
 	bool _enableReflect{};
 	bool _enableRefraction{};
-	Point2D _lastPos{0.0, 0.0};
 };
