@@ -5,68 +5,19 @@ set(ALL_CPP_FILES ${ALL_CPP_FILES} ${APP_CPP_FILES} CACHE STRING "all source fil
 set(ALL_HPP_FILES ${ALL_HPP_FILES} ${APP_HPP_FILES} CACHE STRING "all header files" FORCE)
 
 if(ENABLE_OPENGL)
-    file(GLOB APP_OPENGL_CPP_FILES "GL/*.cpp")
-    file(GLOB APP_OPENGL_HPP_FILES "GL/*.hpp")
+    file(GLOB_RECURSE APP_OPENGL_CPP_FILES "GL/*.cpp")
+    file(GLOB_RECURSE APP_OPENGL_HPP_FILES "GL/*.hpp")
     set(ALL_CPP_FILES ${ALL_CPP_FILES} ${APP_OPENGL_CPP_FILES} CACHE STRING "all source files" FORCE)
     set(ALL_HPP_FILES ${ALL_HPP_FILES} ${APP_OPENGL_HPP_FILES} CACHE STRING "all header files" FORCE)
 endif()
 
 if(ENABLE_DX11)
-    file(GLOB APP_DX11_CPP_FILES "DX11/*.cpp")
-    file(GLOB APP_DX11_HPP_FILES "DX11/*.hpp")
+    file(GLOB_RECURSE APP_DX11_CPP_FILES "DX11/*.cpp")
+    file(GLOB_RECURSE APP_DX11_HPP_FILES "DX11/*.hpp")
     set(ALL_CPP_FILES ${ALL_CPP_FILES} ${APP_DX11_CPP_FILES} CACHE STRING "all source files" FORCE)
     set(ALL_HPP_FILES ${ALL_HPP_FILES} ${APP_DX11_HPP_FILES} CACHE STRING "all header files" FORCE)
 endif()
 
-set(EXTRAC_APP_FILES "${CMAKE_SOURCE_DIR}/Src/App/GL/Base/GLTriangleApp.cpp"
-                     "${CMAKE_SOURCE_DIR}/Src/App/GL/Base/GLRectApp.cpp"
-                     "${CMAKE_SOURCE_DIR}/Src/App/GL/Base/GLSimpleTextureApp.cpp"
-                     "${CMAKE_SOURCE_DIR}/Src/App/GL/Base/GLCubeApp.cpp"
-                     "${CMAKE_SOURCE_DIR}/Src/App/GL/Base/GLCameraApp.cpp"
-                     "${CMAKE_SOURCE_DIR}/Src/App/GL/Base/GLCameraBaseApp.cpp"
-
-                     "${CMAKE_SOURCE_DIR}/Src/App/GL/Light/LightSource/GLLightSourcePoint.cpp"
-                     "${CMAKE_SOURCE_DIR}/Src/App/GL/Light/LightSource/GLLightSourceSpot.cpp"
-                     "${CMAKE_SOURCE_DIR}/Src/App/GL/Light/LightSource/GLLightSourceDirection.cpp"
-                     "${CMAKE_SOURCE_DIR}/Src/App/GL/Light/LightSource/GLLightSourceMult.cpp"
-
-                     "${CMAKE_SOURCE_DIR}/Src/App/GL/Light/GLSimpleLightAmbination.cpp"
-                     "${CMAKE_SOURCE_DIR}/Src/App/GL/Light/GLSimpleLightDiffuse.cpp"
-                     "${CMAKE_SOURCE_DIR}/Src/App/GL/Light/GLSimpleLightSpecular.cpp"
-                     "${CMAKE_SOURCE_DIR}/Src/App/GL/Light/GLSimpleLightMap.cpp"
-                     "${CMAKE_SOURCE_DIR}/Src/App/GL/Light/GLSimpleLightMaterial.cpp"
-
-                     "${CMAKE_SOURCE_DIR}/Src/App/GL/Model/GLLoadModelApp.cpp"
-
-                     "${CMAKE_SOURCE_DIR}/Src/App/GL/Advanced/GLDepthTestApp.cpp"
-                     "${CMAKE_SOURCE_DIR}/Src/App/GL/Advanced/GLTemplateTestApp.cpp"
-                     "${CMAKE_SOURCE_DIR}/Src/App/GL/Advanced/GLBlendApp.cpp"
-                     "${CMAKE_SOURCE_DIR}/Src/App/GL/Advanced/GLCullFaceApp.cpp"
-                     "${CMAKE_SOURCE_DIR}/Src/App/GL/Advanced/GLFrameBufferApp.cpp"
-                     "${CMAKE_SOURCE_DIR}/Src/App/GL/Advanced/GLSkyboxApp.cpp"
-                     "${CMAKE_SOURCE_DIR}/Src/App/GL/Advanced/GLAdvancedGLSLApp.cpp"
-                     "${CMAKE_SOURCE_DIR}/Src/App/GL/Advanced/GLUniformBufferApp.cpp"
-                     
-                     "${CMAKE_SOURCE_DIR}/Src/App/GL/Advanced/Geomtery/GLSimpleGemoteryApp.cpp"
-                     "${CMAKE_SOURCE_DIR}/Src/App/GL/Advanced/Geomtery/GLExplodeApp.cpp"
-                     "${CMAKE_SOURCE_DIR}/Src/App/GL/Advanced/Geomtery/GLNormalLine.cpp"
-                     "${CMAKE_SOURCE_DIR}/Src/App/GL/Advanced/Instance/GLMultieInstanceApp.cpp"
-                     "${CMAKE_SOURCE_DIR}/Src/App/GL/Advanced/Instance/GLSaturnApp.cpp"
-                     "${CMAKE_SOURCE_DIR}/Src/App/GL/Advanced/GLMsaaApp.cpp"
-
-                     "${CMAKE_SOURCE_DIR}/Src/App/GL/Light/Advanced/GLBlinnPhongApp.cpp"
-                     "${CMAKE_SOURCE_DIR}/Src/App/GL/Light/Advanced/GLGammaApp.cpp"
-                     "${CMAKE_SOURCE_DIR}/Src/App/GL/Light/Advanced/GLShadowMapApp.cpp"
-                     "${CMAKE_SOURCE_DIR}/Src/App/GL/Light/Advanced/GLShadowApp.cpp"
-                     "${CMAKE_SOURCE_DIR}/Src/App/GL/Light/Advanced/GLPointLightShadowApp.cpp"
-                     "${CMAKE_SOURCE_DIR}/Src/App/GL/Light/Advanced/GLNormalMapApp.cpp"
-                     "${CMAKE_SOURCE_DIR}/Src/App/GL/Light/Advanced/GLParallaxMapApp.cpp"
-                     "${CMAKE_SOURCE_DIR}/Src/App/GL/Light/Advanced/GLHdrApp.cpp"
-                     "${CMAKE_SOURCE_DIR}/Src/App/GL/Light/Advanced/GLBloomApp.cpp"
-
-                     )
-
-set(ALL_CPP_FILES ${ALL_CPP_FILES} ${EXTRAC_APP_FILES} CACHE STRING "all source files" FORCE)
 
 
 
