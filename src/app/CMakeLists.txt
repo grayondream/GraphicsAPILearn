@@ -17,3 +17,16 @@ if(ENABLE_DX11)
     set(ALL_CPP_FILES ${ALL_CPP_FILES} ${APP_DX11_CPP_FILES} CACHE STRING "all source files" FORCE)
     set(ALL_HPP_FILES ${ALL_HPP_FILES} ${APP_DX11_HPP_FILES} CACHE STRING "all header files" FORCE)
 endif()
+
+set(EXTRAC_APP_FILES "${CMAKE_SOURCE_DIR}/Src/App/GL/Base/GLTriangleApp.cpp"
+                     "${CMAKE_SOURCE_DIR}/Src/App/GL/Base/GLRectApp.cpp"
+                     "${CMAKE_SOURCE_DIR}/Src/App/GL/Base/GLSimpleTextureApp.cpp"
+                     "${CMAKE_SOURCE_DIR}/Src/App/GL/Base/GLCubeApp.cpp"
+                     "${CMAKE_SOURCE_DIR}/Src/App/GL/Base/GLCameraApp.cpp"
+                     "${CMAKE_SOURCE_DIR}/Src/App/GL/Base/GLCameraBaseApp.cpp"
+                     )
+
+set(ALL_CPP_FILES ${ALL_CPP_FILES} ${EXTRAC_APP_FILES} CACHE STRING "all source files" FORCE)
+
+
+

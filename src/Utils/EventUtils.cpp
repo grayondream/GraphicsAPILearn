@@ -24,6 +24,22 @@ namespace Event{
         }
     }
 
+    MouseButton ConvertMouseButton(int button){
+        switch(button){
+            case GLFW_MOUSE_BUTTON_LEFT: return MouseButton::Left;
+            case GLFW_MOUSE_BUTTON_RIGHT: return MouseButton::Right;
+            case GLFW_MOUSE_BUTTON_MIDDLE: return MouseButton::Middle;
+            default: return MouseButton::None;
+        }
+    }
+
+    MouseAction ConvertMouseAction(int action){
+        switch(action){
+            case GLFW_PRESS: return MouseAction::Press;
+            case GLFW_RELEASE: return MouseAction::Release;
+            default: return MouseAction::None;
+        }
+    }
 
 }
 }

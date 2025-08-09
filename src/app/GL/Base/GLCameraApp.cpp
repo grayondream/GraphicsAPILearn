@@ -2,18 +2,21 @@
 #include "Native/GL/GLProgram.hpp"
 #include "Base/StaticCollector.hpp"
 #include "Base/ErrorHandle.hpp"
-#include "glad/glad.h"
+#include "Base/Log.hpp"
 #include "Geometry/Cube.hpp"
 #include "Native/GL/GLImageTexture2D.hpp"
+#include "Utils/FileUtils.hpp"
+#include "Utils/EventUtils.hpp"
+#include "Base/Log.hpp"
+#include <glad/glad.h>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
-#include "Base/Log.hpp"
-#include "imgui.h"
-#include <Utils/FileUtils.hpp>
+#include <imgui.h>
+
 using FileUtils::join;
 using namespace ErrorHandle;
-
+using namespace Utils::Event;
 GLCameraApp::~GLCameraApp() {
 	if (_vao != 0) {
 		glDeleteVertexArrays(1, &_vao);
@@ -23,13 +26,10 @@ GLCameraApp::~GLCameraApp() {
 	_program.destroy();
 }
 
-bool GLCameraApp::init(const HINSTANCE inst, const WindowDesc& param) {
-	if (!GLApp::init(inst, param)) {
-		return false;
-	}
-	
-	_camera = Camera(glm::vec3(0.0f, 0.0f, 3.0f));
-	glViewport(0, 0, _attribute.winAttr.width, _attribute.winAttr.height);
+bool GLCameraApp::initApp() {
+	GLCameraBaseApp::initApp();
+	auto prop = m_window->getProperties();
+	glViewport(0, 0, prop.width, prop.height);
 	const auto vfile = join(StaticCollector::getGLShaderPath(), "Base", "Cube.vert");
 	const auto ffile = join(StaticCollector::getGLShaderPath(), "Base", "Cube.frag");
 	auto ret = _program.init(vfile, ffile);
@@ -71,10 +71,6 @@ void GLCameraApp::createVertexBuffer() {
 	glBindVertexArray(0);
 	_vao = vao;
 	_vbo[0] = vbo[0], _vbo[1] = vbo[1];
-}
-
-void GLCameraApp::clearColor() {
-	return GLApp::clearColor();
 }
 
 void GLCameraApp::beginDrawScene() {
@@ -121,74 +117,4 @@ void GLCameraApp::drawScene(const float dt) {
 
 	glBindVertexArray(0);
 	return GLApp::drawScene(dt);
-}
-
-void GLCameraApp::endDrawScene() {
-	return GLApp::endDrawScene();
-}
-
-void GLCameraApp::onKeyBoardEvent(const UINT msg, const WPARAM wParam, const LPARAM lParam) {
-	switch (msg) {
-	case WM_KEYDOWN:
-		break;
-	case WM_KEYUP:
-		break;
-	case WM_CHAR:
-		const char ch = static_cast<char>(wParam);
-		switch (wParam) {
-		case 'w':
-			_camera.processKeyboardEvent(Camera::Movement::Forward, 0.5); break;
-		case 's':
-			_camera.processKeyboardEvent(Camera::Movement::Backward, 0.5); break;
-		case 'd':
-			_camera.processKeyboardEvent(Camera::Movement::Right, 0.5); break;
-		case 'a':
-			_camera.processKeyboardEvent(Camera::Movement::Left, 0.5); break;
-		}
-		break;
-	}
-
-	return GLApp::onKeyBoardEvent(msg, wParam, lParam);
-}
-
-void GLCameraApp::onMouseDown(const UINT msg, WPARAM btnState, int x, int y) {
-	switch (msg) {
-	case WM_LBUTTONDOWN:
-		_mouseClicked = true; break;
-	}
-	
-	return GLApp::onMouseDown(msg, btnState, x, y);
-}
-
-void GLCameraApp::onMouseUp(const UINT msg, WPARAM btnState, int x, int y) {
-	switch (msg) {
-	case WM_LBUTTONUP:
-		_mouseClicked = false; break;
-	}
-	
-	return GLApp::onMouseUp(msg, btnState, x, y);
-}
-
-void GLCameraApp::onMouseMove(WPARAM btnState, int x, int y) {
-	if (!_mouseClicked) {
-		return GLApp::onMouseMove(btnState, x, y);
-	}
-
-	if (!_clicked) {
-		_clicked = true;
-		_lastPos = { (float)x, (float)y };
-		return GLApp::onMouseMove(btnState, x, y);
-	}
-
-	const float offx = x - _lastPos.x;
-	const float offy = y - _lastPos.y;
-	_camera.processMouseMove(offx, offy);
-	_lastPos = { (float)x, (float)y };
-	return GLApp::onMouseMove(btnState, x, y);
-}
-
-void GLCameraApp::onMouseScroll(const UINT msg, const WPARAM wParam, const LPARAM lParam) {
-	int zDelta = GET_WHEEL_DELTA_WPARAM(wParam);
-	_camera.processMouseScrool(zDelta);
-	return GLApp::onMouseScroll(msg, wParam, lParam);
 }

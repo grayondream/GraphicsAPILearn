@@ -9,10 +9,10 @@ class GLCube;
 class GLCubeApp : public GLApp {
 public:
 	virtual ~GLCubeApp();
-public:
-	virtual bool init(const HINSTANCE, const WindowDesc& param) override;
 
 protected:
+	virtual bool initApp() override;
+
 	virtual void clearColor();
 	virtual void beginDrawScene();
 	virtual void drawScene(const float dt);

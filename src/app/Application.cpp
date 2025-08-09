@@ -42,7 +42,17 @@ bool Application::init(const GLFWWindowProperties& properties){
         return false;
     }
 
+    if(!initApp()){
+        LOGE("initApp failed");
+        return false;
+    }
+    
     return true;
+}
+
+float Application::aspectRatio() const {
+    const auto prop = m_window->getProperties();
+    return static_cast<float>(prop.width) / static_cast<float>(prop.height);
 }
 
 static auto CalcWindowFrameRate() {
@@ -127,7 +137,11 @@ void Application::exit() {
 void Application::render() {
     beginDrawScene();
     m_imguiWindow->newFrame();
-    drawScene(0.0);
+    static auto lastTime = std::chrono::high_resolution_clock::now();
+    auto currentTime = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<float> elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(currentTime - lastTime);
+    drawScene(elapsed.count());
+    lastTime = currentTime;
     m_imguiWindow->render();
     endDrawScene();
 }

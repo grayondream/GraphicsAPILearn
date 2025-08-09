@@ -18,7 +18,6 @@ add_subdirectory(${RENDER_MODEL_PATH})
 add_subdirectory(${RENDER_GEOMETRY_PATH})
 
 message(STATUS "All source files: ${ALL_CPP_FILES}")
-message(STATUS "All header files: ${ALL_HPP_FILES}")
 
 add_executable(${PROJECT_NAME}
     ${ALL_CPP_FILES}

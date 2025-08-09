@@ -51,36 +51,21 @@ using namespace Constexpr;
  *  Bloom                           rende bloom light
  */
 
-// namespace EnumUtil = Utils::Enum;
-
-// int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nShowCmd) {
-//     ConsoleDebugger consoleDebugger{};
-    
-//     auto type = AppType::Bloom;
-//     auto api = GraphicsType::GL;
-//     LOGI("Start Graphics Learn!!!");
-//     LOGI("Select {} Application, Render App With {} API", EnumUtil::EnumName(type), EnumUtil::EnumName(api));
-//     auto app = AppFactory::create(api, type);
-//     assert(app);
-//     app->init(hInstance, { {GetWindowWidth(), GetWindowHeight(), "Hello Grapgic!"}, GetEnableMsaa()});
-//     return app->run(nShowCmd);
-// }
-
-#include "App/GL/GLApp.hpp"
-#include <iostream>
-#include <chrono>
-#include <thread>
+namespace EnumUtil = Utils::Enum;
 
 int main(int argc, char **argv) {
-    // 配置窗口属性
+    auto type = AppType::Camera;
+    auto api = GraphicsType::GL;
+    LOGI("Start Graphics Learn!!!");
+    LOGI("Select {} Application, Render App With {} API", EnumUtil::EnumName(type), EnumUtil::EnumName(api));
+    auto app = AppFactory::create(api, type);
+    assert(app);
+
     GLFWWindowProperties props(
         "Pure Window (No Graphics API)",
         800, 600,  // 宽高
         200, 200 );
-
-    // 创建窗口实例
-    GLApp app;
-    // 初始化应用
-    app.init(props);
-    return app.run();
+    props.title = "Hello Graphics!";
+    app->init(props);
+    return app->run();
 }

@@ -16,11 +16,7 @@ GLRectApp::~GLRectApp() {
 	_program.destroy();
 }
 
-bool GLRectApp::init(const HINSTANCE inst, const WindowDesc& param) {
-	if (!GLApp::init(inst, param)) {
-		return false;
-	}
-
+bool GLRectApp::initApp() {
 	const auto vfile = join(StaticCollector::getGLShaderPath(), "Base", "rect.vert");
 	const auto ffile = join(StaticCollector::getGLShaderPath(), "Base", "rect.frag");
 	auto ret = _program.init(vfile, ffile);

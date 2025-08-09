@@ -22,12 +22,9 @@ GLCubeApp::~GLCubeApp() {
 	_program.destroy();
 }
 
-bool GLCubeApp::init(const HINSTANCE inst, const WindowDesc& param) {
-	if (!GLApp::init(inst, param)) {
-		return false;
-	}
-	
-	glViewport(0, 0, _attribute.winAttr.width, _attribute.winAttr.height);
+bool GLCubeApp::initApp() {
+	const auto prop = m_window->getProperties();
+	glViewport(0, 0, prop.width, prop.height);
 	const auto vfile = join(StaticCollector::getGLShaderPath(), "Base", "Cube.vert");
 	const auto ffile = join(StaticCollector::getGLShaderPath(), "Base", "Cube.frag");
 	auto ret = _program.init(vfile, ffile);

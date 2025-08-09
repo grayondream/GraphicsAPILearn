@@ -16,11 +16,7 @@ GLTriangleApp::~GLTriangleApp() {
 	_program.destroy();
 }
 
-bool GLTriangleApp::init(const HINSTANCE inst, const WindowDesc& param) {
-	if (!GLApp::init(inst, param)) {
-		return false;
-	}
-
+bool GLTriangleApp::initApp() {
 	const auto vfile = join(StaticCollector::getGLShaderPath(), "Base", "triangle.vert");
 	const auto ffile = join(StaticCollector::getGLShaderPath(), "Base", "triangle.frag");
 	auto ret = _program.init(vfile, ffile);

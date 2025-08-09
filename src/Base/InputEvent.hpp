@@ -16,3 +16,17 @@ enum class KeyAction : int32_t{
     Press,
     Release
 };
+
+enum class MouseButton : int32_t{
+    None,
+    Left,
+    Right,
+    Middle
+};
+
+enum class MouseAction : int32_t{
+    None,
+    Press,
+    Release
+};
+

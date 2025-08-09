@@ -5,10 +5,10 @@
 class GLRectApp : public GLApp {
 public:
 	virtual ~GLRectApp();
-public:
-	virtual bool init(const HINSTANCE, const WindowDesc& param) override;
 
 protected:
+	virtual bool initApp() override;
+
 	virtual void clearColor();
 	virtual void beginDrawScene();
 	virtual void drawScene(const float dt);

@@ -19,12 +19,9 @@ GLSimpleTextureApp::~GLSimpleTextureApp() {
 	_program.destroy();
 }
 
-bool GLSimpleTextureApp::init(const HINSTANCE inst, const WindowDesc& param) {
-	if (!GLApp::init(inst, param)) {
-		return false;
-	}
-	
-	glViewport(0, 0, _attribute.winAttr.width, _attribute.winAttr.height);
+bool GLSimpleTextureApp::initApp() {
+	const auto prop = m_window->getProperties();
+	glViewport(0, 0, prop.width, prop.height);
 	const auto vfile = join(StaticCollector::getGLShaderPath(), "Base", "SimpleTexture.vert");
 	const auto ffile = join(StaticCollector::getGLShaderPath(), "Base", "SimpleTexture.frag");
 	auto ret = _program.init(vfile, ffile);

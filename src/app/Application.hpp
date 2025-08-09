@@ -32,11 +32,13 @@ public:
     
 protected:
     virtual bool initGraphics() { return true; }
+    virtual bool initApp() { return true; }
     virtual void render();
     virtual void clearColor() {}
     virtual void beginDrawScene();
     virtual void drawScene(const float dt){}
     virtual void endDrawScene(){}
+    float aspectRatio() const;
 
 private:
     void updateFrameRate();

@@ -5,10 +5,9 @@
 class GLTriangleApp : public GLApp {
 public:
 	virtual ~GLTriangleApp();
-public:
-	virtual bool init(const HINSTANCE, const WindowDesc& param) override;
-
 protected:
+	virtual bool initApp() override;
+
 	virtual void clearColor();
 	virtual void beginDrawScene();
 	virtual void drawScene(const float dt);

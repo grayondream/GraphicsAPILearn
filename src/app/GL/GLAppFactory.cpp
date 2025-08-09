@@ -1,10 +1,10 @@
 #include "GLAppFactory.hpp"
 #include "App/GL/GLApp.hpp"
-//#include "App/GL/Base/GLTriangleApp.hpp"
-// #include "App/GL/Base/GLRectApp.hpp"
-// #include "App/GL/Base/GLSimpleTextureApp.hpp"
-// #include "App/GL/Base/GLCubeApp.hpp"
-// #include "App/GL/Base/GLCameraApp.hpp"
+#include "App/GL/Base/GLTriangleApp.hpp"
+#include "App/GL/Base/GLRectApp.hpp"
+#include "App/GL/Base/GLSimpleTextureApp.hpp"
+#include "App/GL/Base/GLCubeApp.hpp"
+#include "App/GL/Base/GLCameraApp.hpp"
 // #include "App/GL/Light/GLSimpleLightAmbination.hpp"
 // #include "App/GL/Light/GLSimpleLightDiffuse.hpp"
 // #include "App/GL/Light/GLSimpleLightSpecular.hpp"
@@ -45,16 +45,16 @@ std::shared_ptr<IApplication> GLAppFactory::create(const AppType type){
 	switch(type){
 		case AppType::Base:
 			return std::make_shared<GLApp>();
-		// case AppType::Triangle:
-		// 	return std::make_shared<GLTriangleApp>();
-		// case AppType::Rect:
-		// 	return std::make_shared<GLRectApp>();
-		// case AppType::SimpleTexture:
-		// 	return std::make_shared<GLSimpleTextureApp>();
-		// case AppType::Cube:
-		// 	return std::make_shared<GLCubeApp>();
-		// case AppType::Camera:
-		// 	return std::make_shared<GLCameraApp>();
+		case AppType::Triangle:
+			return std::make_shared<GLTriangleApp>();
+		case AppType::Rect:
+			return std::make_shared<GLRectApp>();
+		case AppType::SimpleTexture:
+			return std::make_shared<GLSimpleTextureApp>();
+		case AppType::Cube:
+			return std::make_shared<GLCubeApp>();
+		case AppType::Camera:
+			return std::make_shared<GLCameraApp>();
 		// case AppType::SimpleLight_Ambination:
 		// 	return std::make_shared<GLSimpleLightAmbination>();
 		// case AppType::SimpleLight_Diffuse:
