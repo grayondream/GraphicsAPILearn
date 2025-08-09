@@ -11,10 +11,10 @@ protected:
 	virtual bool initGraphics() override;
 
 protected:
-	virtual void clearColor();
-	virtual void beginDrawScene();
-	virtual void drawScene(const float dt);
-	virtual void endDrawScene();
+	virtual void clearColor() override;
+	virtual void beginDrawScene() override;
+	virtual void drawScene(const float dt) override;
+	virtual void endDrawScene() override;
 
 protected:
 	

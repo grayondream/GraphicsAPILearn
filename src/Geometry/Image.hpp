@@ -1,6 +1,6 @@
 #pragma once
 #include <string>
-#include <Math/Vector.hpp>
+#include "Base/Vector.hpp"
 #include <Geometry/Format.hpp>
 
 class ImageSize : public Vector3DBase<int> {

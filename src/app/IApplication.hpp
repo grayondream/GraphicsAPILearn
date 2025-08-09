@@ -1,6 +1,5 @@
 #pragma once
 #include <string>
-#include <Windows.h>
 #include "WindowProperties.hpp"
 
 class IApplication {

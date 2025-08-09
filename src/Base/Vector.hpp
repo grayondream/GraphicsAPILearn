@@ -1,7 +1,7 @@
 #pragma once
-#include "Math/Vector/Vector2DBase.hpp"
-#include "Math/Vector/Vector3DBase.hpp"
-#include "Math/Vector/Vector4DBase.hpp"
+#include "Base/Vector/Vector2DBase.hpp"
+#include "Base/Vector/Vector3DBase.hpp"
+#include "Base/Vector/Vector4DBase.hpp"
 
 using Point2D = Vector2DBase<float>;
 using Point3D = Vector3DBase<float>;

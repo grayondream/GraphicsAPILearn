@@ -1,0 +1,19 @@
+file(GLOB APP_CPP_FILES "*.cpp")
+file(GLOB APP_HPP_FILES "*.hpp")
+
+set(ALL_CPP_FILES ${ALL_CPP_FILES} ${APP_CPP_FILES} CACHE STRING "all source files" FORCE)
+set(ALL_HPP_FILES ${ALL_HPP_FILES} ${APP_HPP_FILES} CACHE STRING "all header files" FORCE)
+
+if(ENABLE_OPENGL)
+    file(GLOB APP_OPENGL_CPP_FILES "GL/*.cpp")
+    file(GLOB APP_OPENGL_HPP_FILES "GL/*.hpp")
+    set(ALL_CPP_FILES ${ALL_CPP_FILES} ${APP_OPENGL_CPP_FILES} CACHE STRING "all source files" FORCE)
+    set(ALL_HPP_FILES ${ALL_HPP_FILES} ${APP_OPENGL_HPP_FILES} CACHE STRING "all header files" FORCE)
+endif()
+
+if(ENABLE_DX11)
+    file(GLOB APP_DX11_CPP_FILES "DX11/*.cpp")
+    file(GLOB APP_DX11_HPP_FILES "DX11/*.hpp")
+    set(ALL_CPP_FILES ${ALL_CPP_FILES} ${APP_DX11_CPP_FILES} CACHE STRING "all source files" FORCE)
+    set(ALL_HPP_FILES ${ALL_HPP_FILES} ${APP_DX11_HPP_FILES} CACHE STRING "all header files" FORCE)
+endif()

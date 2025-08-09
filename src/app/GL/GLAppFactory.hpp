@@ -2,8 +2,8 @@
 #include "App/AppType.hpp"
 #include <memory>
 
-class GLApp;
+class IApplication;
 class GLAppFactory {
 public:
-    static std::shared_ptr<GLApp> create(const AppType type);
+    static std::shared_ptr<IApplication> create(const AppType type);
 };

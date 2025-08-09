@@ -1,6 +1,6 @@
 #pragma once
-#include "Math/Vector.hpp"
 
+#include "Base/Vector.hpp"
 class Color {
 public:
 	using ValueType = float;

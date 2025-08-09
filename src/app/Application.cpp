@@ -6,7 +6,7 @@
 #include <thread>
 
 #include "Application.hpp"
-#include "EH/ErrorHandle.hpp"
+#include "Base/ErrorHandle.hpp"
 #include "Base/Log.hpp"
 #include <imgui.h>
 #include "Utils/EventUtils.hpp"

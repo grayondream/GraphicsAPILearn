@@ -1,6 +1,6 @@
 #pragma once
 #include <Base/DataView.hpp>
-#include "Math/Vector.hpp"
+#include "Base/Vector.hpp"
 #include <cstdint>
 #include "Geometry/Image.hpp"
 #include <Geometry/Format.hpp>

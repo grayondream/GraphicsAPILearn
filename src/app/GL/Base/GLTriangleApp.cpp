@@ -1,7 +1,7 @@
 #include "GLTriangleApp.hpp"
 #include "Native/GL/GLProgram.hpp"
-#include "Config/StaticCollector.hpp"
-#include "EH/ErrorHandle.hpp"
+#include "Base/StaticCollector.hpp"
+#include "Base/ErrorHandle.hpp"
 #include "glad/glad.h"
 #include "Geometry/Triangle.hpp"
 #include <Utils/FileUtils.hpp>

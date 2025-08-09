@@ -1,6 +1,6 @@
 #include "GLAppUtils.hpp"
-#include "Config/StaticCollector.hpp"
-#include "EH/ErrorHandle.hpp"
+#include "Base/StaticCollector.hpp"
+#include "Base/ErrorHandle.hpp"
 #include <Utils/FileUtils.hpp>
 using FileUtils::join;
 namespace GLUtils {

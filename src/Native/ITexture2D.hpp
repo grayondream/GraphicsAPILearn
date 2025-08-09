@@ -1,6 +1,6 @@
 #pragma once
 #include <Native/TextureDataView.hpp>
-#include <Math/Vector.hpp>
+#include "Base/Vector.hpp"
 #include <Geometry/Image.hpp>
 
 class ITexture2D {

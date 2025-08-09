@@ -1,36 +1,28 @@
-set(RAPP_PATH "${RENDER_SOURCE_PATH}/App" CACHE STRING "app file's path")
-set(RENDER_EH_PATH "${RENDER_SOURCE_PATH}/EH" CACHE STRING "error handle file's path")
-set(RENDER_TRACY_PATH "${RENDER_SOURCE_PATH}/Tracy" CACHE STRING "tracy file's path")
+set(RENDER_APP_PATH "${RENDER_SOURCE_PATH}/App" CACHE STRING "app file's path")
 set(RENDER_BASE_PATH "${RENDER_SOURCE_PATH}/Base" CACHE STRING "base file's path")
-set(RENDER_CONFIG_PATH "${RENDER_SOURCE_PATH}/Config" CACHE STRING "config file's path")
 set(RENDER_NATIVE_PATH "${RENDER_SOURCE_PATH}/Native" CACHE STRING "native file's path")
 set(RENDER_UTILS_PATH "${RENDER_SOURCE_PATH}/Utils" CACHE STRING "utils file's path")
-
+set(RENDER_MODEL_PATH "${RENDER_SOURCE_PATH}/Model" CACHE STRING "model file's path")
+set(RENDER_GEOMETRY_PATH "${RENDER_SOURCE_PATH}/Geometry" CACHE STRING "geometry file's path")
 set(PROJECT_NAME renderLearn)
 
 set(DX_SRC_FILES "" CACHE STRING "all source files")
 
 add_source_group(${RENDER_SOURCE_PATH} "")
 
-file(GLOB_RECURSE ALL_HPP_FILES "${RENDER_SOURCE_PATH}/*.hpp")
-file(GLOB_RECURSE ALL_CPP_FILES "${RENDER_SOURCE_PATH}/*.cpp")
+add_subdirectory(${RENDER_APP_PATH})
+add_subdirectory(${RENDER_BASE_PATH})
+add_subdirectory(${RENDER_NATIVE_PATH})
+add_subdirectory(${RENDER_UTILS_PATH})
+add_subdirectory(${RENDER_MODEL_PATH})
+add_subdirectory(${RENDER_GEOMETRY_PATH})
 
 message(STATUS "All source files: ${ALL_CPP_FILES}")
-
-#${ALL_CPP_FILES} 
-#${ALL_HPP_FILES}
-#${GLAD_SRC_FILES}
-#${IMGUI_SRC_FILES}
-#message(FATAL_ERROR "IMGUI ${GLAD_SRC_FILES}")
+message(STATUS "All header files: ${ALL_HPP_FILES}")
 
 add_executable(${PROJECT_NAME}
-    ${RAPP_PATH}/main.cpp
-    ${RAPP_PATH}/GLFWWindow.cpp
-    ${RAPP_PATH}/Application.cpp
-    ${RENDER_UTILS_PATH}/EventUtils.cpp
-    ${RAPP_PATH}/GL/GLApp.cpp
-    ${RAPP_PATH}/GL/ImGuiOpenglWindow.cpp
-    ${RAPP_PATH}/ImGuiWindow.cpp
+    ${ALL_CPP_FILES}
+    ${ALL_HPP_FILES}
     ${IMGUI_SRC_FILES}
     ${GLAD_SRC_FILES}
 )
