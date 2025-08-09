@@ -54,7 +54,7 @@ using namespace Constexpr;
 namespace EnumUtil = Utils::Enum;
 
 int main(int argc, char **argv) {
-    auto type = AppType::Hdr;
+    auto type = AppType::Bloom;
     auto api = GraphicsType::GL;
     LOGI("Start Graphics Learn!!!");
     LOGI("Select {} Application, Render App With {} API", EnumUtil::EnumName(type), EnumUtil::EnumName(api));

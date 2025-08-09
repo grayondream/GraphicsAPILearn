@@ -17,8 +17,6 @@ add_subdirectory(${RENDER_UTILS_PATH})
 add_subdirectory(${RENDER_MODEL_PATH})
 add_subdirectory(${RENDER_GEOMETRY_PATH})
 
-message(STATUS "All source files: ${ALL_CPP_FILES}")
-
 add_executable(${PROJECT_NAME}
     ${ALL_CPP_FILES}
     ${ALL_HPP_FILES}
@@ -91,3 +89,5 @@ include(${RENDER_SOURCE_PATH}/BuildPost.cmake)
 find_package(glfw3 CONFIG REQUIRED)
 target_link_libraries(${PROJECT_NAME} glfw)
 target_include_directories(${PROJECT_NAME} PRIVATE ${GLFW_INCLUDE_DIR})
+target_include_directories(${PROJECT_NAME} PRIVATE glfw3::glfw3)
+

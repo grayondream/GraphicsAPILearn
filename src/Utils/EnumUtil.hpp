@@ -5,7 +5,15 @@ namespace Enum{
 namespace Detail {
     template<auto V>
     constexpr std::string_view sig() {
+#ifdef __clang__
+        return __PRETTY_FUNCTION__;
+#elif defined(__GNUC__)
+        return __PRETTY_FUNCTION__;
+#elif defined(_MSC_VER) 
         return __FUNCSIG__;
+#else
+        return "";
+#endif
     }
 }
 

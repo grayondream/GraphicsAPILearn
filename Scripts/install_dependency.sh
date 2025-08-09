@@ -1,0 +1,1 @@
+vcpkg install OpenGL assimp spdlog glm imgui glfw3

@@ -1,6 +1,7 @@
 message(STATUS "Initalize ${CMAKE_SYSTEM_NAME}")
 if(NOT CMAKE_SYSTEM_NAME STREQUAL "Windows")
-    message(FATAL_ERROR "Unsupported system: ${CMAKE_SYSTEM_NAME}")
+    message(WARNING "Unsupported system: ${CMAKE_SYSTEM_NAME}")
+    return()
 endif()
 
 message(STATUS ${DX_SDK_ROOT} "DirectX SDK ROOT: ${DX_SDK_ROOT}")
