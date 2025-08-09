@@ -24,13 +24,11 @@ GLLightSourceSpot::~GLLightSourceSpot() {
 	_targetProgram.destroy();
 }
 
-bool GLLightSourceSpot::init(const HINSTANCE inst, const WindowDesc& param) {
-	if (!GLApp::init(inst, param)) {
+bool GLLightSourceSpot::initApp() {
+	if (!GLCameraBaseApp::initApp()) {
 		return false;
 	}
 	
-	_camera = Camera(glm::vec3(0.0f, 0.0f, 5.0f));
-	glViewport(0, 0, _attribute.winAttr.width, _attribute.winAttr.height);
 	const auto shaderDir = join(StaticCollector::getGLShaderPath(), "Light");
 	{
 		const auto vfile = join(shaderDir, "LightSource", "Spot", "Light.vert");
@@ -102,14 +100,6 @@ void GLLightSourceSpot::createVertexBuffer() {
 	_vao = vao;
 	_vbo[0] = vbo[0], _vbo[1] = vbo[1], _vbo[2] = vbo[2];
 	_ebo = ebo;
-}
-
-void GLLightSourceSpot::clearColor() {
-	return GLApp::clearColor();
-}
-
-void GLLightSourceSpot::beginDrawScene() {
-	return GLApp::beginDrawScene();
 }
 
 void GLLightSourceSpot::drawScene(const float dt) {
@@ -212,74 +202,4 @@ void GLLightSourceSpot::drawScene(const float dt) {
 	}
 
 	glBindVertexArray(0);
-}
-
-void GLLightSourceSpot::endDrawScene() {
-	return GLApp::endDrawScene();
-}
-
-void GLLightSourceSpot::onKeyBoardEvent(const UINT msg, const WPARAM wParam, const LPARAM lParam) {
-	switch (msg) {
-	case WM_KEYDOWN:
-		break;
-	case WM_KEYUP:
-		break;
-	case WM_CHAR:
-		const char ch = static_cast<char>(wParam);
-		switch (wParam) {
-		case 'w':
-			_camera.processKeyboardEvent(Camera::Movement::Forward, 0.5); break;
-		case 's':
-			_camera.processKeyboardEvent(Camera::Movement::Backward, 0.5); break;
-		case 'd':
-			_camera.processKeyboardEvent(Camera::Movement::Right, 0.5); break;
-		case 'a':
-			_camera.processKeyboardEvent(Camera::Movement::Left, 0.5); break;
-		}
-		break;
-	}
-
-	return GLApp::onKeyBoardEvent(msg, wParam, lParam);
-}
-
-void GLLightSourceSpot::onMouseDown(const UINT msg, WPARAM btnState, int x, int y) {
-	switch (msg) {
-	case WM_LBUTTONDOWN:
-		_mouseClicked = true; break;
-	}
-	
-	return GLApp::onMouseDown(msg, btnState, x, y);
-}
-
-void GLLightSourceSpot::onMouseUp(const UINT msg, WPARAM btnState, int x, int y) {
-	switch (msg) {
-	case WM_LBUTTONUP:
-		_mouseClicked = false; break;
-	}
-	
-	return GLApp::onMouseUp(msg, btnState, x, y);
-}
-
-void GLLightSourceSpot::onMouseMove(WPARAM btnState, int x, int y) {
-	if (!_mouseClicked) {
-		return GLApp::onMouseMove(btnState, x, y);
-	}
-
-	if (!_clicked) {
-		_clicked = true;
-		_lastPos = { (float)x, (float)y };
-		return GLApp::onMouseMove(btnState, x, y);
-	}
-
-	const float offx = x - _lastPos.x;
-	const float offy = y - _lastPos.y;
-	_camera.processMouseMove(offx, offy);
-	_lastPos = { (float)x, (float)y };
-	return GLApp::onMouseMove(btnState, x, y);
-}
-
-void GLLightSourceSpot::onMouseScroll(const UINT msg, const WPARAM wParam, const LPARAM lParam) {
-	int zDelta = GET_WHEEL_DELTA_WPARAM(wParam);
-	_camera.processMouseScrool(zDelta);
-	return GLApp::onMouseScroll(msg, wParam, lParam);
 }

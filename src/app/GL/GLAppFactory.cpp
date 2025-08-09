@@ -5,15 +5,15 @@
 #include "App/GL/Base/GLSimpleTextureApp.hpp"
 #include "App/GL/Base/GLCubeApp.hpp"
 #include "App/GL/Base/GLCameraApp.hpp"
-// #include "App/GL/Light/GLSimpleLightAmbination.hpp"
-// #include "App/GL/Light/GLSimpleLightDiffuse.hpp"
-// #include "App/GL/Light/GLSimpleLightSpecular.hpp"
-// #include "App/GL/Light/GLSimpleLightMaterial.hpp"
-// #include "App/GL/Light/GLSimpleLightMap.hpp"
-// #include "App/GL/Light/LightSource/GLLightSourceDirection.hpp"
-// #include "App/GL/Light/LightSource/GLLightSourcePoint.hpp"
-// #include "App/GL/Light/LightSource/GLLightSourceSpot.hpp"
-// #include "App/GL/Light/LightSource/GLLightSourceMult.hpp"
+#include "App/GL/Light/GLSimpleLightAmbination.hpp"
+#include "App/GL/Light/GLSimpleLightDiffuse.hpp"
+#include "App/GL/Light/GLSimpleLightSpecular.hpp"
+#include "App/GL/Light/GLSimpleLightMaterial.hpp"
+#include "App/GL/Light/GLSimpleLightMap.hpp"
+#include "App/GL/Light/LightSource/GLLightSourceDirection.hpp"
+#include "App/GL/Light/LightSource/GLLightSourcePoint.hpp"
+#include "App/GL/Light/LightSource/GLLightSourceSpot.hpp"
+#include "App/GL/Light/LightSource/GLLightSourceMult.hpp"
 // #include "App/GL/Model/GLLoadModelApp.hpp"
 // #include "App/GL/Advanced/GLDepthTestApp.hpp"
 // #include "App/GL/Advanced/GLTemplateTestApp.hpp"
@@ -55,24 +55,24 @@ std::shared_ptr<IApplication> GLAppFactory::create(const AppType type){
 			return std::make_shared<GLCubeApp>();
 		case AppType::Camera:
 			return std::make_shared<GLCameraApp>();
-		// case AppType::SimpleLight_Ambination:
-		// 	return std::make_shared<GLSimpleLightAmbination>();
-		// case AppType::SimpleLight_Diffuse:
-		// 	return std::make_shared<GLSimpleLightDiffuse>();
-		// case AppType::SimpleLight_Specular:
-		// 	return std::make_shared<GLSimpleLightSpecular>();
-		// case AppType::SimpleLight_Material:
-		// 	return std::make_shared<GLSimpleLightMaterial>();
-		// case AppType::SimpleLight_Map:
-		// 	return std::make_shared<GLSimpleLightMap>();
-		// case AppType::SimpleLight_Source_Direction:
-		// 	return std::make_shared<GLLightSourceDirection>();
-		// case AppType::SimpleLight_Source_Point:
-		// 	return std::make_shared<GLLightSourcePoint>();
-		// case AppType::SimpleLight_Source_Spot:
-		// 	return std::make_shared<GLLightSourceSpot>();
-		// case AppType::SimpleLight_Source_Mult:
-		// 	return std::make_shared<GLLightSourceMult>();
+		case AppType::SimpleLight_Ambination:
+			return std::make_shared<GLSimpleLightAmbination>();
+		case AppType::SimpleLight_Diffuse:
+			return std::make_shared<GLSimpleLightDiffuse>();
+		case AppType::SimpleLight_Specular:
+			return std::make_shared<GLSimpleLightSpecular>();
+		case AppType::SimpleLight_Material:
+			return std::make_shared<GLSimpleLightMaterial>();
+		case AppType::SimpleLight_Map:
+			return std::make_shared<GLSimpleLightMap>();
+		case AppType::SimpleLight_Source_Direction:
+			return std::make_shared<GLLightSourceDirection>();
+		case AppType::SimpleLight_Source_Point:
+			return std::make_shared<GLLightSourcePoint>();
+		case AppType::SimpleLight_Source_Spot:
+			return std::make_shared<GLLightSourceSpot>();
+		case AppType::SimpleLight_Source_Mult:
+			return std::make_shared<GLLightSourceMult>();
 		// case AppType::LoadModel:
 		// 	return std::make_shared<GLLoadModelApp>();
 		// case AppType::DepthTest:

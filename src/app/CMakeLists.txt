@@ -24,6 +24,18 @@ set(EXTRAC_APP_FILES "${CMAKE_SOURCE_DIR}/Src/App/GL/Base/GLTriangleApp.cpp"
                      "${CMAKE_SOURCE_DIR}/Src/App/GL/Base/GLCubeApp.cpp"
                      "${CMAKE_SOURCE_DIR}/Src/App/GL/Base/GLCameraApp.cpp"
                      "${CMAKE_SOURCE_DIR}/Src/App/GL/Base/GLCameraBaseApp.cpp"
+
+                     "${CMAKE_SOURCE_DIR}/Src/App/GL/Light/LightSource/GLLightSourcePoint.cpp"
+                     "${CMAKE_SOURCE_DIR}/Src/App/GL/Light/LightSource/GLLightSourceSpot.cpp"
+                     "${CMAKE_SOURCE_DIR}/Src/App/GL/Light/LightSource/GLLightSourceDirection.cpp"
+                     "${CMAKE_SOURCE_DIR}/Src/App/GL/Light/LightSource/GLLightSourceMult.cpp"
+
+                     "${CMAKE_SOURCE_DIR}/Src/App/GL/Light/GLSimpleLightAmbination.cpp"
+                     "${CMAKE_SOURCE_DIR}/Src/App/GL/Light/GLSimpleLightDiffuse.cpp"
+                     "${CMAKE_SOURCE_DIR}/Src/App/GL/Light/GLSimpleLightSpecular.cpp"
+                     "${CMAKE_SOURCE_DIR}/Src/App/GL/Light/GLSimpleLightMap.cpp"
+                     "${CMAKE_SOURCE_DIR}/Src/App/GL/Light/GLSimpleLightMaterial.cpp"
+
                      )
 
 set(ALL_CPP_FILES ${ALL_CPP_FILES} ${EXTRAC_APP_FILES} CACHE STRING "all source files" FORCE)
