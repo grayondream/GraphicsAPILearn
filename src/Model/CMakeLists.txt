@@ -1,0 +1,8 @@
+if(ENABLE_OPENGL)
+    file(GLOB_RECURSE ALL_MODEL_CPP_FILES "*.cpp")
+    file(GLOB_RECURSE ALL_MODEL_HPP_FILES "*.hpp")
+
+    set(ALL_CPP_FILES ${ALL_CPP_FILES} ${ALL_MODEL_CPP_FILES} CACHE STRING "all source files" FORCE)
+    set(ALL_HPP_FILES ${ALL_HPP_FILES} ${ALL_MODEL_HPP_FILES} CACHE STRING "all header files" FORCE)
+endif()
+

@@ -36,6 +36,8 @@ set(EXTRAC_APP_FILES "${CMAKE_SOURCE_DIR}/Src/App/GL/Base/GLTriangleApp.cpp"
                      "${CMAKE_SOURCE_DIR}/Src/App/GL/Light/GLSimpleLightMap.cpp"
                      "${CMAKE_SOURCE_DIR}/Src/App/GL/Light/GLSimpleLightMaterial.cpp"
 
+                     "${CMAKE_SOURCE_DIR}/Src/App/GL/Model/GLLoadModelApp.cpp"
+
                      )
 
 set(ALL_CPP_FILES ${ALL_CPP_FILES} ${EXTRAC_APP_FILES} CACHE STRING "all source files" FORCE)

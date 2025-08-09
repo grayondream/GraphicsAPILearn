@@ -14,7 +14,7 @@
 #include "App/GL/Light/LightSource/GLLightSourcePoint.hpp"
 #include "App/GL/Light/LightSource/GLLightSourceSpot.hpp"
 #include "App/GL/Light/LightSource/GLLightSourceMult.hpp"
-// #include "App/GL/Model/GLLoadModelApp.hpp"
+#include "App/GL/Model/GLLoadModelApp.hpp"
 // #include "App/GL/Advanced/GLDepthTestApp.hpp"
 // #include "App/GL/Advanced/GLTemplateTestApp.hpp"
 // #include "App/GL/Advanced/GLBlendApp.hpp"
@@ -73,8 +73,8 @@ std::shared_ptr<IApplication> GLAppFactory::create(const AppType type){
 			return std::make_shared<GLLightSourceSpot>();
 		case AppType::SimpleLight_Source_Mult:
 			return std::make_shared<GLLightSourceMult>();
-		// case AppType::LoadModel:
-		// 	return std::make_shared<GLLoadModelApp>();
+		case AppType::LoadModel:
+			return std::make_shared<GLLoadModelApp>();
 		// case AppType::DepthTest:
 		// 	return std::make_shared<GLDepthTestApp>();
 		// case AppType::TemplateTest:
