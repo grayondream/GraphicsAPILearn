@@ -97,6 +97,17 @@ bool GLFWWindow::initialize() {
         return false;
     }
 
+        // 配置GLFW窗口 hints（不指定图形API，保持通用）
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+    glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
+    glfwWindowHint(GLFW_VISIBLE, GLFW_TRUE);
+    glfwWindowHint(GLFW_DECORATED, GLFW_TRUE);
+
+#ifdef __APPLE__
+    glfwWindowHint(GLFW_OPENGL_FORWOARD_COMPAT, GLFW_TRUE);
+#endif
+
     // 创建窗口
     m_window = glfwCreateWindow(
         m_properties.width, m_properties.height,
@@ -124,6 +135,26 @@ bool GLFWWindow::initialize() {
     glfwSetWindowSizeCallback(m_window, staticWindowResizeCallback);
 
     m_initialized = true;
+    return true;
+}
+
+bool GLFWWindow::initGLContext() {
+    if (!m_initialized) {
+        return true;
+    }
+
+    glfwMakeContextCurrent(m_window);
+    if (glfwGetCurrentContext() == nullptr) {
+        LOGE("Failed to make context current");
+        shutdown();
+        return false;
+    }
+
+    if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
+        LOGE("Failed to initialize GLAD");
+        return false;
+    }
+
     return true;
 }
 
@@ -169,32 +200,6 @@ GLFWWindow& GLFWWindow::updateFrameRate(float fs){
     const auto newTitle = title + " - " + std::to_string(fs) + " FPS";
     glfwSetWindowTitle(m_window, newTitle.c_str());
     return *this;
-}
-
-bool GLFWWindow::initGLContext() {
-    if (!m_initialized) {
-        return true;
-    }
-    
-    // 配置GLFW窗口 hints（不指定图形API，保持通用）
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
-    glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API); // 不创建默认上下文
-    glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
-    glfwWindowHint(GLFW_VISIBLE, GLFW_TRUE);
-    glfwWindowHint(GLFW_DECORATED, GLFW_TRUE);
-
-#ifdef __APPLE__
-    glfwWindowHint(GLFW_COCOA_RETINA_FRAMEBUFFER, GLFW_TRUE);
-#endif
-
-    glfwMakeContextCurrent(m_window);
-    if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
-        LOGE("Failed to initialize GLAD");
-        return false;
-    }
-
-    return true;
 }
 
 GLFWWindow& GLFWWindow::swapBuffers() {

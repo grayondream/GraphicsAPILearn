@@ -162,10 +162,6 @@ public:
             ValueType width;
             ValueType height;
         };
-        struct {
-            ValueType a;
-            ValueType b;
-        };
     };
 };
 

@@ -180,11 +180,6 @@ public:
             ValueType g;
             ValueType b;
         };
-        struct{
-            ValueType a;
-            ValueType b;
-            ValueType c;
-        };
         struct {
             ValueType width;
             ValueType height;

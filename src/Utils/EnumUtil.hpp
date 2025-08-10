@@ -20,7 +20,16 @@ namespace Detail {
 template<auto V>
 constexpr std::string_view EnumName() {
     auto str = Detail::sig<V>();
+#ifdef __clang__
     return std::string_view(str.data() + 99, str.size() - 106);
+#elif defined(__GNUC__)
+    return std::string_view(str.data() + 49, str.size() - 50);
+#elif defined(_MSC_VER)
+    return std::string_view(str.data() + 49, str.size() - 50);
+#else
+    return "";
+#endif
+
 }
 
 namespace Detail{

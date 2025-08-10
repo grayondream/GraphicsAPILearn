@@ -163,12 +163,6 @@ public:
             ValueType w;
         };
         struct{
-            ValueType a;
-            ValueType b;
-            ValueType c;
-            ValueType d;
-        };
-        struct{
             ValueType r;
             ValueType g;
             ValueType b;
