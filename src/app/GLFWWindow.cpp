@@ -105,7 +105,7 @@ bool GLFWWindow::initialize() {
     glfwWindowHint(GLFW_DECORATED, GLFW_TRUE);
 
 #ifdef __APPLE__
-    glfwWindowHint(GLFW_OPENGL_FORWOARD_COMPAT, GLFW_TRUE);
+    glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GLFW_TRUE);
 #endif
 
     // 创建窗口

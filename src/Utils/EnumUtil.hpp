@@ -21,11 +21,11 @@ template<auto V>
 constexpr std::string_view EnumName() {
     auto str = Detail::sig<V>();
 #ifdef __clang__
-    return std::string_view(str.data() + 99, str.size() - 106);
+    return std::string_view(str.data() + 49, str.size() - 50);
 #elif defined(__GNUC__)
     return std::string_view(str.data() + 49, str.size() - 50);
 #elif defined(_MSC_VER)
-    return std::string_view(str.data() + 49, str.size() - 50);
+    return std::string_view(str.data() + 99, str.size() - 106);
 #else
     return "";
 #endif
@@ -33,7 +33,7 @@ constexpr std::string_view EnumName() {
 }
 
 namespace Detail{
-#define kEnumMaxIndex 256
+#define kEnumMaxIndex 128
 #define kEnumMinIndex -10
 
 constexpr auto EnumMaxIndex() {
