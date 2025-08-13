@@ -113,9 +113,34 @@ bool GLBloomApp::initApp() {
 	m_pingpongFBO[1] = pfbos[1];
 	m_pingpongColorbuffers[0] = ppcolorBuffers[0];
 	m_pingpongColorbuffers[1] = ppcolorBuffers[1];
+	createQuadBuffer();
 	glEnable(GL_DEPTH_TEST);
 	//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 	return true;
+}
+
+void GLBloomApp::createQuadBuffer() {
+	float quadVertices[] = {
+		// positions        // texture Coords
+		-1.0f,  1.0f, 0.0f, 0.0f, 1.0f,
+		-1.0f, -1.0f, 0.0f, 0.0f, 0.0f,
+			1.0f,  1.0f, 0.0f, 1.0f, 1.0f,
+			1.0f, -1.0f, 0.0f, 1.0f, 0.0f,
+	};
+	// setup plane VAO
+	unsigned int quadVAO, quadVBO;
+	glGenVertexArrays(1, &quadVAO);
+	glGenBuffers(1, &quadVBO);
+	glBindVertexArray(quadVAO);
+	glBindBuffer(GL_ARRAY_BUFFER, quadVBO);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), &quadVertices, GL_STATIC_DRAW);
+	glEnableVertexAttribArray(0);
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);
+	glEnableVertexAttribArray(1);
+	glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
+	glBindVertexArray(0);
+	m_quadVAO = quadVAO;
+	m_quadVBO = quadVBO;
 }
 
 static std::shared_ptr<GLImageTexture2D> CreateTexture(const std::string &imgname){
@@ -160,6 +185,20 @@ void GLBloomApp::compileShader(){
 		const auto vfile = join(shaderDir, "Light.vs");
 		const auto ffile = join(shaderDir, "Light.fs");
 		auto ret = m_lightProgram.init(vfile, ffile);
+		ErrorHandle::ExitIfFailed(ret, "Create OpenGL program failed!");
+	}
+
+	{
+		const auto vfile = join(shaderDir, "Blur.vs");
+		const auto ffile = join(shaderDir, "Blur.fs");
+		auto ret = m_blurProgram.init(vfile, ffile);
+		ErrorHandle::ExitIfFailed(ret, "Create OpenGL program failed!");
+	}
+
+	{
+		const auto vfile = join(shaderDir, "Final.vs");
+		const auto ffile = join(shaderDir, "Final.fs");
+		auto ret = m_finalProgram.init(vfile, ffile);
 		ErrorHandle::ExitIfFailed(ret, "Create OpenGL program failed!");
 	}
 }
@@ -280,6 +319,49 @@ void GLBloomApp::extractBrightPart(const glm::mat4 &projection, const glm::mat4 
 	//saveFramebufferAsImage(m_hdrFBO, GetWindowWidth(), GetWindowHeight());
 }
 
+void GLBloomApp::blurBrightPart() {
+	m_blurProgram.use();
+	m_blurProgram.update("image", 0);
+	bool horizontal = true, first_iteration = true;
+	for (unsigned int i = 0; i < 10; i++){
+		glBindFramebuffer(GL_FRAMEBUFFER, m_pingpongFBO[horizontal]);
+		m_blurProgram.update("horizontal", horizontal);
+		glBindTexture(GL_TEXTURE_2D, first_iteration ? m_colorBuffers[1] : m_pingpongColorbuffers[!horizontal]);  // bind texture of other framebuffer (or scene if first iteration)
+		renderQuad();
+		horizontal = !horizontal;
+		if (first_iteration){
+			first_iteration = false;
+		}
+		
+		//saveFramebufferAsImage(m_pingpongFBO[horizontal], GetWindowWidth(), GetWindowHeight());
+	}
+    
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
+
+void GLBloomApp::renderFinal() {
+	bool bloom = true;
+	float exposure = 1.0f;
+	m_finalProgram.use();
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	m_finalProgram.use();
+	m_finalProgram.update("scene", 0);
+	m_finalProgram.update("bloomBlur", 1);
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, m_colorBuffers[0]);
+	glActiveTexture(GL_TEXTURE1);
+	glBindTexture(GL_TEXTURE_2D, m_pingpongColorbuffers[1]);
+	m_finalProgram.update("bloom", m_enableBloom);
+	m_finalProgram.update("exposure", m_expose);
+	renderQuad();
+}
+
+void GLBloomApp::renderQuad() {
+	glBindVertexArray(m_quadVAO);
+    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+    glBindVertexArray(0);
+}
+
 void GLBloomApp::renderLight(GLProgram& program, const glm::mat4& projection, const glm::mat4& view) {
 	auto lightPosAndColor = GetLightPosAndColor();
 	const auto& lightPositions = lightPosAndColor.first;
@@ -299,11 +381,13 @@ void GLBloomApp::drawScene(const float dt) {
 	GLCameraBaseApp::drawScene(dt);
 	auto pos = _camera.getAttr().pos;
 	ImGui::Begin("OpenGL");
+	ImGui::Checkbox("Enable Bloom", &m_enableBloom);
+	ImGui::SliderFloat("Expose Value", &m_expose, 0, 1.0);
 	ImGui::End();
 
 	const auto projection = glm::perspective(glm::radians(_camera.zoom()), aspectRatio(), 0.1f, 100.0f);
 	const auto view = _camera.getViewMatrix();
 	extractBrightPart(projection, view);
-	static float curTime = 0;
-	curTime += dt;
+	blurBrightPart();
+	renderFinal();
 }
