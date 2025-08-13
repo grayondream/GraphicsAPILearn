@@ -1,4 +1,5 @@
 #include "Camera.hpp"
+#include <algorithm>
 
 Camera::Camera(const Vec3 pos, const Vec3 up, const float yam, const float pitch) {
 	_attr.pos = pos;

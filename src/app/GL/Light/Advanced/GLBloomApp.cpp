@@ -21,16 +21,79 @@ using FileUtils::join;
 using namespace ErrorHandle;
 
 GLBloomApp::~GLBloomApp() {
-	cube_->destroy();
-	plane_->destroy();
+	m_cube->destroy();
+	m_plane->destroy();
 }
 
 void GLBloomApp::initShapes() {
-	cube_ = std::make_shared< GLCube>();
-	plane_ = std::make_shared< GLPlane>();
+	m_cube = std::make_shared< GLCube>();
+	m_plane = std::make_shared< GLPlane>();
 
-	cube_->init();
-	plane_->init();
+	m_cube->init();
+	m_plane->init();
+}
+
+static auto CreateHdrFrameBuffer(int width, int height) {
+	unsigned int hdrFBO;
+	glGenFramebuffers(1, &hdrFBO);
+	glBindFramebuffer(GL_FRAMEBUFFER, hdrFBO);
+	// create 2 floating point color buffers (1 for normal rendering, other for brightness threshold values)
+	unsigned int colorBuffers[2];
+	glGenTextures(2, colorBuffers);
+	for (unsigned int i = 0; i < 2; i++)
+	{
+		glBindTexture(GL_TEXTURE_2D, colorBuffers[i]);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, width, height, 0, GL_RGBA, GL_FLOAT, NULL);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);  // we clamp to the edge as the blur filter would otherwise sample repeated texture values!
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+		// attach texture to framebuffer
+		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + i, GL_TEXTURE_2D, colorBuffers[i], 0);
+	}
+	// create and attach depth buffer (renderbuffer)
+	unsigned int rboDepth;
+	glGenRenderbuffers(1, &rboDepth);
+	glBindRenderbuffer(GL_RENDERBUFFER, rboDepth);
+	glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, width, height);
+	glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, rboDepth);
+	// tell OpenGL which color attachments we'll use (of this framebuffer) for rendering 
+	unsigned int attachments[2] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1 };
+	glDrawBuffers(2, attachments);
+	// finally check if framebuffer is complete
+	if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+		ErrorHandle::ExitIfFailed(false, "Failed to crate frame buffer");
+	}
+	
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	return std::pair(hdrFBO, std::vector(colorBuffers[0], colorBuffers[1]));
+}
+
+static auto CreateBloomFrameBuffer(int width, int height) {
+	unsigned int pingpongFBO[2];
+	unsigned int pingpongColorbuffers[2];
+	glGenFramebuffers(2, pingpongFBO);
+	glGenTextures(2, pingpongColorbuffers);
+	for (unsigned int i = 0; i < 2; i++)
+	{
+		glBindFramebuffer(GL_FRAMEBUFFER, pingpongFBO[i]);
+		glBindTexture(GL_TEXTURE_2D, pingpongColorbuffers[i]);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, width, height, 0, GL_RGBA, GL_FLOAT, NULL);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE); // we clamp to the edge as the blur filter would otherwise sample repeated texture values!
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, pingpongColorbuffers[i], 0);
+		// also check if framebuffers are complete (no need for depth buffer)
+		if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+			ErrorHandle::ExitIfFailed(false, "Failed to crate frame buffer");
+		}
+			
+
+		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	}
+
+	return std::pair(std::vector(pingpongFBO[0], pingpongFBO[1]), std::vector(pingpongColorbuffers[0], pingpongColorbuffers[1]));
 }
 
 bool GLBloomApp::initApp() {
@@ -41,6 +104,15 @@ bool GLBloomApp::initApp() {
 	createTextures();
 	compileShader();
 	initShapes();
+	const auto [fbo, buffers] = CreateHdrFrameBuffer(GetWindowWidth(), GetWindowHeight());
+	m_hdrFBO = fbo;
+	m_colorBuffers[0] = buffers[0];
+	m_colorBuffers[1] = buffers[1];
+	const auto [pfbos, ppcolorBuffers] = CreateBloomFrameBuffer(GetWindowWidth(), GetWindowHeight());
+	m_pingpongFBO[0] = pfbos[0];
+	m_pingpongFBO[1] = pfbos[1];
+	m_pingpongColorbuffers[0] = ppcolorBuffers[0];
+	m_pingpongColorbuffers[1] = ppcolorBuffers[1];
 	glEnable(GL_DEPTH_TEST);
 	//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 	return true;
@@ -53,63 +125,6 @@ static std::shared_ptr<GLImageTexture2D> CreateTexture(const std::string &imgnam
 	const auto valid = texture->load().texture()->valid();
 	ExitIfFailed(valid, "Failed to load texture from file {}", imgFile);
 	return texture;
-}
-
-static auto CreateHdrFrameBuffer(int width, int height){
-	unsigned int hdrFBO;
-    glGenFramebuffers(1, &hdrFBO);
-    glBindFramebuffer(GL_FRAMEBUFFER, hdrFBO);
-    // create 2 floating point color buffers (1 for normal rendering, other for brightness threshold values)
-    unsigned int colorBuffers[2];
-    glGenTextures(2, colorBuffers);
-    for (unsigned int i = 0; i < 2; i++)
-    {
-        glBindTexture(GL_TEXTURE_2D, colorBuffers[i]);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, width, height, 0, GL_RGBA, GL_FLOAT, NULL);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);  // we clamp to the edge as the blur filter would otherwise sample repeated texture values!
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-        // attach texture to framebuffer
-        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + i, GL_TEXTURE_2D, colorBuffers[i], 0);
-    }
-    // create and attach depth buffer (renderbuffer)
-    unsigned int rboDepth;
-    glGenRenderbuffers(1, &rboDepth);
-    glBindRenderbuffer(GL_RENDERBUFFER, rboDepth);
-    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, width, height);
-    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, rboDepth);
-    // tell OpenGL which color attachments we'll use (of this framebuffer) for rendering 
-    unsigned int attachments[2] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1 };
-    glDrawBuffers(2, attachments);
-    // finally check if framebuffer is complete
-    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
-        std::cout << "Framebuffer not complete!" << std::endl;
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
-	return std::pair(hdrFBO, std::vector(colorBuffers[0], colorBuffers[1]));
-}
-
-static auto CreateBloomFrameBuffer(int width, int height){
-	unsigned int pingpongFBO[2];
-    unsigned int pingpongColorbuffers[2];
-    glGenFramebuffers(2, pingpongFBO);
-    glGenTextures(2, pingpongColorbuffers);
-    for (unsigned int i = 0; i < 2; i++)
-    {
-        glBindFramebuffer(GL_FRAMEBUFFER, pingpongFBO[i]);
-        glBindTexture(GL_TEXTURE_2D, pingpongColorbuffers[i]);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, width, height, 0, GL_RGBA, GL_FLOAT, NULL);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE); // we clamp to the edge as the blur filter would otherwise sample repeated texture values!
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, pingpongColorbuffers[i], 0);
-        // also check if framebuffers are complete (no need for depth buffer)
-        if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
-            std::cout << "Framebuffer not complete!" << std::endl;
-    }
-
-	return std::pair(std::vector(pingpongFBO[0], pingpongFBO[1]), std::vector(pingpongColorbuffers[0], pingpongColorbuffers[1]));
 }
 
 static auto GetLightPosAndColor(){
@@ -128,8 +143,8 @@ static auto GetLightPosAndColor(){
 	return std::pair(lightPositions, lightColors);
 }
 void GLBloomApp::createTextures(){
-	wood_ = CreateTexture("wood.png");
-	brick_ = CreateTexture("bricks2.jpg");
+	m_woodTexture = CreateTexture("wood.png");
+	m_brickTexture = CreateTexture("bricks2.jpg");
 }
 
 void GLBloomApp::compileShader(){
@@ -137,7 +152,14 @@ void GLBloomApp::compileShader(){
 	{
 		const auto vfile = join(shaderDir, "Bloom.vs");
 		const auto ffile = join(shaderDir, "Bloom.fs");
-		auto ret = _bloomProgram.init(vfile, ffile);
+		auto ret = m_bloomProgram.init(vfile, ffile);
+		ErrorHandle::ExitIfFailed(ret, "Create OpenGL program failed!");
+	}
+
+	{
+		const auto vfile = join(shaderDir, "Light.vs");
+		const auto ffile = join(shaderDir, "Light.fs");
+		auto ret = m_lightProgram.init(vfile, ffile);
 		ErrorHandle::ExitIfFailed(ret, "Create OpenGL program failed!");
 	}
 }
@@ -159,56 +181,129 @@ static auto GetCubePositions() {
 	return cubePositions;
 }
 
-void GLBloomApp::extractBrightPart(){
+void GLBloomApp::renderOneCube(GLProgram& program, const glm::mat4& model, const glm::mat4& projection, const glm::mat4& view){
+	program.use();
+	glBindVertexArray(m_cube->getVao());
+	program.update("model", model);
+	program.update("projection", projection);
+	program.update("view", view);
+	m_woodTexture->texture()->bind(0);
+	program.update("diffuseTexture", 0);
+	glDrawElements(GL_TRIANGLES, m_cube->idxSize(), GL_UNSIGNED_INT, 0);
+	glBindVertexArray(0);
+}
 
+void GLBloomApp::renderCubes(GLProgram &program, const glm::mat4 &projection, const glm::mat4 &view, const glm::vec3 &viewPos) {
+	auto cubePositions = GetCubePositions();
+	program.use();
+	program.update("viewPos", viewPos);
+	for (const auto& pos : cubePositions) {
+		glm::mat4 model = glm::mat4(1.0f); // make sure to initialize matrix to identity matrix first	
+		model = glm::translate(model, pos);
+		model = glm::scale(model, glm::vec3(0.5f));
+		renderOneCube(program, model, projection, view);
+	}
+}
+
+void GLBloomApp::renderPlane(GLProgram &program, const glm::mat4 &projection, const glm::mat4 &view, const glm::vec3 &viewPos) {
+	glBindVertexArray(m_plane->getVao());
+	{
+		program.use();
+		program.update("viewPos", viewPos);
+		glm::mat4 model = glm::mat4(1.0f); // make sure to initialize matrix to identity matrix first
+		m_brickTexture->texture()->bind(0);
+		program.update("diffuseTexture", 0);
+		model = glm::translate(model, glm::vec3(0.0));
+		program.update("model", model);
+		program.update("view", view);
+		program.update("projection", projection);
+		glDrawArrays(GL_TRIANGLES, 0, 6);
+	}
+}
+
+#include <iostream>
+#include <fstream>
+
+void saveFramebufferAsImage(GLuint framebuffer, int width, int height) {
+    // �� framebuffer
+    glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
+
+    // ����һ�����������洢������������
+    float* pixels = new float[width * height * 4]; // RGBA��ʽ
+
+    // ��ȡ��������
+    glReadPixels(0, 0, width, height, GL_RGBA, GL_FLOAT, pixels);
+
+    // ����Ϊͼ���ļ������� PPM ��ʽ����������������
+    std::ofstream file("output.ppm", std::ios::binary);
+    if (file) {
+        file << "P6\n" << width << " " << height << "\n255\n";
+
+        // ����������ת��Ϊ8λ���ݲ�д���ļ�
+        for (int i = 0; i < width * height; ++i) {
+            unsigned char r = static_cast<unsigned char>(std::clamp(pixels[i * 4 + 0] * 255.0f, 0.0f, 255.0f));
+            unsigned char g = static_cast<unsigned char>(std::clamp(pixels[i * 4 + 1] * 255.0f, 0.0f, 255.0f));
+            unsigned char b = static_cast<unsigned char>(std::clamp(pixels[i * 4 + 2] * 255.0f, 0.0f, 255.0f));
+            file.write(reinterpret_cast<char*>(&r), 1);
+            file.write(reinterpret_cast<char*>(&g), 1);
+            file.write(reinterpret_cast<char*>(&b), 1);
+        }
+
+        file.close();
+        std::cout << "Framebuffer saved as output.ppm" << std::endl;
+    } else {
+        std::cerr << "Failed to save image" << std::endl;
+    }
+
+    // ����
+    delete[] pixels;
+
+    // ��� framebuffer
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
+
+// ���ʵ��ĵط����ô˺���
+void GLBloomApp::extractBrightPart(const glm::mat4 &projection, const glm::mat4 &view) {
+	glBindFramebuffer(GL_FRAMEBUFFER, m_hdrFBO);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	renderLight(m_lightProgram, projection, view);
+	const auto viewPos = _camera.getAttr().pos;
+	const auto [lightPositions, lightColors] = GetLightPosAndColor();
+	m_bloomProgram.use();
+	for (int i = 0; i < lightPositions.size(); i++) {
+		m_bloomProgram.update("lights[" + std::to_string(i) + "].Position", lightPositions[i]);
+		m_bloomProgram.update("lights[" + std::to_string(i) + "].Color", lightColors[i]);
+	}
+	renderCubes(m_bloomProgram, projection, view, viewPos);
+	renderPlane(m_bloomProgram, projection, view, viewPos);
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	//saveFramebufferAsImage(m_hdrFBO, GetWindowWidth(), GetWindowHeight());
+}
+
+void GLBloomApp::renderLight(GLProgram& program, const glm::mat4& projection, const glm::mat4& view) {
+	auto lightPosAndColor = GetLightPosAndColor();
+	const auto& lightPositions = lightPosAndColor.first;
+	const auto& lightColors = lightPosAndColor.second;
+	program.use();
+	for (int i = 0; i < lightPositions.size(); i++) {
+		glm::mat4 model = glm::mat4(1.0f); // make sure to initialize matrix to identity matrix first	
+		model = glm::translate(model, lightPositions[i]);
+		model = glm::scale(model, glm::vec3(0.25f));
+		program.update("lightColor", lightColors[i]);
+		renderOneCube(program, model, projection, view);
+		
+	}
 }
 
 void GLBloomApp::drawScene(const float dt) {
+	GLCameraBaseApp::drawScene(dt);
 	auto pos = _camera.getAttr().pos;
 	ImGui::Begin("OpenGL");
 	ImGui::End();
 
-	GLApp::drawScene(dt);
-	extractBrightPart();
-	
-	glBindVertexArray(cube_->getVao());
-	
-	auto cubePositions = GetCubePositions();
-	static float curTime = 0;
-	curTime += dt;
 	const auto projection = glm::perspective(glm::radians(_camera.zoom()), aspectRatio(), 0.1f, 100.0f);
 	const auto view = _camera.getViewMatrix();
-	for (int i = 0; i < cubePositions.size(); i++) {
-		glm::mat4 model = glm::mat4(1.0f); // make sure to initialize matrix to identity matrix first
-		
-		model = glm::translate(model, cubePositions[i]);
-		float angle = 20.0f * (i + 1) * curTime;
-		model = glm::rotate(model, glm::radians(angle), glm::vec3(1.0f, 0.3f, 0.5f));
-		_bloomProgram.use();
-		_bloomProgram.update("model", model);
-		_bloomProgram.update("view", view);
-		_bloomProgram.update("projection", projection);
-		brick_->texture()->bind(0);
-		_bloomProgram.update("textureSampler", 0);
-		//glDrawArrays(GL_TRIANGLES, 0, 36);
-		glDrawElements(GL_TRIANGLES, cube_->idxSize(), GL_UNSIGNED_INT, 0);
-	}
-	
-	glBindVertexArray(0);
-
-	glBindVertexArray(plane_->getVao());
-	{
-		glm::mat4 model = glm::mat4(1.0f); // make sure to initialize matrix to identity matrix first
-
-		model = glm::translate(model, glm::vec3(0.0));
-		_bloomProgram.use();
-		_bloomProgram.update("model", model);
-		_bloomProgram.update("view", view);
-		_bloomProgram.update("projection", projection);
-		wood_->texture()->bind(0);
-		_bloomProgram.update("textureSampler", 0);
-		//glDrawArrays(GL_TRIANGLES, 0, 36);
-		glDrawArrays(GL_TRIANGLES, 0, 6);
-	}
-	glBindVertexArray(0);
+	extractBrightPart(projection, view);
+	static float curTime = 0;
+	curTime += dt;
 }

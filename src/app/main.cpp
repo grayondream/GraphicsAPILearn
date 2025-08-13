@@ -63,7 +63,7 @@ int main(int argc, char **argv) {
 
     GLFWWindowProperties props(
         "Pure Window (No Graphics API)",
-        800, 600,  // 宽高
+        GetWindowWidth(), GetWindowHeight(),  // 宽高
         200, 200 );
     props.title = "Hello Graphics!";
     app->init(props);

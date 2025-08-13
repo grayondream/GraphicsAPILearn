@@ -23,15 +23,27 @@ private:
 	void compileShader();
 	void initShapes();
 	void createTextures();
-	void extractBrightPart();
+
+	void extractBrightPart(const glm::mat4 &projection, const glm::mat4 &view);
 	
+	void renderLight(GLProgram& program, const glm::mat4& projection, const glm::mat4& view);
+	void renderOneCube(GLProgram &program, const glm::mat4& model, const glm::mat4& projection, const glm::mat4& view);
+	void renderCubes(GLProgram &program, const glm::mat4 &projection, const glm::mat4 &view, const glm::vec3 &viewPos);
+	void renderPlane(GLProgram &program, const glm::mat4 &projection, const glm::mat4 &view, const glm::vec3 &viewPos);
+
 private:
-	GLProgram _bloomProgram;
+	GLProgram m_bloomProgram;
+	GLProgram m_lightProgram;
+	unsigned int m_hdrFBO{};
+	unsigned int m_colorBuffers[2]{};
+	unsigned int m_rboDepth{};
+	unsigned int m_pingpongFBO[2]{};
+	unsigned int m_pingpongColorbuffers[2]{};
+
 	float _curTime{};	
-	bool _enableHdr = true;
-	float _exposure = 0.5f;
-	std::shared_ptr<GLImageTexture2D> wood_{};
-	std::shared_ptr<GLImageTexture2D> brick_{};
-	std::shared_ptr<GLCube> cube_{};
-	std::shared_ptr<GLPlane> plane_{};
+	
+	std::shared_ptr<GLImageTexture2D> m_woodTexture{};
+	std::shared_ptr<GLImageTexture2D> m_brickTexture{};
+	std::shared_ptr<GLCube> m_cube{};
+	std::shared_ptr<GLPlane> m_plane{};
 };
