@@ -66,7 +66,7 @@ static auto CreateHdrFrameBuffer(int width, int height) {
 	}
 	
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
-	return std::pair(hdrFBO, std::vector(colorBuffers[0], colorBuffers[1]));
+	return std::pair(hdrFBO, std::pair(colorBuffers[0], colorBuffers[1]));
 }
 
 static auto CreateBloomFrameBuffer(int width, int height) {
@@ -93,7 +93,7 @@ static auto CreateBloomFrameBuffer(int width, int height) {
 		glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	}
 
-	return std::pair(std::vector(pingpongFBO[0], pingpongFBO[1]), std::vector(pingpongColorbuffers[0], pingpongColorbuffers[1]));
+	return std::pair(std::pair(pingpongFBO[0], pingpongFBO[1]), std::pair(pingpongColorbuffers[0], pingpongColorbuffers[1]));
 }
 
 bool GLBloomApp::initApp() {
@@ -106,13 +106,13 @@ bool GLBloomApp::initApp() {
 	initShapes();
 	const auto [fbo, buffers] = CreateHdrFrameBuffer(GetWindowWidth(), GetWindowHeight());
 	m_hdrFBO = fbo;
-	m_colorBuffers[0] = buffers[0];
-	m_colorBuffers[1] = buffers[1];
+	m_colorBuffers[0] = buffers.first;
+	m_colorBuffers[1] = buffers.second;
 	const auto [pfbos, ppcolorBuffers] = CreateBloomFrameBuffer(GetWindowWidth(), GetWindowHeight());
-	m_pingpongFBO[0] = pfbos[0];
-	m_pingpongFBO[1] = pfbos[1];
-	m_pingpongColorbuffers[0] = ppcolorBuffers[0];
-	m_pingpongColorbuffers[1] = ppcolorBuffers[1];
+	m_pingpongFBO[0] = pfbos.first;
+	m_pingpongFBO[1] = pfbos.second;
+	m_pingpongColorbuffers[0] = ppcolorBuffers.first;
+	m_pingpongColorbuffers[1] = ppcolorBuffers.second;
 	createQuadBuffer();
 	glEnable(GL_DEPTH_TEST);
 	//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
