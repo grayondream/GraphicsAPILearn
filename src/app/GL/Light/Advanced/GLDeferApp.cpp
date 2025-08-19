@@ -226,11 +226,20 @@ void GLDeferApp::renderLight(GLProgram& program, const glm::mat4& projection, co
 }
 
 void GLDeferApp::renderGBuffer(GLProgram &program, const glm::mat4 &projection, const glm::mat4 &view) {
+	glBindFramebuffer(GL_FRAMEBUFFER, m_gBuffer.gbuffer);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
 	program.use();
 	program.update("projection", projection);
 	program.update("view", view);
+	m_woodTexture->texture()->bind(0);
+	program.update("diffuseTexture", 0);
 	renderCubes(program, projection, view, _camera.getAttr().pos);
+	m_brickTexture->texture()->bind(0);
+	program.update("diffuseTexture", 0);
 	renderPlane(program, projection, view, _camera.getAttr().pos);
+	
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
 
