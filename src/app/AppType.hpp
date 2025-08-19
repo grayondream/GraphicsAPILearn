@@ -48,6 +48,7 @@ enum class AppType : int{
     NormalMap,
     ParallaxMap,
     Hdr,
-    Bloom
+    Bloom,
+    Defer
 };
 

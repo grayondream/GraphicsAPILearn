@@ -49,12 +49,13 @@ using namespace Constexpr;
  *  ParallaxMap                     render object with parallax map
  *  Hdr                             render hdr scene
  *  Bloom                           rende bloom light
+ *  Defer                           render defer scene
  */
 
 namespace EnumUtil = Utils::Enum;
 
 int main(int argc, char **argv) {
-    auto type = AppType::Bloom;
+    auto type = AppType::Defer;
     auto api = GraphicsType::GL;
     LOGI("Start Graphics Learn!!!");
     LOGI("Select {} Application, Render App With {} API", EnumUtil::EnumName(type), EnumUtil::EnumName(api));

@@ -38,6 +38,7 @@
 #include "App/GL/Light/Advanced/GLParallaxMapApp.hpp"
 #include "App/GL/Light/Advanced/GLHdrApp.hpp"
 #include "App/GL/Light/Advanced/GLBloomApp.hpp"
+#include "App/GL/Light/Advanced/GLDeferApp.hpp"
 
 #include <memory>
 
@@ -121,7 +122,8 @@ std::shared_ptr<IApplication> GLAppFactory::create(const AppType type){
 			return std::make_shared<GLHdrApp>();
 		case AppType::Bloom:
 			return std::make_shared<GLBloomApp>();
-			
+		case AppType::Defer:
+			return std::make_shared<GLDeferApp>();			
 		default:
 			break;	
 	}

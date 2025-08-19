@@ -43,6 +43,9 @@
 | **NormalMap**             | Render normal map.                            |   ✅️   |
 | **ParallaxMap**             | Render parallax map.                            |   ✅️   |
 | **Hdr**                     | Render hdr with multiple light source |   ✅️ |
+| **Bloom**                   | Render bloom light. |   ✅️ |
+| **Defer**                   | Render defer scene. |    |
+
 
 ### DirectX
 
