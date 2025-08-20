@@ -50,12 +50,13 @@ using namespace Constexpr;
  *  Hdr                             render hdr scene
  *  Bloom                           rende bloom light
  *  Defer                           render defer scene
+ *  SSAO                            render SSAO scene
  */
 
 namespace EnumUtil = Utils::Enum;
 
 int main(int argc, char **argv) {
-    auto type = AppType::Defer;
+    auto type = AppType::SSAO;
     auto api = GraphicsType::GL;
     LOGI("Start Graphics Learn!!!");
     LOGI("Select {} Application, Render App With {} API", EnumUtil::EnumName(type), EnumUtil::EnumName(api));

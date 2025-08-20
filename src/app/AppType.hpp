@@ -49,6 +49,7 @@ enum class AppType : int{
     ParallaxMap,
     Hdr,
     Bloom,
-    Defer
+    Defer,
+    SSAO,
 };
 

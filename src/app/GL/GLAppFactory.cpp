@@ -39,6 +39,7 @@
 #include "App/GL/Light/Advanced/GLHdrApp.hpp"
 #include "App/GL/Light/Advanced/GLBloomApp.hpp"
 #include "App/GL/Light/Advanced/GLDeferApp.hpp"
+#include "App/GL/Light/Advanced/GLSSAOApp.hpp"
 
 #include <memory>
 
@@ -124,6 +125,8 @@ std::shared_ptr<IApplication> GLAppFactory::create(const AppType type){
 			return std::make_shared<GLBloomApp>();
 		case AppType::Defer:
 			return std::make_shared<GLDeferApp>();			
+		case AppType::SSAO:
+			return std::make_shared<GLSSAOApp>();
 		default:
 			break;	
 	}
