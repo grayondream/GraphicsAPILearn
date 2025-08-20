@@ -26,6 +26,7 @@ private:
 	void createFrameBuffers();
 	void createQuadBuffer();
 
+	void renderLightBox(GLProgram& program, const glm::mat4& projection, const glm::mat4& view);
 	void renderLight(GLProgram& program, const glm::mat4& projection, const glm::mat4& view);
 	void renderOneCube(GLProgram &program, const glm::mat4& model, const glm::mat4& projection, const glm::mat4& view);
 	void renderCubes(GLProgram &program, const glm::mat4 &projection, const glm::mat4 &view, const glm::vec3 &viewPos);
@@ -47,14 +48,15 @@ private:
 private:
 	GBuffer m_gBuffer;
 	GLProgram m_gBufferProgram;
-
-
-	int m_cubeCount{20};
-	
+	GLProgram m_lightBoxProgram;
 	GLProgram m_lightProgram;
-	GLProgram m_blurProgram;
-	GLProgram m_finalProgram;
 
+	int m_Count{10};
+
+	unsigned int m_quadVAO{};
+	unsigned int m_quadVBO{};
+	
+	bool m_enableVolume{};
 	float _curTime{};	
 	
 	std::shared_ptr<GLImageTexture2D> m_woodTexture{};

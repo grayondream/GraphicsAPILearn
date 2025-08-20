@@ -9,6 +9,7 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
+#include <glm/gtc/random.hpp>
 #include "Base/Log.hpp"
 #include "imgui.h"
 #include <Utils/FileUtils.hpp>
@@ -16,13 +17,23 @@
 #include "Utils/GL/GLUtils.hpp"
 #include "Base/Constexpr.hpp"
 
+
 using namespace Constexpr;
 using FileUtils::join;
 using namespace ErrorHandle;
 
 GLDeferApp::~GLDeferApp() {
 	m_cube->destroy();
-	m_plane->destroy();
+    m_plane->destroy();
+    // 释放帧缓冲资源
+    if (m_gBuffer.gbuffer) glDeleteFramebuffers(1, &m_gBuffer.gbuffer);
+    if (m_gBuffer.gPosition) glDeleteTextures(1, &m_gBuffer.gPosition);
+    if (m_gBuffer.gNormal) glDeleteTextures(1, &m_gBuffer.gNormal);
+    if (m_gBuffer.gAlbedoSpec) glDeleteTextures(1, &m_gBuffer.gAlbedoSpec);
+    if (m_gBuffer.rboDepth) glDeleteRenderbuffers(1, &m_gBuffer.rboDepth);
+    // 释放quad的VAO/VBO
+    glDeleteVertexArrays(1, &m_quadVAO);
+    glDeleteBuffers(1, &m_quadVBO);
 }
 
 void GLDeferApp::initShapes() {
@@ -82,6 +93,31 @@ void GLDeferApp::createFrameBuffers() {
 	m_gBuffer.rboDepth = rboDepth;
 }
 
+void GLDeferApp::createQuadBuffer(){
+	unsigned int quadVAO;
+	unsigned int quadVBO;
+	float quadVertices[] = {
+		// positions        // texture Coords
+		-1.0f,  1.0f, 0.0f, 0.0f, 1.0f,
+		-1.0f, -1.0f, 0.0f, 0.0f, 0.0f,
+			1.0f,  1.0f, 0.0f, 1.0f, 1.0f,
+			1.0f, -1.0f, 0.0f, 1.0f, 0.0f,
+	};
+	// setup plane VAO
+	glGenVertexArrays(1, &quadVAO);
+	glGenBuffers(1, &quadVBO);
+	glBindVertexArray(quadVAO);
+	glBindBuffer(GL_ARRAY_BUFFER, quadVBO);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), &quadVertices, GL_STATIC_DRAW);
+	glEnableVertexAttribArray(0);
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);
+	glEnableVertexAttribArray(1);
+	glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
+	glBindVertexArray(0);
+	m_quadVAO = quadVAO;
+	m_quadVBO = quadVBO;
+}
+
 bool GLDeferApp::initApp() {
 	if (!GLCameraBaseApp::initApp()) {
 		return false;
@@ -91,6 +127,7 @@ bool GLDeferApp::initApp() {
 	compileShader();
 	initShapes();
 	createFrameBuffers();
+	createQuadBuffer();
 	glEnable(GL_DEPTH_TEST);
 	//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 	return true;
@@ -105,21 +142,6 @@ static std::shared_ptr<GLImageTexture2D> CreateTexture(const std::string &imgnam
 	return texture;
 }
 
-static auto GetLightPosAndColor(){
-	std::vector<glm::vec3> lightPositions;
-    lightPositions.push_back(glm::vec3( 0.0f, 0.5f,  1.5f));
-    lightPositions.push_back(glm::vec3(-4.0f, 0.5f, -3.0f));
-    lightPositions.push_back(glm::vec3( 3.0f, 0.5f,  1.0f));
-    lightPositions.push_back(glm::vec3(-.8f,  2.4f, -1.0f));
-    // colors
-    std::vector<glm::vec3> lightColors;
-    lightColors.push_back(glm::vec3(5.0f,   5.0f,  5.0f));
-    lightColors.push_back(glm::vec3(10.0f,  0.0f,  0.0f));
-    lightColors.push_back(glm::vec3(0.0f,   0.0f,  15.0f));
-    lightColors.push_back(glm::vec3(0.0f,   5.0f,  0.0f));
-
-	return std::pair(lightPositions, lightColors);
-}
 void GLDeferApp::createTextures(){
 	m_woodTexture = CreateTexture("wood.png");
 	m_brickTexture = CreateTexture("bricks2.jpg");
@@ -134,29 +156,22 @@ void GLDeferApp::compileShader(){
 		ErrorHandle::ExitIfFailed(ret, "Create OpenGL program failed!");
 	}
 
-	// {
-	// 	const auto vfile = join(shaderDir, "Light.vs");
-	// 	const auto ffile = join(shaderDir, "Light.fs");
-	// 	auto ret = m_lightProgram.init(vfile, ffile);
-	// 	ErrorHandle::ExitIfFailed(ret, "Create OpenGL program failed!");
-	// }
+	{
+		const auto vfile = join(shaderDir, "Light.vs");
+		const auto ffile = join(shaderDir, "Light.fs");
+		auto ret = m_lightProgram.init(vfile, ffile);
+		ErrorHandle::ExitIfFailed(ret, "Create OpenGL program failed!");
+	}
 
-	// {
-	// 	const auto vfile = join(shaderDir, "Blur.vs");
-	// 	const auto ffile = join(shaderDir, "Blur.fs");
-	// 	auto ret = m_blurProgram.init(vfile, ffile);
-	// 	ErrorHandle::ExitIfFailed(ret, "Create OpenGL program failed!");
-	// }
-
-	// {
-	// 	const auto vfile = join(shaderDir, "Final.vs");
-	// 	const auto ffile = join(shaderDir, "Final.fs");
-	// 	auto ret = m_finalProgram.init(vfile, ffile);
-	// 	ErrorHandle::ExitIfFailed(ret, "Create OpenGL program failed!");
-	// }
+	{
+		const auto vfile = join(shaderDir, "LightBox.vs");
+		const auto ffile = join(shaderDir, "LightBox.fs");
+		auto ret = m_lightBoxProgram.init(vfile, ffile);
+		ErrorHandle::ExitIfFailed(ret, "Create OpenGL program failed!");
+	}
 }
 
-static auto GetCubePositions(int count = 20, float gap = 0.04f, glm::vec3 center = glm::vec3(0)) {
+static auto GetPositions(int count = 20, float gap = 0.04f, glm::vec3 center = glm::vec3(0)) {
     std::vector<glm::vec3> cubePositions;
 
     for (int x = 0; x < count; ++x) {
@@ -171,26 +186,65 @@ static auto GetCubePositions(int count = 20, float gap = 0.04f, glm::vec3 center
     return cubePositions;
 }
 
+
+static auto GetColorByPos(const glm::vec3& pos) {
+    // 将位置坐标归一化到 [0, 1] 范围（可根据实际场景调整映射范围）
+    // 示例：假设位置在 [-5, 5] 范围内，先映射到 [0, 1]
+    auto normalize = [](float val, float min = -5.0f, float max = 5.0f) {
+        return glm::clamp((val - min) / (max - min), 0.0f, 1.0f);
+    };
+
+    // x 分量映射到红色，y 映射到绿色，z 映射到蓝色
+    float r = normalize(pos.x);       // 红色随 x 变化
+    float g = normalize(pos.y);       // 绿色随 y 变化
+    float b = normalize(pos.z);       // 蓝色随 z 变化
+
+    // 可添加偏移或缩放增强效果（例如让绿色更明显）
+    g = glm::pow(g, 0.8f);  // 绿色曲线调整，使中间值更亮
+
+    return glm::vec3(r, g, b);
+}
+
+static std::vector<std::pair<glm::vec3, glm::vec3>> GetLightPosAndColors(int count = 20, float gap = 0.04f, glm::vec3 center = glm::vec3(0)){
+	std::vector<std::pair<glm::vec3, glm::vec3>> lightPosAndColors;
+	for (int x = 0; x < count; ++x) {
+        for (int z = 0; z < count; ++z) {
+            // 计算每个立方体的位置
+            float posX = center.x + (x - (count - 1) / 2.0f) * gap;
+            float posZ = center.z + (z - (count - 1) / 2.0f) * gap;
+			const auto pos = glm::vec3(posX, center.y, posZ);
+            lightPosAndColors.emplace_back(pos, GetColorByPos(pos));
+        }
+    }
+	return lightPosAndColors;
+}
+
+void GLDeferApp::renderQuad(){
+	glBindVertexArray(m_quadVAO);
+	glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+	glBindVertexArray(0);
+}
+
 void GLDeferApp::renderOneCube(GLProgram& program, const glm::mat4& model, const glm::mat4& projection, const glm::mat4& view){
 	program.use();
 	glBindVertexArray(m_cube->getVao());
 	program.update("model", model);
 	program.update("projection", projection);
 	program.update("view", view);
-	m_woodTexture->texture()->bind(0);
-	program.update("diffuseTexture", 0);
 	glDrawElements(GL_TRIANGLES, m_cube->idxSize(), GL_UNSIGNED_INT, 0);
 	glBindVertexArray(0);
 }
 
 void GLDeferApp::renderCubes(GLProgram &program, const glm::mat4 &projection, const glm::mat4 &view, const glm::vec3 &viewPos) {
-	auto cubePositions = GetCubePositions(m_cubeCount);
+	auto cubePositions = GetPositions(m_Count, 1, glm::vec3(0,0.5,0));
 	program.use();
 	program.update("viewPos", viewPos);
+    m_woodTexture->texture()->bind(0);
+    program.update("diffuseTexture", 0);
 	for (const auto& pos : cubePositions) {
 		glm::mat4 model = glm::mat4(1.0f); // make sure to initialize matrix to identity matrix first	
 		model = glm::translate(model, pos);
-		model = glm::scale(model, glm::vec3(0.02f));
+		model = glm::scale(model, glm::vec3(0.1f));
 		renderOneCube(program, model, projection, view);
 	}
 }
@@ -212,15 +266,47 @@ void GLDeferApp::renderPlane(GLProgram &program, const glm::mat4 &projection, co
 }
 
 void GLDeferApp::renderLight(GLProgram& program, const glm::mat4& projection, const glm::mat4& view) {
-	auto lightPosAndColor = GetLightPosAndColor();
-	const auto& lightPositions = lightPosAndColor.first;
-	const auto& lightColors = lightPosAndColor.second;
+    auto lightPositionsColor = GetLightPosAndColors(m_Count, 2);
 	program.use();
-	for (int i = 0; i < lightPositions.size(); i++) {
-		glm::mat4 model = glm::mat4(1.0f); // make sure to initialize matrix to identity matrix first	
-		model = glm::translate(model, lightPositions[i]);
-		model = glm::scale(model, glm::vec3(0.010f));
-		program.update("lightColor", lightColors[i]);
+	{
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, m_gBuffer.gPosition);
+		program.update("gPosition", 0);
+		glActiveTexture(GL_TEXTURE1);
+		glBindTexture(GL_TEXTURE_2D, m_gBuffer.gNormal);
+		program.update("gNormal", 1);
+		glActiveTexture(GL_TEXTURE2);
+		glBindTexture(GL_TEXTURE_2D, m_gBuffer.gAlbedoSpec);
+		program.update("gAlbedoSpec", 2);
+	}
+
+	program.update("viewPos", _camera.getAttr().pos);
+	const float linear = 0.7f;
+	const float quadratic = 1.8f;
+	const float constant = 1.0f;
+	program.update("enableVolume", m_enableVolume);
+	for (unsigned int i = 0; i < lightPositionsColor.size(); i++){
+		program.update("lights[" + std::to_string(i) + "].Position", lightPositionsColor[i].first);
+		program.update("lights[" + std::to_string(i) + "].Color", lightPositionsColor[i].second);
+		// update attenuation parameters and calculate radius
+		program.update("lights[" + std::to_string(i) + "].Linear", linear);
+		program.update("lights[" + std::to_string(i) + "].Quadratic", quadratic);
+		const float maxBrightness = std::fmaxf(std::fmaxf(lightPositionsColor[i].second.r, lightPositionsColor[i].second.g), lightPositionsColor[i].second.b);
+        float radius = (-linear + std::sqrt(linear * linear - 4 * quadratic * (constant - (256.0f / 5.0f) * maxBrightness))) / (2.0f * quadratic);
+        program.update("lights[" + std::to_string(i) + "].Radius", radius);
+	}
+
+	renderQuad();
+}
+
+void GLDeferApp::renderLightBox(GLProgram &program, const glm::mat4 &projection, const glm::mat4 &view) {
+	program.use();
+	auto lightPositionsColor = GetLightPosAndColors(m_Count, 1);
+	for (const auto& posColor : lightPositionsColor) {
+		glm::mat4 model = glm::mat4(1.0f); // make sure to initialize matrix to identity matrix first
+		model = glm::translate(model, posColor.first);
+		model = glm::scale(model, glm::vec3(0.1f));
+		program.update("lightColor", posColor.second);
 		renderOneCube(program, model, projection, view);
 	}
 }
@@ -246,11 +332,20 @@ void GLDeferApp::renderGBuffer(GLProgram &program, const glm::mat4 &projection, 
 void GLDeferApp::drawScene(const float dt) {
 	GLCameraBaseApp::drawScene(dt);
 	auto pos = _camera.getAttr().pos;
-	ImGui::Begin("OpenGL");
-	ImGui::SliderInt("Cube Count", &m_cubeCount, 10, 200);
-	ImGui::End();
-
 	const auto projection = glm::perspective(glm::radians(_camera.zoom()), aspectRatio(), 0.1f, 100.0f);
 	const auto view = _camera.getViewMatrix();
 	renderGBuffer(m_gBufferProgram, projection, view);
+	renderLight(m_lightProgram, projection, view);
+
+	glBindFramebuffer(GL_READ_FRAMEBUFFER, m_gBuffer.gbuffer);
+	glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0); // write to default framebuffer
+	glBlitFramebuffer(0, 0, GetWindowWidth(), GetWindowHeight(), 0, 0, GetWindowWidth(), GetWindowHeight(), GL_DEPTH_BUFFER_BIT, GL_NEAREST);
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+	renderLightBox(m_lightBoxProgram, projection, view);
+
+	ImGui::Begin("OpenGL");
+	ImGui::SliderInt("Cube Count", &m_Count, 1, 13);
+	ImGui::Checkbox("Enable Volume", &m_enableVolume);
+	ImGui::End();
 }
