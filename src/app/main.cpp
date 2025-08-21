@@ -51,12 +51,13 @@ using namespace Constexpr;
  *  Bloom                           rende bloom light
  *  Defer                           render defer scene
  *  SSAO                            render SSAO scene
+ *  PBR_Base                        render PBR base scene
  */
 
 namespace EnumUtil = Utils::Enum;
 
 int main(int argc, char **argv) {
-    auto type = AppType::SSAO;
+    auto type = AppType::PBR_Base;
     auto api = GraphicsType::GL;
     LOGI("Start Graphics Learn!!!");
     LOGI("Select {} Application, Render App With {} API", EnumUtil::EnumName(type), EnumUtil::EnumName(api));

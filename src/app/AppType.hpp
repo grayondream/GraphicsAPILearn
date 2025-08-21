@@ -51,5 +51,6 @@ enum class AppType : int{
     Bloom,
     Defer,
     SSAO,
+    PBR_Base,
 };
 
