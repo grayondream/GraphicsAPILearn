@@ -1,4 +1,9 @@
 #include "GLSSAOApp.hpp"
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/type_ptr.hpp>
+#include <glm/gtc/random.hpp>
+#include <random>
 #include "Native/GL/GLProgram.hpp"
 #include "Base/StaticCollector.hpp"
 #include "Base/ErrorHandle.hpp"
@@ -6,13 +11,9 @@
 #include "Native/GL/GLImageTexture2D.hpp"
 #include "Native/GL/GLCube.hpp"
 #include "Native/GL/GLPlane.hpp"
-#include <glm/glm.hpp>
-#include <glm/gtc/matrix_transform.hpp>
-#include <glm/gtc/type_ptr.hpp>
-#include <glm/gtc/random.hpp>
 #include "Base/Log.hpp"
 #include "imgui.h"
-#include <Utils/FileUtils.hpp>
+#include "Utils/FileUtils.hpp"
 #include "Geometry/Rect.hpp"
 #include "Utils/GL/GLUtils.hpp"
 #include "Base/Constexpr.hpp"
@@ -23,8 +24,6 @@ using FileUtils::join;
 using namespace ErrorHandle;
 
 GLSSAOApp::~GLSSAOApp() {
-	m_cube->destroy();
-    m_plane->destroy();
     // 释放帧缓冲资源
     if (m_gBuffer.gbuffer) glDeleteFramebuffers(1, &m_gBuffer.gbuffer);
     if (m_gBuffer.gPosition) glDeleteTextures(1, &m_gBuffer.gPosition);
@@ -37,14 +36,79 @@ GLSSAOApp::~GLSSAOApp() {
 }
 
 void GLSSAOApp::initShapes() {
-	m_cube = std::make_shared< GLCube>();
-	m_plane = std::make_shared< GLPlane>();
+	
+}
 
-	m_cube->init();
-	m_plane->init();
+static std::vector<glm::vec3> GenerateSSAONoise(int kernelSize = 64) {
+	std::vector<glm::vec3> ssaoNoise;
+	std::uniform_real_distribution<GLfloat> randomFloats(0.0, 1.0); // generates random floats between 0.0 and 1.0
+    std::default_random_engine generator;
+    for (unsigned int i = 0; i < kernelSize; i++)
+    {
+        glm::vec3 noise(randomFloats(generator) * 2.0 - 1.0, randomFloats(generator) * 2.0 - 1.0, 0.0f); // rotate around z-axis (in tangent space)
+        ssaoNoise.push_back(noise);
+    }
+
+    return ssaoNoise;
+}
+
+void GLSSAOApp::createSSAOFbo() {
+	unsigned int ssaoFBO, ssaoBlurFBO;
+    glGenFramebuffers(1, &ssaoFBO);  glGenFramebuffers(1, &ssaoBlurFBO);
+    glBindFramebuffer(GL_FRAMEBUFFER, ssaoFBO);
+    unsigned int ssaoColorBuffer, ssaoColorBufferBlur;
+    // SSAO color buffer
+    glGenTextures(1, &ssaoColorBuffer);
+    glBindTexture(GL_TEXTURE_2D, ssaoColorBuffer);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, GetWindowWidth(), GetWindowHeight(), 0, GL_RED, GL_FLOAT, NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, ssaoColorBuffer, 0);
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE){
+		SPDLOG_ERROR("SSAO Framebuffer not complete!");
+		ExitIfFailed(false, "SSAO Framebuffer not complete!");
+	}
+
+    // and blur stage
+    glBindFramebuffer(GL_FRAMEBUFFER, ssaoBlurFBO);
+    glGenTextures(1, &ssaoColorBufferBlur);
+    glBindTexture(GL_TEXTURE_2D, ssaoColorBufferBlur);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, GetWindowWidth(), GetWindowHeight(), 0, GL_RED, GL_FLOAT, NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, ssaoColorBufferBlur, 0);
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE){
+		SPDLOG_ERROR("SSAO Blur Framebuffer not complete!");
+		ExitIfFailed(false, "SSAO Blur Framebuffer not complete!");
+	}
+
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+	{
+		const auto ssaoNoise = GenerateSSAONoise();
+		unsigned int noiseTexture; 
+		glGenTextures(1, &noiseTexture);
+		glBindTexture(GL_TEXTURE_2D, noiseTexture);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, 4, 4, 0, GL_RGB, GL_FLOAT, &ssaoNoise[0]);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+		m_ssaoBuffer.noiseTexture = noiseTexture;
+	}
+
+	m_ssaoBuffer.fbo = ssaoFBO;
+	m_ssaoBuffer.blurFbo = ssaoBlurFBO;
+	m_ssaoBuffer.ssaoColorBuffer = ssaoColorBuffer;
+	m_ssaoBuffer.ssaoBlurBuffer = ssaoColorBufferBlur;
 }
 
 void GLSSAOApp::createFrameBuffers() {
+	createGBufferFbo();
+	createSSAOFbo();	
+}
+
+void GLSSAOApp::createGBufferFbo() {
 	unsigned int gBuffer;
     glGenFramebuffers(1, &gBuffer);
     glBindFramebuffer(GL_FRAMEBUFFER, gBuffer);
@@ -121,14 +185,81 @@ void GLSSAOApp::createQuadBuffer(){
 	m_quadVBO = quadVBO;
 }
 
+void GLSSAOApp::createCubeBuffer(){
+	unsigned int cubeVAO;
+	unsigned int cubeVBO;
+	float vertices[] = {
+		// back face
+		-1.0f, -1.0f, -1.0f,  0.0f,  0.0f, -1.0f, 0.0f, 0.0f, // bottom-left
+		 1.0f,  1.0f, -1.0f,  0.0f,  0.0f, -1.0f, 1.0f, 1.0f, // top-right
+		 1.0f, -1.0f, -1.0f,  0.0f,  0.0f, -1.0f, 1.0f, 0.0f, // bottom-right         
+		 1.0f,  1.0f, -1.0f,  0.0f,  0.0f, -1.0f, 1.0f, 1.0f, // top-right
+		-1.0f, -1.0f, -1.0f,  0.0f,  0.0f, -1.0f, 0.0f, 0.0f, // bottom-left
+		-1.0f,  1.0f, -1.0f,  0.0f,  0.0f, -1.0f, 0.0f, 1.0f, // top-left
+		// front face
+		-1.0f, -1.0f,  1.0f,  0.0f,  0.0f,  1.0f, 0.0f, 0.0f, // bottom-left
+		 1.0f, -1.0f,  1.0f,  0.0f,  0.0f,  1.0f, 1.0f, 0.0f, // bottom-right
+		 1.0f,  1.0f,  1.0f,  0.0f,  0.0f,  1.0f, 1.0f, 1.0f, // top-right
+		 1.0f,  1.0f,  1.0f,  0.0f,  0.0f,  1.0f, 1.0f, 1.0f, // top-right
+		-1.0f,  1.0f,  1.0f,  0.0f,  0.0f,  1.0f, 0.0f, 1.0f, // top-left
+		-1.0f, -1.0f,  1.0f,  0.0f,  0.0f,  1.0f, 0.0f, 0.0f, // bottom-left
+		// left face
+		-1.0f,  1.0f,  1.0f, -1.0f,  0.0f,  0.0f, 1.0f, 0.0f, // top-right
+		-1.0f,  1.0f, -1.0f, -1.0f,  0.0f,  0.0f, 1.0f, 1.0f, // top-left
+		-1.0f, -1.0f, -1.0f, -1.0f,  0.0f,  0.0f, 0.0f, 1.0f, // bottom-left
+		-1.0f, -1.0f, -1.0f, -1.0f,  0.0f,  0.0f, 0.0f, 1.0f, // bottom-left
+		-1.0f, -1.0f,  1.0f, -1.0f,  0.0f,  0.0f, 0.0f, 0.0f, // bottom-right
+		-1.0f,  1.0f,  1.0f, -1.0f,  0.0f,  0.0f, 1.0f, 0.0f, // top-right
+		// right face
+		 1.0f,  1.0f,  1.0f,  1.0f,  0.0f,  0.0f, 1.0f, 0.0f, // top-left
+		 1.0f, -1.0f, -1.0f,  1.0f,  0.0f,  0.0f, 0.0f, 1.0f, // bottom-right
+		 1.0f,  1.0f, -1.0f,  1.0f,  0.0f,  0.0f, 1.0f, 1.0f, // top-right         
+		 1.0f, -1.0f, -1.0f,  1.0f,  0.0f,  0.0f, 0.0f, 1.0f, // bottom-right
+		 1.0f,  1.0f,  1.0f,  1.0f,  0.0f,  0.0f, 1.0f, 0.0f, // top-left
+		 1.0f, -1.0f,  1.0f,  1.0f,  0.0f,  0.0f, 0.0f, 0.0f, // bottom-left     
+		// bottom face
+		-1.0f, -1.0f, -1.0f,  0.0f, -1.0f,  0.0f, 0.0f, 1.0f, // top-right
+		 1.0f, -1.0f, -1.0f,  0.0f, -1.0f,  0.0f, 1.0f, 1.0f, // top-left
+		 1.0f, -1.0f,  1.0f,  0.0f, -1.0f,  0.0f, 1.0f, 0.0f, // bottom-left
+		 1.0f, -1.0f,  1.0f,  0.0f, -1.0f,  0.0f, 1.0f, 0.0f, // bottom-left
+		-1.0f, -1.0f,  1.0f,  0.0f, -1.0f,  0.0f, 0.0f, 0.0f, // bottom-right
+		-1.0f, -1.0f, -1.0f,  0.0f, -1.0f,  0.0f, 0.0f, 1.0f, // top-right
+		// top face
+		-1.0f,  1.0f, -1.0f,  0.0f,  1.0f,  0.0f, 0.0f, 1.0f, // top-left
+		 1.0f,  1.0f , 1.0f,  0.0f,  1.0f,  0.0f, 1.0f, 0.0f, // bottom-right
+		 1.0f,  1.0f, -1.0f,  0.0f,  1.0f,  0.0f, 1.0f, 1.0f, // top-right     
+		 1.0f,  1.0f,  1.0f,  0.0f,  1.0f,  0.0f, 1.0f, 0.0f, // bottom-right
+		-1.0f,  1.0f, -1.0f,  0.0f,  1.0f,  0.0f, 0.0f, 1.0f, // top-left
+		-1.0f,  1.0f,  1.0f,  0.0f,  1.0f,  0.0f, 0.0f, 0.0f  // bottom-left        
+	};
+	glGenVertexArrays(1, &cubeVAO);
+	glGenBuffers(1, &cubeVBO);
+	// fill buffer
+	glBindBuffer(GL_ARRAY_BUFFER, cubeVBO);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+	// link vertex attributes
+	glBindVertexArray(cubeVAO);
+	glEnableVertexAttribArray(0);
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)0);
+	glEnableVertexAttribArray(1);
+	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(3 * sizeof(float)));
+	glEnableVertexAttribArray(2);
+	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(6 * sizeof(float)));
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+	glBindVertexArray(0);
+	m_cubeVAO = cubeVAO;
+	m_cubeVBO = cubeVBO;
+}
 bool GLSSAOApp::initApp() {
 	if (!GLCameraBaseApp::initApp()) {
 		return false;
 	}
-	
+
+	loadModel();
 	createTextures();
 	compileShader();
 	initShapes();
+	createCubeBuffer();
 	createFrameBuffers();
 	createQuadBuffer();
 	glEnable(GL_DEPTH_TEST);
@@ -146,8 +277,7 @@ static std::shared_ptr<GLImageTexture2D> CreateTexture(const std::string &imgnam
 }
 
 void GLSSAOApp::createTextures(){
-	m_woodTexture = CreateTexture("wood.png");
-	m_brickTexture = CreateTexture("bricks2.jpg");
+	
 }
 
 void GLSSAOApp::compileShader(){
@@ -160,66 +290,54 @@ void GLSSAOApp::compileShader(){
 	}
 
 	{
+		const auto vfile = join(shaderDir, "SSAO.vs");
+		const auto ffile = join(shaderDir, "SSAO.fs");
+		auto ret = m_ssaoProgram.init(vfile, ffile);
+		ErrorHandle::ExitIfFailed(ret, "Create OpenGL program failed!");
+	}
+
+	{
+		const auto vfile = join(shaderDir, "SSAOBlur.vs");
+		const auto ffile = join(shaderDir, "SSAOBlur.fs");
+		auto ret = m_ssaoBlurProgram.init(vfile, ffile);
+		ErrorHandle::ExitIfFailed(ret, "Create OpenGL program failed!");
+	}
+
+	{
 		const auto vfile = join(shaderDir, "Light.vs");
 		const auto ffile = join(shaderDir, "Light.fs");
 		auto ret = m_lightProgram.init(vfile, ffile);
 		ErrorHandle::ExitIfFailed(ret, "Create OpenGL program failed!");
 	}
-
-	{
-		const auto vfile = join(shaderDir, "LightBox.vs");
-		const auto ffile = join(shaderDir, "LightBox.fs");
-		auto ret = m_lightBoxProgram.init(vfile, ffile);
-		ErrorHandle::ExitIfFailed(ret, "Create OpenGL program failed!");
-	}
 }
 
-static auto GetPositions(int count = 20, float gap = 0.04f, glm::vec3 center = glm::vec3(0)) {
-    std::vector<glm::vec3> cubePositions;
+void GLSSAOApp::loadModel() {
+	const auto modelPath = StaticCollector::getModelPath();
+	const auto modelFile = join(modelPath, "backpack", "backpack.obj");
+	m_model = std::make_shared<Model>(modelFile);
+}
 
-    for (int x = 0; x < count; ++x) {
-        for (int z = 0; z < count; ++z) {
-            // 计算每个立方体的位置
-            float posX = center.x + (x - (count - 1) / 2.0f) * gap;
-            float posZ = center.z + (z - (count - 1) / 2.0f) * gap;
-            cubePositions.emplace_back(posX, center.y, posZ);
-        }
+static float ourLerp(float a, float b, float f){
+	return a + f * (b - a);
+}
+
+static std::vector<glm::vec3> GenerateSSAOKernel(int kernelSize = 64) {
+	std::uniform_real_distribution<GLfloat> randomFloats(0.0, 1.0); // generates random floats between 0.0 and 1.0
+    std::default_random_engine generator;
+    std::vector<glm::vec3> ssaoKernel;
+    for (unsigned int i = 0; i < kernelSize; ++i)
+    {
+        glm::vec3 sample(randomFloats(generator) * 2.0 - 1.0, randomFloats(generator) * 2.0 - 1.0, randomFloats(generator));
+        sample = glm::normalize(sample);
+        sample *= randomFloats(generator);
+        float scale = float(i) / float(kernelSize);
+
+        // scale samples s.t. they're more aligned to center of kernel
+        scale = ourLerp(0.1f, 1.0f, scale * scale);
+        sample *= scale;
+        ssaoKernel.push_back(sample);
     }
-
-    return cubePositions;
-}
-
-
-static auto GetColorByPos(const glm::vec3& pos) {
-    // 将位置坐标归一化到 [0, 1] 范围（可根据实际场景调整映射范围）
-    // 示例：假设位置在 [-5, 5] 范围内，先映射到 [0, 1]
-    auto normalize = [](float val, float min = -5.0f, float max = 5.0f) {
-        return glm::clamp((val - min) / (max - min), 0.0f, 1.0f);
-    };
-
-    // x 分量映射到红色，y 映射到绿色，z 映射到蓝色
-    float r = normalize(pos.x);       // 红色随 x 变化
-    float g = normalize(pos.y);       // 绿色随 y 变化
-    float b = normalize(pos.z);       // 蓝色随 z 变化
-
-    // 可添加偏移或缩放增强效果（例如让绿色更明显）
-    g = glm::pow(g, 0.8f);  // 绿色曲线调整，使中间值更亮
-
-    return glm::vec3(r, g, b);
-}
-
-static std::vector<std::pair<glm::vec3, glm::vec3>> GetLightPosAndColors(int count = 20, float gap = 0.04f, glm::vec3 center = glm::vec3(0)){
-	std::vector<std::pair<glm::vec3, glm::vec3>> lightPosAndColors;
-	for (int x = 0; x < count; ++x) {
-        for (int z = 0; z < count; ++z) {
-            // 计算每个立方体的位置
-            float posX = center.x + (x - (count - 1) / 2.0f) * gap;
-            float posZ = center.z + (z - (count - 1) / 2.0f) * gap;
-			const auto pos = glm::vec3(posX, center.y, posZ);
-            lightPosAndColors.emplace_back(pos, GetColorByPos(pos));
-        }
-    }
-	return lightPosAndColors;
+    return ssaoKernel;
 }
 
 void GLSSAOApp::renderQuad(){
@@ -228,109 +346,110 @@ void GLSSAOApp::renderQuad(){
 	glBindVertexArray(0);
 }
 
-void GLSSAOApp::renderOneCube(GLProgram& program, const glm::mat4& model, const glm::mat4& projection, const glm::mat4& view){
-	program.use();
-	glBindVertexArray(m_cube->getVao());
-	program.update("model", model);
-	program.update("projection", projection);
-	program.update("view", view);
-	glDrawElements(GL_TRIANGLES, m_cube->idxSize(), GL_UNSIGNED_INT, 0);
+void GLSSAOApp::renderOneCube() {
+	glBindVertexArray(m_cubeVAO);
+	glDrawArrays(GL_TRIANGLES, 0, 36);
 	glBindVertexArray(0);
-}
-
-void GLSSAOApp::renderCubes(GLProgram &program, const glm::mat4 &projection, const glm::mat4 &view, const glm::vec3 &viewPos) {
-	auto cubePositions = GetPositions(m_Count, 1, glm::vec3(0,0.5,0));
-	program.use();
-	program.update("viewPos", viewPos);
-    m_woodTexture->texture()->bind(0);
-    program.update("diffuseTexture", 0);
-	for (const auto& pos : cubePositions) {
-		glm::mat4 model = glm::mat4(1.0f); // make sure to initialize matrix to identity matrix first	
-		model = glm::translate(model, pos);
-		model = glm::scale(model, glm::vec3(0.1f));
-		renderOneCube(program, model, projection, view);
-	}
-}
-
-void GLSSAOApp::renderPlane(GLProgram &program, const glm::mat4 &projection, const glm::mat4 &view, const glm::vec3 &viewPos) {
-	glBindVertexArray(m_plane->getVao());
-	{
-		program.use();
-		program.update("viewPos", viewPos);
-		glm::mat4 model = glm::mat4(1.0f); // make sure to initialize matrix to identity matrix first
-		m_brickTexture->texture()->bind(0);
-		program.update("diffuseTexture", 0);
-		model = glm::translate(model, glm::vec3(0.0));
-		program.update("model", model);
-		program.update("view", view);
-		program.update("projection", projection);
-		glDrawArrays(GL_TRIANGLES, 0, 6);
-	}
-}
-
-void GLSSAOApp::renderLight(GLProgram& program, const glm::mat4& projection, const glm::mat4& view) {
-    auto lightPositionsColor = GetLightPosAndColors(m_Count, 2);
-	program.use();
-	{
-		glActiveTexture(GL_TEXTURE0);
-		glBindTexture(GL_TEXTURE_2D, m_gBuffer.gPosition);
-		program.update("gPosition", 0);
-		glActiveTexture(GL_TEXTURE1);
-		glBindTexture(GL_TEXTURE_2D, m_gBuffer.gNormal);
-		program.update("gNormal", 1);
-		glActiveTexture(GL_TEXTURE2);
-		glBindTexture(GL_TEXTURE_2D, m_gBuffer.gAlbedoSpec);
-		program.update("gAlbedoSpec", 2);
-	}
-
-	program.update("viewPos", _camera.getAttr().pos);
-	const float linear = 0.7f;
-	const float quadratic = 1.8f;
-	const float constant = 1.0f;
-	program.update("enableVolume", m_enableVolume);
-	for (unsigned int i = 0; i < lightPositionsColor.size(); i++){
-		program.update("lights[" + std::to_string(i) + "].Position", lightPositionsColor[i].first);
-		program.update("lights[" + std::to_string(i) + "].Color", lightPositionsColor[i].second);
-		// update attenuation parameters and calculate radius
-		program.update("lights[" + std::to_string(i) + "].Linear", linear);
-		program.update("lights[" + std::to_string(i) + "].Quadratic", quadratic);
-		const float maxBrightness = std::fmaxf(std::fmaxf(lightPositionsColor[i].second.r, lightPositionsColor[i].second.g), lightPositionsColor[i].second.b);
-        float radius = (-linear + std::sqrt(linear * linear - 4 * quadratic * (constant - (256.0f / 5.0f) * maxBrightness))) / (2.0f * quadratic);
-        program.update("lights[" + std::to_string(i) + "].Radius", radius);
-	}
-
-	renderQuad();
-}
-
-void GLSSAOApp::renderLightBox(GLProgram &program, const glm::mat4 &projection, const glm::mat4 &view) {
-	program.use();
-	auto lightPositionsColor = GetLightPosAndColors(m_Count, 1);
-	for (const auto& posColor : lightPositionsColor) {
-		glm::mat4 model = glm::mat4(1.0f); // make sure to initialize matrix to identity matrix first
-		model = glm::translate(model, posColor.first);
-		model = glm::scale(model, glm::vec3(0.1f));
-		program.update("lightColor", posColor.second);
-		renderOneCube(program, model, projection, view);
-	}
 }
 
 void GLSSAOApp::renderGBuffer(GLProgram &program, const glm::mat4 &projection, const glm::mat4 &view) {
 	glBindFramebuffer(GL_FRAMEBUFFER, m_gBuffer.gbuffer);
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-	program.use();
-	program.update("projection", projection);
-	program.update("view", view);
-	m_woodTexture->texture()->bind(0);
-	program.update("diffuseTexture", 0);
-	renderCubes(program, projection, view, _camera.getAttr().pos);
-	m_brickTexture->texture()->bind(0);
-	program.update("diffuseTexture", 0);
-	renderPlane(program, projection, view, _camera.getAttr().pos);
-	
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+		
+		glm::mat4 model = glm::mat4(1.0f);
+		m_gBufferProgram.use();
+		m_gBufferProgram.update("projection", projection);
+		m_gBufferProgram.update("view", view);
+		// room cube
+		model = glm::mat4(1.0f);
+		model = glm::translate(model, glm::vec3(0.0, 7.0f, 0.0f));
+		model = glm::scale(model, glm::vec3(7.5f, 7.5f, 7.5f));
+		m_gBufferProgram.update("model", model);
+		m_gBufferProgram.update("invertedNormals", 1); // invert normals as we're inside the cube
+		renderOneCube();
+		m_gBufferProgram.update("invertedNormals", 0); 
+		// backpack model on the floor
+		model = glm::mat4(1.0f);
+		model = glm::translate(model, glm::vec3(0.0f, 0.5f, 0.0));
+		model = glm::rotate(model, glm::radians(-90.0f), glm::vec3(1.0, 0.0, 0.0));
+		model = glm::scale(model, glm::vec3(1.0f));
+		m_gBufferProgram.update("model", model);
+		m_model->draw(m_gBufferProgram);
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
+void GLSSAOApp::renderSSAOTexture(GLProgram &program, const glm::mat4 &projection){
+	m_ssaoProgram.use();
+    m_ssaoProgram.update("gPosition", 0);
+    m_ssaoProgram.update("gNormal", 1);
+    m_ssaoProgram.update("texNoise", 2);
+	const auto ssaoKernel = GenerateSSAOKernel();
+	const auto ssaoFBO = m_ssaoBuffer.fbo;
+	const auto gPosition = m_gBuffer.gPosition;
+	const auto gNormal = m_gBuffer.gNormal;
+	const auto noiseTexture = m_ssaoBuffer.noiseTexture;
+	glBindFramebuffer(GL_FRAMEBUFFER, ssaoFBO);
+		glClear(GL_COLOR_BUFFER_BIT);
+		// Send kernel + rotation 
+		for (unsigned int i = 0; i < 64; ++i){
+			m_ssaoProgram.update("samples[" + std::to_string(i) + "]", ssaoKernel[i]);
+		}
+			
+		m_ssaoProgram.update("projection", projection);
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, gPosition);
+		glActiveTexture(GL_TEXTURE1);
+		glBindTexture(GL_TEXTURE_2D, gNormal);
+		glActiveTexture(GL_TEXTURE2);
+		glBindTexture(GL_TEXTURE_2D, noiseTexture);
+		renderQuad();
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
+
+void GLSSAOApp::renderBlurSSAOTexture(GLProgram &program){
+	m_ssaoBlurProgram.use();
+    m_ssaoBlurProgram.update("ssaoInput", 0);
+	const auto ssaoBlurFBO = m_ssaoBuffer.blurFbo;
+	const auto ssaoColorBuffer = m_ssaoBuffer.ssaoColorBuffer;
+	glBindFramebuffer(GL_FRAMEBUFFER, ssaoBlurFBO);
+		glClear(GL_COLOR_BUFFER_BIT);
+		m_ssaoBlurProgram.use();
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, ssaoColorBuffer);
+		renderQuad();
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
+
+void GLSSAOApp::renderLightPass(GLProgram &program){
+	m_lightProgram.use();
+    m_lightProgram.update("gPosition", 0);
+    m_lightProgram.update("gNormal", 1);
+    m_lightProgram.update("gAlbedo", 2);
+    m_lightProgram.update("ssao", 3);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	
+	// send light relevant uniforms
+	const glm::vec3 lightPos = glm::vec3(2.0, 4.0, -2.0);
+	const glm::vec3 lightColor = glm::vec3(0.2, 0.2, 0.7);
+	glm::vec3 lightPosView = glm::vec3(_camera.getViewMatrix() * glm::vec4(lightPos, 1.0));
+	m_lightProgram.update("light.Position", lightPosView);
+	m_lightProgram.update("light.Color", lightColor);
+	// Update attenuation parameters
+	const float linear    = 0.09f;
+	const float quadratic = 0.032f;
+	m_lightProgram.update("enableSSAO", m_enableSSAO);
+	m_lightProgram.update("light.Linear", linear);
+	m_lightProgram.update("light.Quadratic", quadratic);
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, m_gBuffer.gPosition);
+	glActiveTexture(GL_TEXTURE1);
+	glBindTexture(GL_TEXTURE_2D, m_gBuffer.gNormal);
+	glActiveTexture(GL_TEXTURE2);
+	glBindTexture(GL_TEXTURE_2D, m_gBuffer.gAlbedoSpec);
+	glActiveTexture(GL_TEXTURE3); // add extra SSAO texture to lighting pass
+	glBindTexture(GL_TEXTURE_2D, m_ssaoBuffer.ssaoColorBuffer);
+	renderQuad();
+}
 
 void GLSSAOApp::drawScene(const float dt) {
 	GLCameraBaseApp::drawScene(dt);
@@ -338,17 +457,10 @@ void GLSSAOApp::drawScene(const float dt) {
 	const auto projection = glm::perspective(glm::radians(_camera.zoom()), aspectRatio(), 0.1f, 100.0f);
 	const auto view = _camera.getViewMatrix();
 	renderGBuffer(m_gBufferProgram, projection, view);
-	renderLight(m_lightProgram, projection, view);
-
-	glBindFramebuffer(GL_READ_FRAMEBUFFER, m_gBuffer.gbuffer);
-	glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0); // write to default framebuffer
-	glBlitFramebuffer(0, 0, GetWindowWidth(), GetWindowHeight(), 0, 0, GetWindowWidth(), GetWindowHeight(), GL_DEPTH_BUFFER_BIT, GL_NEAREST);
-	glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
-	renderLightBox(m_lightBoxProgram, projection, view);
-
+	renderSSAOTexture(m_ssaoProgram, projection);
+	renderBlurSSAOTexture(m_ssaoBlurProgram);
+	renderLightPass(m_ssaoProgram);
 	ImGui::Begin("OpenGL");
-	ImGui::SliderInt("Cube Count", &m_Count, 1, 13);
-	ImGui::Checkbox("Enable Volume", &m_enableVolume);
+	ImGui::Checkbox("Enable SSAO", &m_enableSSAO);
 	ImGui::End();
 }
