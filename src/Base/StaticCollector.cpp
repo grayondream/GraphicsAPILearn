@@ -2,7 +2,7 @@
 #include "Utils/FileUtils.hpp"
 #include <filesystem>
 #ifndef RESOURCE_DIR
-constexpr const char * kResourceRoot = "res";
+constexpr const char * kResourceRoot = "Res";
 #else
 constexpr const char* kResourceRoot = RESOURCE_DIR;
 #endif//RESOURCE_DIR

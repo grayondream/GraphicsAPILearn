@@ -64,16 +64,16 @@ void GLPBRBaseApp::compileShader(){
 
 static auto GetLightPosAndColor(){
 	std::vector<glm::vec3> lightPositions = {
-        glm::vec3(-10.0f,  10.0f, 10.0f),
-        glm::vec3( 10.0f,  10.0f, 10.0f),
-        glm::vec3(-10.0f, -10.0f, 10.0f),
-        glm::vec3( 10.0f, -10.0f, 10.0f),
+        glm::vec3(-1.0f,  1.0f, 1.0f),
+        glm::vec3( 1.0f,  1.0f, 1.0f),
+        glm::vec3(-1.0f, -1.0f, 1.0f),
+        glm::vec3( 1.0f, -1.0f, 1.0f),
     };
 	std::vector<glm::vec3> lightColors = {
-        glm::vec3(300.0f, 300.0f, 300.0f),
-        glm::vec3(300.0f, 300.0f, 300.0f),
-        glm::vec3(300.0f, 300.0f, 300.0f),
-        glm::vec3(300.0f, 300.0f, 300.0f)
+        glm::vec3(1.0f, 1.0f, 1.0f),
+        glm::vec3(1.0f, 1.0f, 1.0f),
+        glm::vec3(1.0f, 1.0f, 1.0f),
+        glm::vec3(1.0f, 1.0f, 1.0f)
     };
 
     return std::make_pair(lightPositions, lightColors);
@@ -82,6 +82,8 @@ static auto GetLightPosAndColor(){
 void GLPBRBaseApp::renderSphere(GLProgram &program, const glm::mat4 &model) {
 	m_program.use();
 	program.update("model", model);
+	const auto normal = glm::transpose(glm::inverse(glm::mat3(model)));
+	program.update("normalMatrix", normal);
 	glBindVertexArray(m_sphere.getVao());
 	glDrawElements(GL_TRIANGLES, m_sphere.idxSize(), GL_UNSIGNED_INT, 0);
 	glBindVertexArray(0);
@@ -94,15 +96,15 @@ void GLPBRBaseApp::drawScene(const float dt) {
 	const auto view = _camera.getViewMatrix();
 
 	m_program.use();
-	m_program.update("albedo", glm::vec3(0.5f, 0.0f, 0.0f));
+	m_program.update("albedo", glm::vec3(0.5f, 0.5f, 0.5f));
     m_program.update("ao", 1.0f);
 	m_program.update("projection", projection);
 	m_program.update("view", view);
 	m_program.update("camPos", pos);
 	m_program.update("roughness", m_roughness);
-	const auto objectPos = glm::mat4(1.0f);
-	const auto normal =  glm::transpose(glm::inverse(glm::mat3(objectPos)));
-	m_program.update("normalMatrix", normal);
+    m_program.update("metallic", 0.0f);
+	auto objectPos = glm::mat4(1.0f);
+    objectPos = glm::translate(objectPos, glm::vec3(0.0f, 0.0f, -2.0f));
 	renderSphere(m_program, objectPos);
 
 	m_program.use();
@@ -117,7 +119,6 @@ void GLPBRBaseApp::drawScene(const float dt) {
 		lightModel = glm::translate(lightModel, lightPos);
 		lightModel = glm::scale(lightModel, glm::vec3(0.2f));
 		m_program.update("model", lightModel);
-		m_program.update("normalMatrix", glm::transpose(glm::inverse(glm::mat3(lightModel))));
 		renderSphere(m_program, lightModel);
 	}
 

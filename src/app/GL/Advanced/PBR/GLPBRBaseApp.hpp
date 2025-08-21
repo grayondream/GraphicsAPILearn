@@ -3,7 +3,8 @@
 
 #include "App/GL/Base/GLCameraApp.hpp"
 #include "Native/GL/GLProgram.hpp"
-#include "Native/GL/GLSphere.hpp" // 假设存在球体类
+#include "Native/GL/GLSphere.hpp" 
+#include "Native/GL/GLCube.hpp"
 #include <glm/glm.hpp>
 #include <vector>
 
@@ -31,7 +32,7 @@ protected:
     GLProgram m_program;
     
     // 球体几何体（用于渲染PBR物体和光源）
-    GLSphere m_sphere;
+    GLCube m_sphere;
     
     // PBR材质参数
     float m_roughness = 0.5f;   // 粗糙度
