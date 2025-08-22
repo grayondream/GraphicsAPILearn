@@ -44,7 +44,11 @@
 | **ParallaxMap**             | Render parallax map.                            |   ✅️   |
 | **Hdr**                     | Render hdr with multiple light source |   ✅️ |
 | **Bloom**                   | Render bloom light. |   ✅️ |
-| **Defer**                   | Render defer scene. |    |
+| **Defer**                   | Render defer scene. |  ✅️  |
+| **PBR_Base**                     | Render PBR scene. | ✅️   |
+| **PBR_Texture**             | Render PBR scene with texture. | ✅️   |
+
+
 
 
 ### DirectX
