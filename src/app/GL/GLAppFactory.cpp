@@ -41,6 +41,7 @@
 #include "App/GL/Light/Advanced/GLDeferApp.hpp"
 #include "App/GL/Light/Advanced/GLSSAOApp.hpp"
 #include "App/GL/Advanced/PBR/GLPBRBaseApp.hpp"
+#include "App/GL/Advanced/PBR/GLPBRTextureApp.hpp"
 
 #include <memory>
 
@@ -130,6 +131,8 @@ std::shared_ptr<IApplication> GLAppFactory::create(const AppType type){
 			return std::make_shared<GLSSAOApp>();
 		case AppType::PBR_Base:
 			return std::make_shared<GLPBRBaseApp>();
+		case AppType::PBR_Texture:
+			return std::make_shared<GLPBRTextureApp>();
 		default:
 			break;	
 	}

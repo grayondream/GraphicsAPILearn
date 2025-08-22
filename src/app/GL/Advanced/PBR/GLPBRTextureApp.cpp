@@ -1,4 +1,4 @@
-#include "GLPBRBaseApp.hpp"
+#include "GLPBRTextureApp.hpp"
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
@@ -23,16 +23,18 @@ using namespace Constexpr;
 using FileUtils::join;
 using namespace ErrorHandle;
 
-GLPBRBaseApp::~GLPBRBaseApp() {
+GLPBRTextureApp::~GLPBRTextureApp() {
     
 }
 
-void GLPBRBaseApp::initShapes() {
+void GLPBRTextureApp::initShapes() {
 	m_sphere.init();	
 }
 
 static std::shared_ptr<GLImageTexture2D> CreateTexture(const std::string &imgname){
-	const auto resDir = StaticCollector::getImagePath();
+	auto resDir = StaticCollector::getImagePath();
+	resDir = join(resDir, "rusted_iron");
+
 	const auto imgFile = join(resDir, imgname);
 	auto texture = std::make_shared<GLImageTexture2D>(imgFile);
 	const auto valid = texture->load().texture()->valid();
@@ -40,20 +42,22 @@ static std::shared_ptr<GLImageTexture2D> CreateTexture(const std::string &imgnam
 	return texture;
 }
 
-bool GLPBRBaseApp::initApp() {
+bool GLPBRTextureApp::initApp() {
 	if (!GLCameraBaseApp::initApp()) {
 		return false;
 	}
 
 	compileShader();
 	initShapes();	
+	loadTexture();
 	glEnable(GL_DEPTH_TEST);
 	//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 	return true;
 }
 
-void GLPBRBaseApp::compileShader(){
-	const auto shaderDir = join(StaticCollector::getGLShaderPath(), "Advanced", "PBR", "Base");
+void GLPBRTextureApp::compileShader(){
+	const auto shaderDir = join(StaticCollector::getGLShaderPath(), "Advanced", "PBR", "Texture");
+
 	{
 		const auto vfile = join(shaderDir, "PBR.vs");
 		const auto ffile = join(shaderDir, "PBR.fs");
@@ -79,7 +83,7 @@ static auto GetLightPosAndColor(){
     return std::make_pair(lightPositions, lightColors);
 }
 
-void GLPBRBaseApp::renderSphere(GLProgram &program, const glm::mat4 &model) {
+void GLPBRTextureApp::renderSphere(GLProgram &program, const glm::mat4 &model) {
 	m_program.use();
 	program.update("model", model);
 	const auto normal = glm::transpose(glm::inverse(glm::mat3(model)));
@@ -106,7 +110,16 @@ static std::vector<glm::vec3> GenreateObjPos(int radius = 5, float gap = 0.5f, c
     return positions;
 }
 
-void GLPBRBaseApp::drawScene(const float dt) {
+void GLPBRTextureApp::loadTexture(){
+    m_albedoMap = CreateTexture("albedo.png");
+    m_roughnessMap = CreateTexture("roughness.png");
+    m_metallicMap = CreateTexture("metallic.png");
+    m_aoMap = CreateTexture("ao.png");
+	m_normalMap = CreateTexture("normal.png");
+
+}
+
+void GLPBRTextureApp::drawScene(const float dt) {
 	GLCameraBaseApp::drawScene(dt);
 	auto pos = _camera.getAttr().pos;
 	const auto projection = glm::perspective(glm::radians(_camera.zoom()), aspectRatio(), 0.1f, 100.0f);
@@ -115,17 +128,26 @@ void GLPBRBaseApp::drawScene(const float dt) {
 
 	m_program.use();
 	m_program.update("texture", 0);
-    m_program.update("ao", m_ao);
+    
 	m_program.update("projection", projection);
 	m_program.update("view", view);
 	m_program.update("camPos", pos);
-	m_program.update("roughness", m_roughness);
-    m_program.update("metallic", m_metallic);
+	m_metallicMap->texture()->bind(3);
+	m_normalMap->texture()->bind(5);
+	m_aoMap->texture()->bind(4);
+	m_albedoMap->texture()->bind(1);
+	m_roughnessMap->texture()->bind(2);
+
+	m_program.update("albedoMap", 1);
+	m_program.update("roughnessMap", 2);
+	m_program.update("metallicMap", 3);
+	m_program.update("aoMap", 4);
+	m_program.update("normalMap", 5);
+	
 	const int cnt = objPos.size();
 	for(int i = 0;i < cnt;i ++){
 		const auto pos = objPos[i];
 		auto objectPos = glm::mat4(1.0f);
-		m_program.update("albedo", glm::vec3(i * 1.0f/ cnt, 0.0f, 0.0f));
 		objectPos = glm::translate(objectPos, pos);
 		objectPos = glm::scale(objectPos, glm::vec3(0.4f));
 		renderSphere(m_program, objectPos);
@@ -144,8 +166,5 @@ void GLPBRBaseApp::drawScene(const float dt) {
 
 	ImGui::Begin("OpenGL");
 	ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
-	ImGui::SliderFloat("Roughness", &m_roughness, 0.0f, 1.0f);
-	ImGui::SliderFloat("Metallic", &m_metallic, 0.0f, 1.0f);
-	ImGui::SliderFloat("AO", &m_ao, 0.0f, 1.0f);
 	ImGui::End();
 }

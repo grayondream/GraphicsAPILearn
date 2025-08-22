@@ -52,5 +52,6 @@ enum class AppType : int{
     Defer,
     SSAO,
     PBR_Base,
+    PBR_Texture,
 };
 

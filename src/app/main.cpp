@@ -52,12 +52,13 @@ using namespace Constexpr;
  *  Defer                           render defer scene
  *  SSAO                            render SSAO scene
  *  PBR_Base                        render PBR base scene
+ *  PBR_Texture                     render PBR texture scene
  */
 
 namespace EnumUtil = Utils::Enum;
 
 int main(int argc, char **argv) {
-    auto type = AppType::PBR_Base;
+    auto type = AppType::PBR_Texture;
     auto api = GraphicsType::GL;
     LOGI("Start Graphics Learn!!!");
     LOGI("Select {} Application, Render App With {} API", EnumUtil::EnumName(type), EnumUtil::EnumName(api));
