@@ -32,7 +32,7 @@ protected:
     GLProgram m_program;
     
     // 球体几何体（用于渲染PBR物体和光源）
-    GLCube m_sphere;
+    GLSphere m_sphere;
     
     // PBR材质参数
     float m_roughness = 0.5f;   // 粗糙度

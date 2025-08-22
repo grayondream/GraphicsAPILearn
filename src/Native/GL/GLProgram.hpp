@@ -42,6 +42,8 @@ public:
 
 	const GLProgram& update(const std::string& name, const glm::mat4 &value) const;
 
+	const GLProgram& update(const std::string& name, const glm::mat3 &value) const;
+
 private:
 	std::tuple<unsigned int, unsigned int, unsigned int> compileShader(const std::string vertFile, const std::string fragFile, const std::string geomFile);
 	GLuint createProgram(const std::string vertFile, const std::string fragFile, const std::string geomFile);

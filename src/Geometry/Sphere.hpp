@@ -9,17 +9,18 @@
 class Sphere : public Shape {
 public:
     Sphere(float radius = 1.0f, int sectorCount = 36, int stackCount = 18) {
-        generate(_pts, _idx, _normal, radius, sectorCount, stackCount);
+        generate(_pts, _idx, _normal, _uv, radius, sectorCount, stackCount);
     }
 
 private:
-    static void generate(std::vector<Vertex>& vertices, std::vector<unsigned int>& indices, std::vector<Vector4DBase<float>>& normals,
+    static void generate(std::vector<Vertex>& vertices, std::vector<unsigned int>& indices, std::vector<Vector4DBase<float>>& normals, std::vector<Vector2DBase<float>>& uvs,
         float radius, int sectorCount, int stackCount) {
         constexpr float PI = 3.14159265359f;
 
         vertices.clear();
         indices.clear();
         normals.clear();
+        uvs.clear();
 
         // Step 1: Generate vertices and normals
         for (int i = 0; i <= stackCount; ++i) {
@@ -41,6 +42,11 @@ private:
                 //glm::vec3 normalVec = glm::normalize(glm::vec3(x, y, z));
                 glm::vec3 normalVec = glm::vec3(x, y, z);
                 normals.push_back(Vector4DBase<float>{normalVec.x, normalVec.y, normalVec.z, 1.0});
+
+                // Calculate UV coordinates
+                float u = (float)j / sectorCount;
+                float v = (float)i / stackCount;
+                uvs.push_back(Vector2DBase<float>{u, v});
             }
         }
 

@@ -89,6 +89,11 @@ const GLProgram& GLProgram::update(const std::string& name, const glm::mat4& val
 	return *this;
 }
 
+const GLProgram& GLProgram::update(const std::string& name, const glm::mat3& value) const {
+	glUniformMatrix3fv(locate(name), 1, GL_FALSE, &value[0][0]);
+	return *this;
+}
+
 const GLProgram& GLProgram::update(const std::string& name, const glm::vec3& value) const {
 	glUniform3fv(locate(name), 1, &value[0]);
 	return *this;
