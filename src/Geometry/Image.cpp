@@ -5,30 +5,37 @@ extern "C" {
 }
 
 #include <Utils/GL/GLUtils.hpp>
+#include <exception>
 
-Image::Image(const std::string& file) {
-	_file = file;
+Image::Image(const std::string& file, const TextureOption& option) {
+	m_file = file;
+	m_option = option;
 }
 
 Image::~Image() {
-	stbi_image_free(_pdata);
+	stbi_image_free(m_pdata);
 }
 
 Image& Image::load(bool flip) {
 	stbi_set_flip_vertically_on_load(flip);
-	_pdata = stbi_load(_file.c_str(), &_size.width, &_size.height, &_size.channel, 0);
-	_format = GLUtils::PixelChannel2PixelFormat(_size.channel);
+	if (m_option.IsHdr) {
+		m_pdata = (uint8_t*)stbi_loadf(m_file.c_str(), &m_size.width, &m_size.height, &m_size.channel, 0);
+	}else {
+		m_pdata = stbi_load(m_file.c_str(), &m_size.width, &m_size.height, &m_size.channel, 0);
+	}
+
+	m_format = GLUtils::PixelChannel2PixelFormat(m_size.channel, m_option.IsHdr);
 	return *this;
 }
 
 uint8_t* Image::data() {
-	return _pdata;
+	return m_pdata;
 }
 
 ImageSize Image::size() {
-	return _size;
+	return m_size;
 }
 
 PixelFormat Image::format() {
-	return _format;
+	return m_format;
 }

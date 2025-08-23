@@ -16,9 +16,13 @@ public:
 	}
 };
 
-class Image {
+struct TextureOption {
+	bool IsHdr = false;
+};
+
+class Image {	
 public:
-	Image(const std::string& file = {});
+	Image(const std::string& file = {}, const TextureOption& option = {});
 	~Image();
 
 	Image& load(bool flip = true);
@@ -30,8 +34,9 @@ public:
 	PixelFormat format();
 
 private:
-	std::string _file{};
-	uint8_t* _pdata{};
-	ImageSize _size{};
-	PixelFormat _format{};
+	std::string m_file{};
+	uint8_t* m_pdata{};
+	ImageSize m_size{};
+	PixelFormat m_format{};
+	TextureOption m_option{};
 };

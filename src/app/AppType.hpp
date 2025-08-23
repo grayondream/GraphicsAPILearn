@@ -53,5 +53,6 @@ enum class AppType : int{
     SSAO,
     PBR_Base,
     PBR_Texture,
+    PBR_IBL_Irradiance_Conversion,
 };
 

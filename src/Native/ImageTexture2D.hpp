@@ -1,8 +1,7 @@
-
+#pragma once
 #include <Geometry/Image.hpp>
 #include "ITexture2D.hpp"
 #include "Geometry/Vertex.hpp"
-
 #include <vector>
 #include <memory>
 
@@ -10,7 +9,7 @@ using GLTextureType = unsigned int;
 using DX11TextureType = 
 class ImageTexture2D {
 public:
-	ImageTexture2D(const std::string& file);
+	ImageTexture2D(const std::string& file, const TextureOption& option = {});
 
 	virtual ImageTexture2D& load();
 

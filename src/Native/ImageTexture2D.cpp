@@ -4,8 +4,8 @@
 #include "glad/glad.h"
 #include <cassert>
 
-ImageTexture2D::ImageTexture2D(const std::string& file) {
-	_img = Image(file);
+ImageTexture2D::ImageTexture2D(const std::string& file, const TextureOption& option) {
+	_img = Image(file, option);
 	_coord = {
 		Point2D{1.0, 1.0},
 		Point2D{1.0, 0.0},

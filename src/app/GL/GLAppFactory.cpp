@@ -42,6 +42,7 @@
 #include "App/GL/Light/Advanced/GLSSAOApp.hpp"
 #include "App/GL/Advanced/PBR/GLPBRBaseApp.hpp"
 #include "App/GL/Advanced/PBR/GLPBRTextureApp.hpp"
+#include "App/GL/Advanced/PBR/GLIBLIrradianceConversionApp.hpp"
 
 #include <memory>
 
@@ -133,6 +134,8 @@ std::shared_ptr<IApplication> GLAppFactory::create(const AppType type){
 			return std::make_shared<GLPBRBaseApp>();
 		case AppType::PBR_Texture:
 			return std::make_shared<GLPBRTextureApp>();
+		case AppType::PBR_IBL_Irradiance_Conversion:
+			return std::make_shared<GLIBLIrradianceConversionApp>();
 		default:
 			break;	
 	}

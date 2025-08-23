@@ -4,8 +4,8 @@
 #include "glad/glad.h"
 #include <cassert>
 
-GLImageTexture2D::GLImageTexture2D(const std::string& file) 
-	: ImageTexture2D(file) {
+GLImageTexture2D::GLImageTexture2D(const std::string& file, const TextureOption& option) 
+	: ImageTexture2D(file, option) {
 }
 
 

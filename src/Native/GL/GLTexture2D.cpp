@@ -13,6 +13,7 @@ bool GLTexture2D::init(const Texture2DDataView &data){
     _size = data.size();
     unsigned int texture{};
     auto format = GLUtils::PixelFormat2GLFormat(data.format());
+    auto layout = GLUtils::PixelChannel2Layout(data.size().channel);
 	glGenTextures(1, &texture);
 	glBindTexture(GL_TEXTURE_2D, texture);
 	// set the texture wrapping parameters
@@ -23,7 +24,8 @@ bool GLTexture2D::init(const Texture2DDataView &data){
     
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	glTexImage2D(GL_TEXTURE_2D, 0, format, size().width, size().height, 0, format, GL_UNSIGNED_BYTE, data.data());
+    
+	glTexImage2D(GL_TEXTURE_2D, 0, format, size().width, size().height, 0, layout, GL_UNSIGNED_BYTE, data.data());
 	glGenerateMipmap(GL_TEXTURE_2D);
 	glBindTexture(GL_TEXTURE_2D, 0);
     _textureId = texture;
