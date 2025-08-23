@@ -2,6 +2,7 @@
 
 #include <glad/glad.h>
 #include <Geometry/Format.hpp>
+#include <string>
 
 namespace GLUtils {
     GLenum PixelChannel2Layout(int channel);
@@ -15,4 +16,6 @@ namespace GLUtils {
     GLuint Ptr2GLTextureId(const void* ptr);
 
     void* GLTextureId2Ptr(const GLuint& id);
+
+    void SaveFramebufferAsImage(GLuint framebuffer, int width, int height, const std::string &fileName = "output.ppm");
 }

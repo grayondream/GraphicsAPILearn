@@ -19,7 +19,8 @@ Image::~Image() {
 Image& Image::load(bool flip) {
 	stbi_set_flip_vertically_on_load(flip);
 	if (m_option.IsHdr) {
-		m_pdata = (uint8_t*)stbi_loadf(m_file.c_str(), &m_size.width, &m_size.height, &m_size.channel, 0);
+		float *ptr = stbi_loadf(m_file.c_str(), &m_size.width, &m_size.height, &m_size.channel, 0);
+		m_pdata = reinterpret_cast<uint8_t*>(ptr);
 	}else {
 		m_pdata = stbi_load(m_file.c_str(), &m_size.width, &m_size.height, &m_size.channel, 0);
 	}

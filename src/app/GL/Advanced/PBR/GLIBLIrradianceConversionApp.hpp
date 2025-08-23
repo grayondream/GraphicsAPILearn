@@ -25,20 +25,38 @@ private:
     void initShapes();
     void loadTexture();
     void compileShader();
+    void initFramebuffer();
+    void initCaptureViews();
+    void renderBeforeLoop() override;
+
+    void renderToCubemap();
+
+    void renderCube(GLProgram& program, const glm::mat4& model);
     void renderSphere(GLProgram& program, const glm::mat4& model);
+
+    void renderObjectsAndLights(GLProgram& program, const glm::mat4& view, const glm::mat4& projection);
+    void renderBackground(GLProgram& program, const glm::mat4& view, const glm::mat4& projection);
 
 protected:
     // PBR着色器程序
+    GLProgram m_cubeMapProgram;
     GLProgram m_program;
+    GLProgram m_backgroundProgram;
     
-    // 球体几何体（用于渲染PBR物体和光源）
     GLSphere m_sphere;
+    GLCube m_cube;
+
     
+
     std::shared_ptr<GLImageTexture2D> m_albedoMap;
     std::shared_ptr<GLImageTexture2D> m_roughnessMap;
     std::shared_ptr<GLImageTexture2D> m_metallicMap;
     std::shared_ptr<GLImageTexture2D> m_aoMap;
     std::shared_ptr<GLImageTexture2D> m_normalMap;
     std::shared_ptr<GLImageTexture2D> m_hdrEnvTexture;
+
+    unsigned int m_captureFBO = 0;
+    unsigned int m_captureRBO = 0;
+    unsigned int m_envCubemap = 0;
 };
 

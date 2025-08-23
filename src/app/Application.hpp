@@ -33,6 +33,7 @@ public:
 protected:
     virtual bool initGraphics() { return true; }
     virtual bool initApp() { return true; }
+    virtual void renderBeforeLoop(){}
     virtual void render();
     virtual void clearColor() {}
     virtual void beginDrawScene();

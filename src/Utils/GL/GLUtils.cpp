@@ -1,4 +1,6 @@
 #include "GLUtils.hpp"
+#include <Base/Log.hpp>
+#include <fstream>
 
 namespace GLUtils {
     GLenum PixelChannel2Layout(int channel) {
@@ -88,5 +90,43 @@ namespace GLUtils {
 
     void* GLTextureId2Ptr(const GLuint& id) {
         return static_cast<void*>(new GLuint(id)); 
+    }
+
+    void SaveFramebufferAsImage(GLuint framebuffer, int width, int height, const std::string &fileName) {
+        // �� framebuffer
+        glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
+
+        // ����һ�����������洢������������
+        float* pixels = new float[width * height * 4]; // RGBA��ʽ
+
+        // ��ȡ��������
+        glReadPixels(0, 0, width, height, GL_RGBA, GL_FLOAT, pixels);
+
+        // ����Ϊͼ���ļ������� PPM ��ʽ����������������
+        std::ofstream file(fileName, std::ios::binary);
+        if (file) {
+            file << "P6\n" << width << " " << height << "\n255\n";
+
+            // ����������ת��Ϊ8λ���ݲ�д���ļ�
+            for (int i = 0; i < width * height; ++i) {
+                unsigned char r = static_cast<unsigned char>(std::clamp(pixels[i * 4 + 0] * 255.0f, 0.0f, 255.0f));
+                unsigned char g = static_cast<unsigned char>(std::clamp(pixels[i * 4 + 1] * 255.0f, 0.0f, 255.0f));
+                unsigned char b = static_cast<unsigned char>(std::clamp(pixels[i * 4 + 2] * 255.0f, 0.0f, 255.0f));
+                file.write(reinterpret_cast<char*>(&r), 1);
+                file.write(reinterpret_cast<char*>(&g), 1);
+                file.write(reinterpret_cast<char*>(&b), 1);
+            }
+
+            file.close();
+            SPDLOG_INFO("Framebuffer saved as image: {}", fileName);
+        } else {
+            SPDLOG_ERROR("Failed to save image: {}", fileName);
+        }
+
+        // ����
+        delete[] pixels;
+
+        // ��� framebuffer
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
     }
 }

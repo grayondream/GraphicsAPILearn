@@ -29,6 +29,7 @@ GLIBLIrradianceConversionApp::~GLIBLIrradianceConversionApp() {
 
 void GLIBLIrradianceConversionApp::initShapes() {
 	m_sphere.init();	
+	m_cube.init();
 }
 
 static std::shared_ptr<GLImageTexture2D> CreateTexture(const std::string &imgFile, bool isHdr = false){
@@ -48,13 +49,54 @@ bool GLIBLIrradianceConversionApp::initApp() {
 	compileShader();
 	initShapes();	
 	loadTexture();
+	initFramebuffer();
+	initCaptureViews();
 	glEnable(GL_DEPTH_TEST);
 	//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 	return true;
 }
 
+void GLIBLIrradianceConversionApp::initCaptureViews(){
+	unsigned int envCubemap;
+    glGenTextures(1, &envCubemap);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, envCubemap);
+    for (unsigned int i = 0; i < 6; ++i)
+    {
+        glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB16F, 512, 512, 0, GL_RGB, GL_FLOAT, nullptr);
+    }
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR); 
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    m_envCubemap = envCubemap;
+}
+
+void GLIBLIrradianceConversionApp::initFramebuffer(){
+	unsigned int captureFBO;
+    unsigned int captureRBO;
+    glGenFramebuffers(1, &captureFBO);
+    glGenRenderbuffers(1, &captureRBO);
+
+    glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
+    glBindRenderbuffer(GL_RENDERBUFFER, captureRBO);
+    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, 512, 512);
+    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, captureRBO);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+	m_captureFBO = captureFBO;
+	m_captureRBO = captureRBO;
+}
+
 void GLIBLIrradianceConversionApp::compileShader(){
-	const auto shaderDir = join(StaticCollector::getGLShaderPath(), "Advanced", "PBR", "Texture");
+	const auto shaderDir = join(StaticCollector::getGLShaderPath(), "Advanced", "PBR", "IBL_IC");
+	{
+		const auto vfile = join(shaderDir, "CUBE.vs");
+		const auto ffile = join(shaderDir, "CUBE.fs");
+		auto ret = m_cubeMapProgram.init(vfile, ffile);
+		ErrorHandle::ExitIfFailed(ret, "Create OpenGL program failed!");
+	}
+
 
 	{
 		const auto vfile = join(shaderDir, "PBR.vs");
@@ -62,6 +104,26 @@ void GLIBLIrradianceConversionApp::compileShader(){
 		auto ret = m_program.init(vfile, ffile);
 		ErrorHandle::ExitIfFailed(ret, "Create OpenGL program failed!");
 	}
+
+	{
+		const auto vfile = join(shaderDir, "Background.vs");
+		const auto ffile = join(shaderDir, "Background.fs");
+		auto ret = m_backgroundProgram.init(vfile, ffile);
+		ErrorHandle::ExitIfFailed(ret, "Create OpenGL program failed!");
+	}
+}
+
+static std::vector<glm::mat4> GetCaptureViews(){
+	glm::mat4 captureViews[] =
+    {
+        glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3( 1.0f,  0.0f,  0.0f), glm::vec3(0.0f, -1.0f,  0.0f)),
+        glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(-1.0f,  0.0f,  0.0f), glm::vec3(0.0f, -1.0f,  0.0f)),
+        glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3( 0.0f,  1.0f,  0.0f), glm::vec3(0.0f,  0.0f,  1.0f)),
+        glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3( 0.0f, -1.0f,  0.0f), glm::vec3(0.0f,  0.0f, -1.0f)),
+        glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3( 0.0f,  0.0f,  1.0f), glm::vec3(0.0f, -1.0f,  0.0f)),
+        glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3( 0.0f,  0.0f, -1.0f), glm::vec3(0.0f, -1.0f,  0.0f))
+    };
+    return std::vector<glm::mat4>(captureViews, captureViews + 6);
 }
 
 static auto GetLightPosAndColor(){
@@ -79,6 +141,37 @@ static auto GetLightPosAndColor(){
     };
 
     return std::make_pair(lightPositions, lightColors);
+}
+
+void GLIBLIrradianceConversionApp::renderToCubemap(){
+	glViewport(0, 0, 512, 512);
+	glm::mat4 captureProjection = glm::perspective(glm::radians(90.0f), 1.0f, 0.1f, 10.0f);
+	const auto captureViews = GetCaptureViews();
+	m_cubeMapProgram.use();
+	m_hdrEnvTexture->texture()->bind(0);
+    m_cubeMapProgram.update("equirectangularMap", 0);
+    m_cubeMapProgram.update("projection", captureProjection);
+    glBindFramebuffer(GL_FRAMEBUFFER, m_captureFBO);
+    for (unsigned int i = 0; i < 6; ++i){
+        m_cubeMapProgram.update("view", captureViews[i]);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, m_envCubemap, 0);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+        renderCube(m_cubeMapProgram, glm::mat4(1.0));
+    }
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	GLUtils::SaveFramebufferAsImage(m_captureFBO, 512, 512);
+	glViewport(0, 0, m_window->getProperties().width, m_window->getProperties().height);
+}
+
+void GLIBLIrradianceConversionApp::renderCube(GLProgram &program, const glm::mat4 &model) {
+	m_program.use();
+	program.update("model", model);
+	const auto normal = glm::transpose(glm::inverse(glm::mat3(model)));
+	program.update("normalMatrix", normal);
+	glBindVertexArray(m_cube.getVao());
+	glDrawElements(GL_TRIANGLES, m_cube.idxSize(), GL_UNSIGNED_INT, 0);
+	glBindVertexArray(0);
 }
 
 void GLIBLIrradianceConversionApp::renderSphere(GLProgram &program, const glm::mat4 &model) {
@@ -120,30 +213,40 @@ void GLIBLIrradianceConversionApp::loadTexture(){
     m_hdrEnvTexture = CreateTexture(join(resDir, "newport_loft.hdr"), true);
 }
 
-void GLIBLIrradianceConversionApp::drawScene(const float dt) {
-	GLCameraBaseApp::drawScene(dt);
-	auto pos = _camera.getAttr().pos;
-	const auto projection = glm::perspective(glm::radians(_camera.zoom()), aspectRatio(), 0.1f, 100.0f);
-	const auto view = _camera.getViewMatrix();
-	const auto objPos = GenreateObjPos(2, 1.0f, glm::vec3(0.0f));
+void GLIBLIrradianceConversionApp::renderBeforeLoop(){
+	renderToCubemap();
+}
 
-	m_program.use();
-	m_program.update("texture", 0);
+void GLIBLIrradianceConversionApp::renderBackground(GLProgram& program, const glm::mat4& view, const glm::mat4& projection) {
+	program.use();
+	glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, m_envCubemap);
+	program.update("view", view);
+	program.update("environmentMap", 0);
+	program.update("projection", projection);
+	renderCube(program, glm::mat4(1.0));
+}
+
+void GLIBLIrradianceConversionApp::renderObjectsAndLights(GLProgram &program, const glm::mat4 &view, const glm::mat4 &projection) {
+	const auto objPos = GenreateObjPos(2, 1.0f, glm::vec3(0.0f));
+	auto pos = _camera.getAttr().pos;
+	program.use();
+	program.update("texture", 0);
     
-	m_program.update("projection", projection);
-	m_program.update("view", view);
-	m_program.update("camPos", pos);
+	program.update("projection", projection);
+	program.update("view", view);
+	program.update("camPos", pos);
 	m_metallicMap->texture()->bind(3);
 	m_normalMap->texture()->bind(5);
 	m_aoMap->texture()->bind(4);
 	m_albedoMap->texture()->bind(1);
 	m_roughnessMap->texture()->bind(2);
 
-	m_program.update("albedoMap", 1);
-	m_program.update("roughnessMap", 2);
-	m_program.update("metallicMap", 3);
-	m_program.update("aoMap", 4);
-	m_program.update("normalMap", 5);
+	program.update("albedoMap", 1);
+	program.update("roughnessMap", 2);
+	program.update("metallicMap", 3);
+	program.update("aoMap", 4);
+	program.update("normalMap", 5);
 	
 	const int cnt = objPos.size();
 	for(int i = 0;i < cnt;i ++){
@@ -151,7 +254,7 @@ void GLIBLIrradianceConversionApp::drawScene(const float dt) {
 		auto objectPos = glm::mat4(1.0f);
 		objectPos = glm::translate(objectPos, pos);
 		objectPos = glm::scale(objectPos, glm::vec3(0.4f));
-		renderSphere(m_program, objectPos);
+		renderSphere(program, objectPos);
 	}
 
 	const auto lightPosAndColor = GetLightPosAndColor();
@@ -160,10 +263,19 @@ void GLIBLIrradianceConversionApp::drawScene(const float dt) {
 		auto lightModel = glm::mat4(1.0f);
 		lightModel = glm::translate(lightModel, lightPos);
 		lightModel = glm::scale(lightModel, glm::vec3(0.2f));
-		m_program.update("lightPositions[" + std::to_string(i) + "]", lightPosAndColor.first[i]);
-		m_program.update("lightColors[" + std::to_string(i) + "]", lightPosAndColor.second[i]);
-		renderSphere(m_program, lightModel);
+		program.update("lightPositions[" + std::to_string(i) + "]", lightPosAndColor.first[i]);
+		program.update("lightColors[" + std::to_string(i) + "]", lightPosAndColor.second[i]);
+		renderSphere(program, lightModel);
 	}
+}
+
+void GLIBLIrradianceConversionApp::drawScene(const float dt) {
+	GLCameraBaseApp::drawScene(dt);
+	const auto projection = glm::perspective(glm::radians(_camera.zoom()), aspectRatio(), 0.1f, 100.0f);
+	const auto view = _camera.getViewMatrix();
+	
+	renderObjectsAndLights(m_program, view, projection);
+	renderBackground(m_backgroundProgram, view, projection);
 
 	ImGui::Begin("OpenGL");
 	ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);

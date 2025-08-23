@@ -260,47 +260,6 @@ void GLBloomApp::renderPlane(GLProgram &program, const glm::mat4 &projection, co
 	}
 }
 
-#include <iostream>
-#include <fstream>
-
-void saveFramebufferAsImage(GLuint framebuffer, int width, int height) {
-    // �� framebuffer
-    glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
-
-    // ����һ�����������洢������������
-    float* pixels = new float[width * height * 4]; // RGBA��ʽ
-
-    // ��ȡ��������
-    glReadPixels(0, 0, width, height, GL_RGBA, GL_FLOAT, pixels);
-
-    // ����Ϊͼ���ļ������� PPM ��ʽ����������������
-    std::ofstream file("output.ppm", std::ios::binary);
-    if (file) {
-        file << "P6\n" << width << " " << height << "\n255\n";
-
-        // ����������ת��Ϊ8λ���ݲ�д���ļ�
-        for (int i = 0; i < width * height; ++i) {
-            unsigned char r = static_cast<unsigned char>(std::clamp(pixels[i * 4 + 0] * 255.0f, 0.0f, 255.0f));
-            unsigned char g = static_cast<unsigned char>(std::clamp(pixels[i * 4 + 1] * 255.0f, 0.0f, 255.0f));
-            unsigned char b = static_cast<unsigned char>(std::clamp(pixels[i * 4 + 2] * 255.0f, 0.0f, 255.0f));
-            file.write(reinterpret_cast<char*>(&r), 1);
-            file.write(reinterpret_cast<char*>(&g), 1);
-            file.write(reinterpret_cast<char*>(&b), 1);
-        }
-
-        file.close();
-        std::cout << "Framebuffer saved as output.ppm" << std::endl;
-    } else {
-        std::cerr << "Failed to save image" << std::endl;
-    }
-
-    // ����
-    delete[] pixels;
-
-    // ��� framebuffer
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
-}
-
 // ���ʵ��ĵط����ô˺���
 void GLBloomApp::extractBrightPart(const glm::mat4 &projection, const glm::mat4 &view) {
 	glBindFramebuffer(GL_FRAMEBUFFER, m_hdrFBO);

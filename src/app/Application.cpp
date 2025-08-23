@@ -116,6 +116,7 @@ void Application::updateFrameRate(){
 }
 
 int Application::run(){
+    renderBeforeLoop();
     while (!m_window->shouldClose()) {
         updateFrameRate();
         m_window->beginFrame();

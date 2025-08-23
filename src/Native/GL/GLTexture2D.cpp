@@ -18,14 +18,13 @@ bool GLTexture2D::init(const Texture2DDataView &data){
 	glBindTexture(GL_TEXTURE_2D, texture);
 	// set the texture wrapping parameters
     auto type = format == GL_RGBA ? GL_CLAMP_TO_EDGE : GL_REPEAT;
+    glTexImage2D(GL_TEXTURE_2D, 0, format, size().width, size().height, 0, layout, GL_UNSIGNED_BYTE, data.data());
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, type);	
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, type);
 	// set texture filtering parameters
-    
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    
-	glTexImage2D(GL_TEXTURE_2D, 0, format, size().width, size().height, 0, layout, GL_UNSIGNED_BYTE, data.data());
+
 	glGenerateMipmap(GL_TEXTURE_2D);
 	glBindTexture(GL_TEXTURE_2D, 0);
     _textureId = texture;
