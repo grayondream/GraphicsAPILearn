@@ -54,5 +54,6 @@ enum class AppType : int{
     PBR_Base,
     PBR_Texture,
     PBR_IBL_Irradiance_Conversion,
+    PBR_IBL_Irradiance,
 };
 
