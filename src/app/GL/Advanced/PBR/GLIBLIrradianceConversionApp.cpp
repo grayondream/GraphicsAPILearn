@@ -17,7 +17,7 @@
 #include "Geometry/Rect.hpp"
 #include "Utils/GL/GLUtils.hpp"
 #include "Base/Constexpr.hpp"
-
+#include <stb_image.h>
 
 using namespace Constexpr;
 using FileUtils::join;
@@ -51,7 +51,8 @@ bool GLIBLIrradianceConversionApp::initApp() {
 	loadTexture();
 	initFramebuffer();
 	initCaptureViews();
-	glEnable(GL_DEPTH_TEST);
+	glEnable(GL_DEPTH_TEST);\
+	glDepthFunc(GL_LEQUAL);  // change depth function so depth test passes when values are equal to depth buffer's content
 	//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 	return true;
 }
@@ -143,6 +144,7 @@ static auto GetLightPosAndColor(){
     return std::make_pair(lightPositions, lightColors);
 }
 
+
 void GLIBLIrradianceConversionApp::renderToCubemap(){
 	glViewport(0, 0, 512, 512);
 	glm::mat4 captureProjection = glm::perspective(glm::radians(90.0f), 1.0f, 0.1f, 10.0f);
@@ -160,22 +162,20 @@ void GLIBLIrradianceConversionApp::renderToCubemap(){
         renderCube(m_cubeMapProgram, glm::mat4(1.0));
     }
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
-	GLUtils::SaveFramebufferAsImage(m_captureFBO, 512, 512);
+	//GLUtils::SaveFramebufferAsImage(m_captureFBO, 512, 512);
 	glViewport(0, 0, m_window->getProperties().width, m_window->getProperties().height);
 }
 
 void GLIBLIrradianceConversionApp::renderCube(GLProgram &program, const glm::mat4 &model) {
-	m_program.use();
+	program.use();
 	program.update("model", model);
-	const auto normal = glm::transpose(glm::inverse(glm::mat3(model)));
-	program.update("normalMatrix", normal);
 	glBindVertexArray(m_cube.getVao());
 	glDrawElements(GL_TRIANGLES, m_cube.idxSize(), GL_UNSIGNED_INT, 0);
 	glBindVertexArray(0);
 }
 
-void GLIBLIrradianceConversionApp::renderSphere(GLProgram &program, const glm::mat4 &model) {
-	m_program.use();
+void GLIBLIrradianceConversionApp::renderSphere(GLProgram& program, const glm::mat4& model) {
+	program.use();
 	program.update("model", model);
 	const auto normal = glm::transpose(glm::inverse(glm::mat3(model)));
 	program.update("normalMatrix", normal);
@@ -203,13 +203,6 @@ static std::vector<glm::vec3> GenreateObjPos(int radius = 5, float gap = 0.5f, c
 
 void GLIBLIrradianceConversionApp::loadTexture(){
 	auto resDir = StaticCollector::getImagePath();
-	auto rustDir = join(resDir, "rusted_iron");
-
-    m_albedoMap = CreateTexture(join(rustDir, "albedo.png"));
-    m_roughnessMap = CreateTexture(join(rustDir, "roughness.png"));
-    m_metallicMap = CreateTexture(join(rustDir, "metallic.png"));
-    m_aoMap = CreateTexture(join(rustDir, "ao.png"));
-	m_normalMap = CreateTexture(join(rustDir, "normal.png"));
     m_hdrEnvTexture = CreateTexture(join(resDir, "newport_loft.hdr"), true);
 }
 
@@ -236,21 +229,13 @@ void GLIBLIrradianceConversionApp::renderObjectsAndLights(GLProgram &program, co
 	program.update("projection", projection);
 	program.update("view", view);
 	program.update("camPos", pos);
-	m_metallicMap->texture()->bind(3);
-	m_normalMap->texture()->bind(5);
-	m_aoMap->texture()->bind(4);
-	m_albedoMap->texture()->bind(1);
-	m_roughnessMap->texture()->bind(2);
-
-	program.update("albedoMap", 1);
-	program.update("roughnessMap", 2);
-	program.update("metallicMap", 3);
-	program.update("aoMap", 4);
-	program.update("normalMap", 5);
-	
+	program.update("roughness", m_roughness);
+    program.update("metallic", m_metallic);
+	program.update("ao", m_ao);
 	const int cnt = objPos.size();
 	for(int i = 0;i < cnt;i ++){
 		const auto pos = objPos[i];
+		program.update("albedo", glm::vec3(i * 1.0f/ cnt, 0.0f, 0.0f));
 		auto objectPos = glm::mat4(1.0f);
 		objectPos = glm::translate(objectPos, pos);
 		objectPos = glm::scale(objectPos, glm::vec3(0.4f));
@@ -279,5 +264,8 @@ void GLIBLIrradianceConversionApp::drawScene(const float dt) {
 
 	ImGui::Begin("OpenGL");
 	ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+	ImGui::SliderFloat("Roughness", &m_roughness, 0.0f, 1.0f);
+	ImGui::SliderFloat("Metallic", &m_metallic, 0.0f, 1.0f);
+	ImGui::SliderFloat("AO", &m_ao, 0.0f, 1.0f);
 	ImGui::End();
 }

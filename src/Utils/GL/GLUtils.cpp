@@ -41,6 +41,21 @@ namespace GLUtils {
         return GL_UNSIGNED_BYTE;
     }
 
+    GLenum GLFormat2ByteWidth(const PixelFormat& fmt){
+        switch(fmt){
+            case PixelFormat::RED:
+            case PixelFormat::RGB:
+                return GL_UNSIGNED_BYTE;break;
+            case PixelFormat::RGBA16F:
+            case PixelFormat::RGB16F:
+                return GL_FLOAT;break;
+            default:
+                return 0;break;
+        }
+
+        return 0;
+    }
+
     PixelFormat GLFormat2PixelFormat(const GLenum& fmt) {
         switch (fmt) {
         case GL_RED:

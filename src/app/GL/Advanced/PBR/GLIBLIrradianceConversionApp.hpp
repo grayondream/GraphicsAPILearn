@@ -46,13 +46,11 @@ protected:
     GLSphere m_sphere;
     GLCube m_cube;
 
-    
-
-    std::shared_ptr<GLImageTexture2D> m_albedoMap;
-    std::shared_ptr<GLImageTexture2D> m_roughnessMap;
-    std::shared_ptr<GLImageTexture2D> m_metallicMap;
-    std::shared_ptr<GLImageTexture2D> m_aoMap;
-    std::shared_ptr<GLImageTexture2D> m_normalMap;
+    // PBR材质参数
+    float m_roughness = 0.5f;   // 粗糙度
+    float m_metallic = 0.0f;    // 金属度
+    glm::vec3 m_albedo = glm::vec3(0.5f, 0.5f, 0.5f); // 反照率
+    float m_ao = 1.0f;          // 环境光遮蔽
     std::shared_ptr<GLImageTexture2D> m_hdrEnvTexture;
 
     unsigned int m_captureFBO = 0;

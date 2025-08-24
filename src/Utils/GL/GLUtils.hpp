@@ -17,5 +17,7 @@ namespace GLUtils {
 
     void* GLTextureId2Ptr(const GLuint& id);
 
+    GLenum GLFormat2ByteWidth(const PixelFormat& fmt);
+    
     void SaveFramebufferAsImage(GLuint framebuffer, int width, int height, const std::string &fileName = "output.ppm");
 }
