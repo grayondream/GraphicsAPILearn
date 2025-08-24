@@ -71,6 +71,7 @@ int main(int argc, char **argv) {
         GetWindowWidth(), GetWindowHeight(),  // 宽高
         200, 200 );
     props.title = "Hello Graphics!";
+    props.vsync = false;
     app->init(props);
     return app->run();
 }

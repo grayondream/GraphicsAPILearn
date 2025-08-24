@@ -45,12 +45,13 @@ namespace GLUtils {
         switch(fmt){
             case PixelFormat::RED:
             case PixelFormat::RGB:
+            case PixelFormat::RGBA:
                 return GL_UNSIGNED_BYTE;break;
             case PixelFormat::RGBA16F:
             case PixelFormat::RGB16F:
                 return GL_FLOAT;break;
             default:
-                return 0;break;
+                return GL_UNSIGNED_BYTE;break;
         }
 
         return 0;

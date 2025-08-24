@@ -121,6 +121,13 @@ bool GLFWWindow::initialize() {
         return false;
     }
 
+    if (m_properties.vsync) {
+        glfwSwapInterval(1);
+    }
+    else {
+        glfwSwapInterval(0);
+    }
+
     // 设置用户指针，用于回调中获取实例
     glfwSetWindowUserPointer(m_window, this);
 
@@ -133,7 +140,7 @@ bool GLFWWindow::initialize() {
     glfwSetCursorPosCallback(m_window, staticMouseMoveCallback);
     glfwSetScrollCallback(m_window, staticMouseScrollCallback);
     glfwSetWindowSizeCallback(m_window, staticWindowResizeCallback);
-
+    
     m_initialized = true;
     return true;
 }
