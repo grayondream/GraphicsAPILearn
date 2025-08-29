@@ -50,7 +50,6 @@ bool GLIBLIrradianceApp::initApp() {
 	initShapes();	
 	loadTexture();
 	initFramebuffer();
-	createIrradianceMap();
 	initCaptureViews();
 	glEnable(GL_DEPTH_TEST);\
 	glDepthFunc(GL_LEQUAL);  // change depth function so depth test passes when values are equal to depth buffer's content
@@ -263,6 +262,7 @@ void GLIBLIrradianceApp::loadTexture(){
 
 void GLIBLIrradianceApp::renderBeforeLoop(){
 	renderToCubemap();
+	createIrradianceMap();
 	renderIrradianceMap();
 }
 
