@@ -55,12 +55,13 @@ using namespace Constexpr;
  *  PBR_Texture                     render PBR texture scene
  *  PBR_IBL_Irradiance_Conversion   render PBR IBL Irradiance Conversion scene
  *  PBR_IBL_Irradiance              render PBR IBL Irradiance scene
+ *  PBR_IBL_Specular                render PBR IBL Specular scene
  */
 
 namespace EnumUtil = Utils::Enum;
 
 int main(int argc, char **argv) {
-    auto type = AppType::PBR_IBL_Irradiance;
+    auto type = AppType::PBR_IBL_Specular;
     auto api = GraphicsType::GL;
     LOGI("Start Graphics Learn!!!");
     LOGI("Select {} Application, Render App With {} API", EnumUtil::EnumName(type), EnumUtil::EnumName(api));

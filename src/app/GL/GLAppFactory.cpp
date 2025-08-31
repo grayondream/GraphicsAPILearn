@@ -44,6 +44,7 @@
 #include "App/GL/Advanced/PBR/GLPBRTextureApp.hpp"
 #include "App/GL/Advanced/PBR/GLIBLIrradianceConversionApp.hpp"
 #include "App/GL/Advanced/PBR/GLIBLIrradianceApp.hpp"
+#include "App/GL/Advanced/PBR/GLIBLSpecularApp.hpp"
 #include <memory>
 
 std::shared_ptr<IApplication> GLAppFactory::create(const AppType type){
@@ -138,6 +139,8 @@ std::shared_ptr<IApplication> GLAppFactory::create(const AppType type){
 			return std::make_shared<GLIBLIrradianceConversionApp>();
 		case AppType::PBR_IBL_Irradiance:
 			return std::make_shared<GLIBLIrradianceApp>();
+		case AppType::PBR_IBL_Specular:
+			return std::make_shared<GLIBLSpecularApp>();
 		default:
 			break;	
 	}
