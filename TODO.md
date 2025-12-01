@@ -47,7 +47,9 @@
 | **Defer**                   | Render defer scene. |  ✅️  |
 | **PBR_Base**                     | Render PBR scene. | ✅️   |
 | **PBR_Texture**             | Render PBR scene with texture. | ✅️   |
-
+| **PBR_IBL_Irradiance_Conversion** | Render PBR scene with IBL irradiance conversion. | ✅️   |
+| **PBR_IBL_Irradiance** | Render PBR scene with IBL irradiance. | ✅️   |
+| **PBR_IBL_Specular** | Render PBR scene with IBL specular. |  ❌  |
 
 
 

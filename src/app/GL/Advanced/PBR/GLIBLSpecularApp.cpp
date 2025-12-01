@@ -53,7 +53,9 @@ bool GLIBLSpecularApp::initApp() {
 	initCaptureViews();
 	glEnable(GL_DEPTH_TEST);\
 	glDepthFunc(GL_LEQUAL);  // change depth function so depth test passes when values are equal to depth buffer's content
+	glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
 	//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+	
 	return true;
 }
 
@@ -112,14 +114,13 @@ void GLIBLSpecularApp::initFramebuffer(){
 }
 
 void GLIBLSpecularApp::compileShader(){
-	const auto shaderDir = join(StaticCollector::getGLShaderPath(), "Advanced", "PBR", "IBL_Irradiance");
+	const auto shaderDir = join(StaticCollector::getGLShaderPath(), "Advanced", "PBR", "IBL_Specular");
 	{
 		const auto vfile = join(shaderDir, "CUBE.vs");
 		const auto ffile = join(shaderDir, "CUBE.fs");
 		auto ret = m_cubeMapProgram.init(vfile, ffile);
 		ErrorHandle::ExitIfFailed(ret, "Create OpenGL program failed!");
 	}
-
 
 	{
 		const auto vfile = join(shaderDir, "PBR.vs");
@@ -140,7 +141,20 @@ void GLIBLSpecularApp::compileShader(){
 		const auto ffile = join(shaderDir, "Irradiance.fs");
 		auto ret = m_irradianceProgram.init(vfile, ffile);
 		ErrorHandle::ExitIfFailed(ret, "Create OpenGL program failed!");
+	}
 
+	{
+		const auto vfile = join(shaderDir, "Prefilter.vs");
+		const auto ffile = join(shaderDir, "Prefilter.fs");
+		auto ret = m_prefilterProgram.init(vfile, ffile);
+		ErrorHandle::ExitIfFailed(ret, "Create OpenGL program failed!");
+	}
+
+	{
+		const auto vfile = join(shaderDir, "Brdf.vs");
+		const auto ffile = join(shaderDir, "Brdf.fs");
+		auto ret = m_brdfLUTProgram.init(vfile, ffile);
+		ErrorHandle::ExitIfFailed(ret, "Create OpenGL program failed!");
 	}
 }
 
@@ -194,13 +208,19 @@ void GLIBLSpecularApp::renderToCubemap(){
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	//GLUtils::SaveFramebufferAsImage(m_captureFBO, 512, 512);
 	glViewport(0, 0, m_window->getProperties().width, m_window->getProperties().height);
+	glBindTexture(GL_TEXTURE_CUBE_MAP, m_envCubemap);
+    glGenerateMipmap(GL_TEXTURE_CUBE_MAP);
+}
+
+glm::mat4 GetCaptureProjection(){
+	return glm::perspective(glm::radians(90.0f), 1.0f, 0.1f, 10.0f);
 }
 
 void GLIBLSpecularApp::renderIrradianceMap(){
 	m_irradianceProgram.use();
     m_irradianceProgram.update("environmentMap", 0);
 	//should be same as capture projection in renderToCubemap
-	glm::mat4 captureProjection = glm::perspective(glm::radians(90.0f), 1.0f, 0.1f, 10.0f);
+	glm::mat4 captureProjection = GetCaptureProjection();
     m_irradianceProgram.update("projection", captureProjection);
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_CUBE_MAP, m_envCubemap);
@@ -238,6 +258,30 @@ void GLIBLSpecularApp::renderSphere(GLProgram& program, const glm::mat4& model) 
 	glBindVertexArray(0);
 }
 
+void GLIBLSpecularApp::createQuadBuffer() {
+	float quadVertices[] = {
+		// positions        // texture Coords
+		-1.0f,  1.0f, 0.0f, 0.0f, 1.0f,
+		-1.0f, -1.0f, 0.0f, 0.0f, 0.0f,
+			1.0f,  1.0f, 0.0f, 1.0f, 1.0f,
+			1.0f, -1.0f, 0.0f, 1.0f, 0.0f,
+	};
+	// setup plane VAO
+	unsigned int quadVAO, quadVBO;
+	glGenVertexArrays(1, &quadVAO);
+	glGenBuffers(1, &quadVBO);
+	glBindVertexArray(quadVAO);
+	glBindBuffer(GL_ARRAY_BUFFER, quadVBO);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), &quadVertices, GL_STATIC_DRAW);
+	glEnableVertexAttribArray(0);
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);
+	glEnableVertexAttribArray(1);
+	glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
+	glBindVertexArray(0);
+	m_quadVAO = quadVAO;
+	m_quadVBO = quadVBO;
+}
+
 static std::vector<glm::vec3> GenreateObjPos(int radius = 5, float gap = 0.5f, const glm::vec3 &center = glm::vec3(0.0f)) {
     std::vector<glm::vec3> positions;
     if (radius < 0) {
@@ -255,6 +299,85 @@ static std::vector<glm::vec3> GenreateObjPos(int radius = 5, float gap = 0.5f, c
     return positions;
 }
 
+void GLIBLSpecularApp::createPrefilterMap(){
+	unsigned int prefilterMap;
+    glGenTextures(1, &prefilterMap);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, prefilterMap);
+    for (unsigned int i = 0; i < 6; ++i){
+        glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB16F, 128, 128, 0, GL_RGB, GL_FLOAT, nullptr);
+    }
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR); // be sure to set minification filter to mip_linear 
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    // generate mipmaps for the cubemap so OpenGL automatically allocates the required memory.
+    glGenerateMipmap(GL_TEXTURE_CUBE_MAP);
+	m_prefilterMap = prefilterMap;	
+}
+
+void GLIBLSpecularApp::renderPerfilterMap(){
+	m_prefilterProgram.use();
+    m_prefilterProgram.update("environmentMap", 0);
+	glm::mat4 captureProjection = GetCaptureProjection();
+    m_prefilterProgram.update("projection", captureProjection);
+	glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, m_envCubemap);
+
+    glBindFramebuffer(GL_FRAMEBUFFER, m_captureFBO);
+    unsigned int maxMipLevels = 5;
+    for (unsigned int mip = 0; mip < maxMipLevels; ++mip){
+        // reisze framebuffer according to mip-level size.
+        unsigned int mipWidth  = static_cast<unsigned int>(128 * std::pow(0.5, mip));
+        unsigned int mipHeight = static_cast<unsigned int>(128 * std::pow(0.5, mip));
+        glBindRenderbuffer(GL_RENDERBUFFER, m_captureRBO);
+        glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, mipWidth, mipHeight);
+        glViewport(0, 0, mipWidth, mipHeight);
+
+		const auto captureViews = GetCaptureViews();
+        float roughness = (float)mip / (float)(maxMipLevels - 1);
+        m_prefilterProgram.update("roughness", roughness);
+        for (unsigned int i = 0; i < 6; ++i){
+            m_prefilterProgram.update("view", captureViews[i]);
+            glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, m_prefilterMap, mip);
+
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+            renderCube(m_prefilterProgram, glm::mat4(1.0));
+        }
+    }
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
+
+void GLIBLSpecularApp::renderBrdfLUT(){
+	// pbr: generate a 2D LUT from the BRDF equations used.
+    // ----------------------------------------------------
+    unsigned int brdfLUTTexture;
+    glGenTextures(1, &brdfLUTTexture);
+
+    // pre-allocate enough memory for the LUT texture.
+    glBindTexture(GL_TEXTURE_2D, brdfLUTTexture);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RG16F, 512, 512, 0, GL_RG, GL_FLOAT, 0);
+    // be sure to set wrapping mode to GL_CLAMP_TO_EDGE
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+    // then re-configure capture framebuffer object and render screen-space quad with BRDF shader.
+    glBindFramebuffer(GL_FRAMEBUFFER, m_captureFBO);
+    glBindRenderbuffer(GL_RENDERBUFFER, m_captureRBO);
+    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, 512, 512);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, brdfLUTTexture, 0);
+
+    glViewport(0, 0, 512, 512);
+    m_brdfLUTProgram.use();
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    renderQuad();
+
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	m_brdfLUTTexture = brdfLUTTexture;
+}
+
 void GLIBLSpecularApp::loadTexture(){
 	auto resDir = StaticCollector::getImagePath();
     m_hdrEnvTexture = CreateTexture(join(resDir, "newport_loft.hdr"), true);
@@ -264,6 +387,15 @@ void GLIBLSpecularApp::renderBeforeLoop(){
 	renderToCubemap();
 	createIrradianceMap();
 	renderIrradianceMap();
+	createPrefilterMap();
+	renderPerfilterMap();
+	renderBrdfLUT();
+}
+
+void GLIBLSpecularApp::renderQuad() {
+	glBindVertexArray(m_quadVAO);
+    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+    glBindVertexArray(0);
 }
 
 void GLIBLSpecularApp::renderBackground(GLProgram& program, const glm::mat4& view, const glm::mat4& projection) {
@@ -283,6 +415,13 @@ void GLIBLSpecularApp::renderObjectsAndLights(GLProgram &program, const glm::mat
 	glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_CUBE_MAP, m_irradianceMap);
 
+	glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, m_prefilterMap);
+    glActiveTexture(GL_TEXTURE2);
+    glBindTexture(GL_TEXTURE_2D, m_brdfLUTTexture);
+
+	program.update("prefilterMap", 1);
+    program.update("brdfLUT", 2);
 	program.update("texture", 0);
     program.update("irradianceMap", 0);
 	program.update("projection", projection);

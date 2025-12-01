@@ -28,11 +28,17 @@ private:
     void initFramebuffer();
     void initCaptureViews();
     void createIrradianceMap();
+    void createPrefilterMap();
+    void createQuadBuffer();
     void renderBeforeLoop() override;
 
     void renderIrradianceMap();
+    
+    void renderPerfilterMap();
+    void renderBrdfLUT();
     void renderToCubemap();
 
+    void renderQuad();
     void renderCube(GLProgram& program, const glm::mat4& model);
     void renderSphere(GLProgram& program, const glm::mat4& model);
 
@@ -45,6 +51,8 @@ protected:
     GLProgram m_program;
     GLProgram m_backgroundProgram;
     GLProgram m_irradianceProgram;
+    GLProgram m_prefilterProgram;
+    GLProgram m_brdfLUTProgram;
 
     GLSphere m_sphere;
     GLCube m_cube;
@@ -60,6 +68,9 @@ protected:
     unsigned int m_captureRBO = 0;
     unsigned int m_envCubemap = 0;
     unsigned int m_irradianceMap = 0;
-
+    unsigned int m_prefilterMap = 0;
+    unsigned int m_brdfLUTTexture = 0;
+    unsigned int m_quadVAO = 0;
+    unsigned int m_quadVBO = 0;
 };
 
