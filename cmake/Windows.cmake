@@ -1,9 +1,8 @@
-message(STATUS "Initalize ${CMAKE_SYSTEM_NAME}")
 if(NOT CMAKE_SYSTEM_NAME STREQUAL "Windows")
-    message(WARNING "Unsupported system: ${CMAKE_SYSTEM_NAME}")
     return()
 endif()
 
+message(STATUS "Initalize ${CMAKE_SYSTEM_NAME}")
 message(STATUS ${DX_SDK_ROOT} "DirectX SDK ROOT: ${DX_SDK_ROOT}")
 if(NOT DX_SDK_ROOT)
     message(FATAL_ERROR "The DirectX's sdk directory is empty, please set it with the variable DX_SDK_ROOT")
