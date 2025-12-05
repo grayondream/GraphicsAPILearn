@@ -1,7 +1,7 @@
 #include "GLApp.hpp"
 #include "Base/ErrorHandle.hpp"
 #include "Base/Log.hpp"
-#include <GL/gl.h>
+#include "GL/GLHeader.hpp"
 #include "ImGuiOpenglWindow.hpp"
 #include <imgui.h>
 
