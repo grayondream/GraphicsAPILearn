@@ -1,4 +1,4 @@
-set(RENDER_APP_PATH "${RENDER_SOURCE_PATH}/App" CACHE STRING "app file's path")
+set(RENDER_APP_PATH "${RENDER_SOURCE_PATH}/app" CACHE STRING "app file's path")
 set(RENDER_BASE_PATH "${RENDER_SOURCE_PATH}/Base" CACHE STRING "base file's path")
 set(RENDER_NATIVE_PATH "${RENDER_SOURCE_PATH}/Native" CACHE STRING "native file's path")
 set(RENDER_UTILS_PATH "${RENDER_SOURCE_PATH}/Utils" CACHE STRING "utils file's path")
@@ -27,17 +27,17 @@ add_executable(${PROJECT_NAME}
 include_directories(${RENDER_NATIVE_PATH})
 
 if(${ENABLE_OPENGL})
-    message("Graphic API Enabel OPenGL")
+    message("Graphic API Enable OpenGL")
     target_compile_definitions(${PROJECT_NAME} PRIVATE ENABLE_OPENGL=1)
 endif()
 
 if(${ENABLE_DX11})
-    message("Graphic API Enabel D3D11")
+    message("Graphic API Enable D3D11")
     target_compile_definitions(${PROJECT_NAME} PRIVATE ENABLE_DX11=1)
 endif()
 
 if(${ENABLE_DX12})
-    message("Graphic API Enabel D3D12")
+    message("Graphic API Enable D3D12")
     target_compile_definitions(${PROJECT_NAME} PRIVATE ENABLE_DX12=1)
 endif()
 
@@ -83,7 +83,7 @@ find_package(assimp CONFIG REQUIRED)
 target_link_libraries(${PROJECT_NAME} assimp::assimp)
 target_include_directories(${PROJECT_NAME} PRIVATE ${ASSIMP_INCLUDE_DIR})
 
-target_compile_definitions(${PROJECT_NAME} PRIVATE RESOURCE_DIR="${CMAKE_SOURCE_DIR}/Res")
+target_compile_definitions(${PROJECT_NAME} PRIVATE RESOURCE_DIR="${CMAKE_SOURCE_DIR}/res")
 include(${RENDER_SOURCE_PATH}/BuildPost.cmake)
 
 find_package(glfw3 CONFIG REQUIRED)

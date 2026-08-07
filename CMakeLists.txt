@@ -8,8 +8,8 @@ option(ENABLE_OPENGL "Enable OpenGL" ON)
 option(ENABLE_METAL "Enable Metal" OFF)
 option(ENABLE_VULKAN "Enable Vulkan" OFF)
 
-set(RENDER_SOURCE_PATH "${CMAKE_SOURCE_DIR}/Src" CACHE STRING "all source file's path")
-set(RENDER_CMAKE_PATH "${CMAKE_SOURCE_DIR}/Cmake" CACHE STRING "all cmake tool file's path")
+set(RENDER_SOURCE_PATH "${CMAKE_SOURCE_DIR}/src" CACHE STRING "all source file's path")
+set(RENDER_CMAKE_PATH "${CMAKE_SOURCE_DIR}/cmake" CACHE STRING "all cmake tool file's path")
 set(RENDER_3PARTY_PATH "${CMAKE_SOURCE_DIR}/3party" CACHE STRING "all 3party tool file's path")
 
 
