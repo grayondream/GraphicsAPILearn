@@ -6,10 +6,10 @@
 #include <thread>
 
 #include "Application.hpp"
-#include "Base/ErrorHandle.hpp"
-#include "Base/Log.hpp"
+#include "base/ErrorHandle.hpp"
+#include "base/Log.hpp"
 #include <imgui.h>
-#include "Utils/EventUtils.hpp"
+#include "utils/EventUtils.hpp"
 
 namespace eh = ErrorHandle;
 using namespace Utils::Event;

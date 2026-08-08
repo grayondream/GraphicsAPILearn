@@ -1,22 +1,22 @@
 
 #include "GLSkyboxApp.hpp"
-#include "Native/GL/GLProgram.hpp"
-#include "Base/StaticCollector.hpp"
-#include "Base/ErrorHandle.hpp"
+#include "native/GL/GLProgram.hpp"
+#include "base/StaticCollector.hpp"
+#include "base/ErrorHandle.hpp"
 #include "glad/glad.h"
-#include "Geometry/Cube.hpp"
-#include "Geometry/Sphere.hpp"
-#include "Native/GL/GLImageTexture2D.hpp"
-#include "Native/GL/GLImageTexture3D.hpp"
+#include "geometry/Cube.hpp"
+#include "geometry/Sphere.hpp"
+#include "native/GL/GLImageTexture2D.hpp"
+#include "native/GL/GLImageTexture3D.hpp"
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
-#include "Base/Log.hpp"
+#include "base/Log.hpp"
 #include "imgui.h"
-#include "Geometry/Image.hpp"
-#include "Utils/GL/GLUtils.hpp"
-#include "Utils/GL/GLAppUtils.hpp"
-#include "Utils/FileUtils.hpp"
+#include "geometry/Image.hpp"
+#include "utils/GL/GLUtils.hpp"
+#include "utils/GL/GLAppUtils.hpp"
+#include "utils/FileUtils.hpp"
 using FileUtils::join;
 using namespace ErrorHandle;
 

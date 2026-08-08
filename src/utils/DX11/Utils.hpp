@@ -1,7 +1,7 @@
 #pragma once
 #include <tuple>
 #include <map>
-#include "Base/DXH.hpp"
+#include "base/DXH.hpp"
 
 namespace Utils{
 	using Microsoft::WRL::ComPtr;

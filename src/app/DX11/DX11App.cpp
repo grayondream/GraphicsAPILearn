@@ -6,11 +6,11 @@
 #include <chrono>
 #include <thread>
 
-#include "Base/DXBaseConexpr.hpp"
-#include "Base/ErrorHandle.hpp"
-#include "Base/GameTimer.hpp"
-#include "Base/Log.hpp"
-#include "Base/Utils.hpp"
+#include "base/DXBaseConexpr.hpp"
+#include "base/ErrorHandle.hpp"
+#include "base/GameTimer.hpp"
+#include "base/Log.hpp"
+#include "base/Utils.hpp"
 #include <windowsx.h>
 #include <imgui.h>
 #include <backends/imgui_impl_dx11.h>

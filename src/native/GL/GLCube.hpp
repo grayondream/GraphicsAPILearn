@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Geometry/Cube.hpp"
+#include "geometry/Cube.hpp"
 
 class GLCube : public Cube{
 public:

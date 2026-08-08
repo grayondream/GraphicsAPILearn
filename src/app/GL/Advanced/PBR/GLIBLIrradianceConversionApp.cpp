@@ -4,19 +4,19 @@
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtc/random.hpp>
 #include <random>
-#include "Native/GL/GLProgram.hpp"
-#include "Base/StaticCollector.hpp"
-#include "Base/ErrorHandle.hpp"
+#include "native/GL/GLProgram.hpp"
+#include "base/StaticCollector.hpp"
+#include "base/ErrorHandle.hpp"
 #include "glad/glad.h"
-#include "Native/GL/GLImageTexture2D.hpp"
-#include "Native/GL/GLCube.hpp"
-#include "Native/GL/GLPlane.hpp"
-#include "Base/Log.hpp"
+#include "native/GL/GLImageTexture2D.hpp"
+#include "native/GL/GLCube.hpp"
+#include "native/GL/GLPlane.hpp"
+#include "base/Log.hpp"
 #include "imgui.h"
-#include "Utils/FileUtils.hpp"
-#include "Geometry/Rect.hpp"
-#include "Utils/GL/GLUtils.hpp"
-#include "Base/Constexpr.hpp"
+#include "utils/FileUtils.hpp"
+#include "geometry/Rect.hpp"
+#include "utils/GL/GLUtils.hpp"
+#include "base/Constexpr.hpp"
 #include <stb_image.h>
 
 using namespace Constexpr;

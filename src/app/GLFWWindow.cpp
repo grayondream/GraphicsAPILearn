@@ -1,8 +1,8 @@
 #include "GLFWWindow.hpp"
 #include <iostream>
 #include <glad/glad.h>
-#include <glfw/glfw3.h>
-#include "Base/Log.hpp"
+#include <GLFW/glfw3.h>
+#include "base/Log.hpp"
 
 // 静态回调函数实现
 void GLFWWindow::staticKeyCallback(GLFWwindow* window, int key, int scancode, int action, int mods) {

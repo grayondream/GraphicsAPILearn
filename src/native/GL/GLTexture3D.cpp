@@ -1,7 +1,7 @@
 #include "GLTexture3D.hpp"
 #include "glad/glad.h"
 #include <cassert>
-#include <Utils/GL/GLUtils.hpp>
+#include <utils/GL/GLUtils.hpp>
 
 GLTexture3D::~GLTexture3D(){
     

@@ -1,9 +1,9 @@
 #include "AppFactory.hpp"
 #if ENABLE_OPENGL
-#include "App/GL/GLAppFactory.hpp"
+#include "app/GL/GLAppFactory.hpp"
 #endif
 #if ENABLE_DX11
-#include "App/DX11/DX11AppFactory.hpp"
+#include "app/DX11/DX11AppFactory.hpp"
 #endif
 #include "IApplication.hpp"
 

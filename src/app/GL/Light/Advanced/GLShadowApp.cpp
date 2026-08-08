@@ -1,19 +1,19 @@
 #include "GLShadowApp.hpp"
-#include "Native/GL/GLProgram.hpp"
-#include "Base/StaticCollector.hpp"
-#include "Base/ErrorHandle.hpp"
+#include "native/GL/GLProgram.hpp"
+#include "base/StaticCollector.hpp"
+#include "base/ErrorHandle.hpp"
 #include "glad/glad.h"
-#include "Native/GL/GLImageTexture2D.hpp"
+#include "native/GL/GLImageTexture2D.hpp"
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
-#include "Base/Log.hpp"
+#include "base/Log.hpp"
 #include "imgui.h"
-#include "Geometry/Plane.hpp"
-#include <Utils/FileUtils.hpp>
-#include "Geometry/Rect.hpp"
-#include "Utils/GL/GLUtils.hpp"
-#include "Base/Constexpr.hpp"
+#include "geometry/Plane.hpp"
+#include <utils/FileUtils.hpp>
+#include "geometry/Rect.hpp"
+#include "utils/GL/GLUtils.hpp"
+#include "base/Constexpr.hpp"
 
 using namespace Constexpr;
 using FileUtils::join;

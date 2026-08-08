@@ -1,10 +1,10 @@
 #include "GLTriangleApp.hpp"
-#include "Native/GL/GLProgram.hpp"
-#include "Base/StaticCollector.hpp"
-#include "Base/ErrorHandle.hpp"
+#include "native/GL/GLProgram.hpp"
+#include "base/StaticCollector.hpp"
+#include "base/ErrorHandle.hpp"
 #include "glad/glad.h"
-#include "Geometry/Triangle.hpp"
-#include <Utils/FileUtils.hpp>
+#include "geometry/Triangle.hpp"
+#include <utils/FileUtils.hpp>
 using FileUtils::join;
 
 GLTriangleApp::~GLTriangleApp() {

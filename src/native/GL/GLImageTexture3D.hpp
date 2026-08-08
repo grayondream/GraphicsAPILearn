@@ -1,5 +1,5 @@
 #pragma once
-#include <Native/ImageTexture3D.hpp>
+#include <native/ImageTexture3D.hpp>
 #include <vector>
 
 class GLImageTexture3D : public ImageTexture3D{

@@ -1,6 +1,6 @@
 
 #include "ImageTexture2D.hpp"
-#include "Native/GL/GLTexture2D.hpp"
+#include "native/GL/GLTexture2D.hpp"
 #include "glad/glad.h"
 #include <cassert>
 

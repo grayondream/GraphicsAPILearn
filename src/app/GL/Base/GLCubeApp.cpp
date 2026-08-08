@@ -1,17 +1,17 @@
 #include "GLCubeApp.hpp"
-#include "Native/GL/GLProgram.hpp"
-#include "Base/StaticCollector.hpp"
-#include "Base/ErrorHandle.hpp"
+#include "native/GL/GLProgram.hpp"
+#include "base/StaticCollector.hpp"
+#include "base/ErrorHandle.hpp"
 #include "glad/glad.h"
-#include "Geometry/Cube.hpp"
-#include "Native/GL/GLImageTexture2D.hpp"
+#include "geometry/Cube.hpp"
+#include "native/GL/GLImageTexture2D.hpp"
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
-#include "Base/Log.hpp"
+#include "base/Log.hpp"
 #include "imgui.h"
-#include <Utils/FileUtils.hpp>
-#include "Native/GL/GLCube.hpp"
+#include <utils/FileUtils.hpp>
+#include "native/GL/GLCube.hpp"
 
 using FileUtils::join;
 

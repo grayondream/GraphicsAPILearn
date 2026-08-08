@@ -1,5 +1,5 @@
 #pragma once
-#include "Base/InputEvent.hpp"
+#include "base/InputEvent.hpp"
 
 namespace Utils{
 namespace Event{

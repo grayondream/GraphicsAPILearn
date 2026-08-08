@@ -1,7 +1,7 @@
 #pragma once
-#include <Native/TextureDataView.hpp>
-#include "Base/Vector.hpp"
-#include <Geometry/Image.hpp>
+#include <native/TextureDataView.hpp>
+#include "base/Vector.hpp"
+#include <geometry/Image.hpp>
 
 class ITexture3D {
 public:

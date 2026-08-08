@@ -1,9 +1,9 @@
 #pragma once
-#include <Base/DataView.hpp>
-#include "Base/Vector.hpp"
+#include <base/DataView.hpp>
+#include "base/Vector.hpp"
 #include <cstdint>
-#include "Geometry/Image.hpp"
-#include <Geometry/Format.hpp>
+#include "geometry/Image.hpp"
+#include <geometry/Format.hpp>
 #include <vector>
 
 class Texture2DDataView{

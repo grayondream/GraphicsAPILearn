@@ -1,8 +1,8 @@
 #include "GLProgram.hpp"
-#include "Base/Log.hpp"
-#include "Utils/FileUtils.hpp"
+#include "base/Log.hpp"
+#include "utils/FileUtils.hpp"
 #include "glad/glad.h"
-#include <Base/Assert.hpp>
+#include <base/Assert.hpp>
 
 static unsigned int GLCompileShader(const std::string file, const GLenum type) {
 	std::string content = FileUtils::readFile2String(file);

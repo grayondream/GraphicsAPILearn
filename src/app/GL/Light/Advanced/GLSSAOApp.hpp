@@ -1,13 +1,13 @@
 #pragma once
-#include "App/GL/Base/GLCameraBaseApp.hpp"
-#include "Native/GL/GLProgram.hpp"
+#include "app/GL/Base/GLCameraBaseApp.hpp"
+#include "native/GL/GLProgram.hpp"
 #include <memory>
 #include <array>
-#include "Geometry/Camera.hpp"
-#include "Geometry/Vertex.hpp"
-#include "Geometry/Sphere.hpp"
-#include "Geometry/Cube.hpp"
-#include "Model/Model.hpp"
+#include "geometry/Camera.hpp"
+#include "geometry/Vertex.hpp"
+#include "geometry/Sphere.hpp"
+#include "geometry/Cube.hpp"
+#include "model/Model.hpp"
 
 class GLImageTexture2D;
 class GLPlane;

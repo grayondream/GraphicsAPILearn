@@ -1,6 +1,6 @@
 #pragma once
 
-#include "App/Application.hpp"
+#include "app/Application.hpp"
 
 class GLApp : public Application {
 public:

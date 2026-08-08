@@ -1,6 +1,6 @@
 #pragma once
-#include <Native/TextureBase.hpp>
-#include <Native/TextureDataView.hpp>
+#include <native/TextureBase.hpp>
+#include <native/TextureDataView.hpp>
 
 class GLTexture3D : public Texture3DBase {
 public:

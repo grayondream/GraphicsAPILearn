@@ -1,7 +1,7 @@
 #include "Utils.hpp"
-#include "Base/ErrorHandle.hpp"
-#include "Base/GameTimer.hpp"
-#include "Base/Log.hpp"
+#include "base/ErrorHandle.hpp"
+#include "base/GameTimer.hpp"
+#include "base/Log.hpp"
 namespace Utils{
 namespace eh = ErrorHandle;
 std::tuple<ComPtr<ID3D11Device>, ComPtr<ID3D11DeviceContext>, ComPtr<IDXGISwapChain>> CreateD3DDeviceAndtSwapChain(const HWND winId, const int width, const int height) {

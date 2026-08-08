@@ -1,6 +1,6 @@
 #include "GLApp.hpp"
-#include "Base/ErrorHandle.hpp"
-#include "Base/Log.hpp"
+#include "base/ErrorHandle.hpp"
+#include "base/Log.hpp"
 #include "GL/GLHeader.hpp"
 #include "ImGuiOpenglWindow.hpp"
 #include <imgui.h>

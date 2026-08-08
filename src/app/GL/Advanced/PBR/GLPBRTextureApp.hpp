@@ -1,9 +1,9 @@
 #pragma once
 
-#include "App/GL/Base/GLCameraApp.hpp"
-#include "Native/GL/GLProgram.hpp"
-#include "Native/GL/GLSphere.hpp" 
-#include "Native/GL/GLCube.hpp"
+#include "app/GL/Base/GLCameraApp.hpp"
+#include "native/GL/GLProgram.hpp"
+#include "native/GL/GLSphere.hpp" 
+#include "native/GL/GLCube.hpp"
 #include <glm/glm.hpp>
 #include <vector>
 

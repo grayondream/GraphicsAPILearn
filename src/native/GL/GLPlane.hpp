@@ -1,5 +1,5 @@
 #pragma once
-#include "Geometry/Plane.hpp"
+#include "geometry/Plane.hpp"
 
 class GLPlane : public Plane{
 public:

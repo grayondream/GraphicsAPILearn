@@ -4,7 +4,7 @@ extern "C" {
 	#include "stb_image.h"
 }
 
-#include <Utils/GL/GLUtils.hpp>
+#include <utils/GL/GLUtils.hpp>
 #include <exception>
 
 Image::Image(const std::string& file, const TextureOption& option) {

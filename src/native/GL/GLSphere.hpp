@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Geometry/Sphere.hpp"
+#include "geometry/Sphere.hpp"
 
 
 class GLSphere : public Sphere{

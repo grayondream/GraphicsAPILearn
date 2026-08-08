@@ -1,10 +1,10 @@
 #pragma once
-#include "App/GL/Base/GLCameraBaseApp.hpp"
-#include "Native/GL/GLProgram.hpp"
+#include "app/GL/Base/GLCameraBaseApp.hpp"
+#include "native/GL/GLProgram.hpp"
 #include <memory>
 #include <array>
-#include "Geometry/Camera.hpp"
-#include "Geometry/Vertex.hpp"
+#include "geometry/Camera.hpp"
+#include "geometry/Vertex.hpp"
 
 class GLImageTexture2D;
 class GLFrameBufferApp : public GLCameraBaseApp {

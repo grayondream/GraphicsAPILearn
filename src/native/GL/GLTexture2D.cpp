@@ -1,7 +1,7 @@
 #include "GLTexture2D.hpp"
 #include "glad/glad.h"
 #include <cassert>
-#include <Utils/GL/GLUtils.hpp>
+#include <utils/GL/GLUtils.hpp>
 
 //TODO:
 //memory leak

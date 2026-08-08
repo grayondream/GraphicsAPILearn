@@ -1,7 +1,7 @@
 #pragma once
 
-#include "Native/ITexture2D.hpp"
-#include "Native/ITexture3D.hpp"
+#include "native/ITexture2D.hpp"
+#include "native/ITexture3D.hpp"
 #include <cassert>
 
 class Texture2DBase : public ITexture2D{

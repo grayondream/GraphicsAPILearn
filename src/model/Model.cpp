@@ -1,8 +1,8 @@
 #include "Model.hpp"
-#include <Utils/FileUtils.hpp>
-#include <Native/GL/GLImageTexture2D.hpp>
-#include <Base/Log.hpp>
-#include <Utils/GL/GLUtils.hpp>
+#include <utils/FileUtils.hpp>
+#include <native/GL/GLImageTexture2D.hpp>
+#include <base/Log.hpp>
+#include <utils/GL/GLUtils.hpp>
 using FileUtils::join;
 
 Model::Model(string const &path, bool gamma) : gammaCorrection(gamma){

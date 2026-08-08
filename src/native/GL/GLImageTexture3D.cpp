@@ -1,6 +1,6 @@
 #include "GLImageTexture3D.hpp"
-#include "Geometry/Image.hpp"
-#include <Native/GL/GLTexture3D.hpp>
+#include "geometry/Image.hpp"
+#include <native/GL/GLTexture3D.hpp>
 #include "glad/glad.h"
 #include <cassert>
 

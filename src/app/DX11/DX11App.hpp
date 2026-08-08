@@ -1,8 +1,8 @@
 #pragma once
 #include <string>
-#include "Base/DXH.hpp"
-#include "Base/GameTimer.hpp"
-#include "App/Application.hpp"
+#include "base/DXH.hpp"
+#include "base/GameTimer.hpp"
+#include "app/Application.hpp"
 
 using Microsoft::WRL::ComPtr;
 class DX11App : public Application{

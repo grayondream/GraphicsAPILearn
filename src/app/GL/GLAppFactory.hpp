@@ -1,5 +1,5 @@
 #pragma once
-#include "App/AppType.hpp"
+#include "app/AppType.hpp"
 #include <memory>
 
 class IApplication;

@@ -1,5 +1,5 @@
 #include "GLUtils.hpp"
-#include <Base/Log.hpp>
+#include <base/Log.hpp>
 #include <fstream>
 
 namespace GLUtils {

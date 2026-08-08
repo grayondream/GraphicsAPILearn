@@ -1,7 +1,7 @@
 #pragma once
-#include <Native/ImageTexture2D.hpp>
+#include <native/ImageTexture2D.hpp>
 #include <vector>
-#include <Base/DXH.hpp>
+#include <base/DXH.hpp>
 
 using Microsoft::WRL::ComPtr;
 class ID3D11DeviceContext;

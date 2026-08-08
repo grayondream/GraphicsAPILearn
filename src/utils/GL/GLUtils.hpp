@@ -1,7 +1,7 @@
 #pragma once
 
 #include <glad/glad.h>
-#include <Geometry/Format.hpp>
+#include <geometry/Format.hpp>
 #include <string>
 
 namespace GLUtils {

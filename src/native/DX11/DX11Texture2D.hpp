@@ -1,7 +1,7 @@
 #pragma once
-#include <Native/TextureBase.hpp>
-#include <Native/TextureDataView.hpp>
-#include <Base/DXH.hpp>
+#include <native/TextureBase.hpp>
+#include <native/TextureDataView.hpp>
+#include <base/DXH.hpp>
 
 using Microsoft::WRL::ComPtr;
 class ID3D11Device;

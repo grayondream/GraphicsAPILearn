@@ -1,11 +1,11 @@
 #include "DX11RectApp.hpp"
-#include "Base/DXBaseConexpr.hpp"
-#include "Base/ErrorHandle.hpp"
-#include "Base/StaticCollector.hpp"
-#include <Base/MathHelper.h>
+#include "base/DXBaseConexpr.hpp"
+#include "base/ErrorHandle.hpp"
+#include "base/StaticCollector.hpp"
+#include <base/MathHelper.h>
 #include <filesystem>
-#include "Geometry/Rect.hpp"
-#include <Utils/FileUtils.hpp>
+#include "geometry/Rect.hpp"
+#include <utils/FileUtils.hpp>
 using FileUtils::join;
 namespace eh = ErrorHandle;
 namespace fs = std::filesystem;

@@ -1,7 +1,7 @@
 #pragma once
-#include <Geometry/Image.hpp>
+#include <geometry/Image.hpp>
 #include "ITexture2D.hpp"
-#include "Geometry/Vertex.hpp"
+#include "geometry/Vertex.hpp"
 #include <vector>
 #include <memory>
 

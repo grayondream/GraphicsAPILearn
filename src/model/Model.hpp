@@ -10,7 +10,7 @@
 #include <assimp/scene.h>
 #include <assimp/postprocess.h>
 
-#include <Model/Mesh.hpp>
+#include <model/Mesh.hpp>
 
 #include <string>
 #include <fstream>

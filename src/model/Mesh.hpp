@@ -6,7 +6,7 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
-#include <Native/GL/GLProgram.hpp>
+#include <native/GL/GLProgram.hpp>
 
 #include <string>
 #include <vector>

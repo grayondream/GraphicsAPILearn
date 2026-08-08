@@ -1,7 +1,7 @@
 #pragma once
 #include <string>
-#include "Base/Vector.hpp"
-#include <Geometry/Format.hpp>
+#include "base/Vector.hpp"
+#include <geometry/Format.hpp>
 
 class ImageSize : public Vector3DBase<int> {
 public:

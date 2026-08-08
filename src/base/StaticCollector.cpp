@@ -1,5 +1,5 @@
 #include "StaticCollector.hpp"
-#include "Utils/FileUtils.hpp"
+#include "utils/FileUtils.hpp"
 #include <filesystem>
 #ifndef RESOURCE_DIR
 constexpr const char * kResourceRoot = "Res";

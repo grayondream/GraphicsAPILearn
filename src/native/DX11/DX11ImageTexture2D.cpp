@@ -1,6 +1,6 @@
 #include "DX11ImageTexture2D.hpp"
-#include "Geometry/Image.hpp"
-#include <Native/DX11/DX11Texture2D.hpp>
+#include "geometry/Image.hpp"
+#include <native/DX11/DX11Texture2D.hpp>
 #include "glad/glad.h"
 #include <cassert>
 

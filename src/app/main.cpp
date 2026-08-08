@@ -1,10 +1,10 @@
 
 
-#include "Base/Log.hpp"
-#include "App/AppFactory.hpp"
-#include "App/IApplication.hpp"
-#include "Utils/EnumUtil.hpp"
-#include "Base/Constexpr.hpp"
+#include "base/Log.hpp"
+#include "app/AppFactory.hpp"
+#include "app/IApplication.hpp"
+#include "utils/EnumUtil.hpp"
+#include "base/Constexpr.hpp"
 
 using namespace Constexpr;
 /*
