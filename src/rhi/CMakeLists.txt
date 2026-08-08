@@ -1,0 +1,11 @@
+file(GLOB RHI_CORE_CPP_FILES "core/*.cpp")
+file(GLOB RHI_CORE_HPP_FILES "core/*.hpp")
+set(ALL_CPP_FILES ${ALL_CPP_FILES} ${RHI_CORE_CPP_FILES} CACHE STRING "all source files" FORCE)
+set(ALL_HPP_FILES ${ALL_HPP_FILES} ${RHI_CORE_HPP_FILES} CACHE STRING "all header files" FORCE)
+
+if(ENABLE_OPENGL)
+    file(GLOB RHI_OPENGL_CPP_FILES "gl/*.cpp")
+    file(GLOB RHI_OPENGL_HPP_FILES "gl/*.hpp")
+    set(ALL_CPP_FILES ${ALL_CPP_FILES} ${RHI_OPENGL_CPP_FILES} CACHE STRING "all source files" FORCE)
+    set(ALL_HPP_FILES ${ALL_HPP_FILES} ${RHI_OPENGL_HPP_FILES} CACHE STRING "all header files" FORCE)
+endif()

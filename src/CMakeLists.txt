@@ -16,6 +16,7 @@ add_subdirectory(${RENDER_NATIVE_PATH})
 add_subdirectory(${RENDER_UTILS_PATH})
 add_subdirectory(${RENDER_MODEL_PATH})
 add_subdirectory(${RENDER_GEOMETRY_PATH})
+add_subdirectory(${RENDER_SOURCE_PATH}/rhi)
 
 add_executable(${PROJECT_NAME}
     ${ALL_CPP_FILES}
