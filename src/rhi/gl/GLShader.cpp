@@ -1,5 +1,4 @@
 #include "GLShader.hpp"
-#include "base/Log.hpp"
 #include "utils/FileUtils.hpp"
 
 namespace rhi {
@@ -36,7 +35,12 @@ bool GLShader::compile(const std::vector<ShaderStage>& stages) {
     GLuint vs = 0, fs = 0, gs = 0;
     for (const auto& st : stages) {
         auto id = compileStage(st);
-        if (id == 0) return false;
+        if (id == 0) {
+            if (vs) glDeleteShader(vs);
+            if (fs) glDeleteShader(fs);
+            if (gs) glDeleteShader(gs);
+            return false;
+        }
         if (st.type == ShaderStage::Vertex) vs = id;
         else if (st.type == ShaderStage::Fragment) fs = id;
         else if (st.type == ShaderStage::Geometry) gs = id;
@@ -52,6 +56,11 @@ bool GLShader::compile(const std::vector<ShaderStage>& stages) {
         char buf[512]{};
         glGetProgramInfoLog(_program, 512, nullptr, buf);
         _log += buf;
+        glDeleteProgram(_program);
+        _program = 0;
+        if (vs) glDeleteShader(vs);
+        if (fs) glDeleteShader(fs);
+        if (gs) glDeleteShader(gs);
         return false;
     }
     if (vs) glDeleteShader(vs);
