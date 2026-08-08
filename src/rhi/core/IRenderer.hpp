@@ -1,0 +1,50 @@
+#pragma once
+#include "Common.hpp"
+#include <memory>
+#include <cstdint>
+
+namespace rhi {
+
+class IBuffer;
+class IShader;
+class IPipeline;
+class ITexture2D;
+class ITexture3D;
+class IRenderTarget;
+class ISurface;
+class ISwapchain;
+
+class IRenderer {
+public:
+    virtual ~IRenderer() = default;
+
+    // 生命周期
+    virtual bool init(const std::shared_ptr<ISurface>& surface) = 0;
+    virtual void shutdown() = 0;
+
+    // 资源创建工厂（App 通过它获取资源）
+    virtual std::shared_ptr<IShader> createShader() = 0;
+    virtual std::shared_ptr<IPipeline> createPipeline(const VertexLayout& layout, const std::shared_ptr<IShader>& shader) = 0;
+    virtual std::shared_ptr<IBuffer> createBuffer() = 0;
+    virtual std::shared_ptr<ITexture2D> createTexture2D() = 0;
+    virtual std::shared_ptr<ITexture3D> createTexture3D() = 0;
+    virtual std::shared_ptr<IRenderTarget> createRenderTarget() = 0;
+    virtual std::shared_ptr<ISwapchain> getSwapchain() = 0;
+
+    // 帧控制
+    virtual void beginFrame() = 0;
+    virtual void endFrame() = 0;
+    virtual bool present() = 0;
+
+    // 状态与绘制
+    virtual void clearColor(float r, float g, float b, float a) = 0;
+    virtual void setViewport(const Viewport& vp) = 0;
+    virtual void setPipeline(const std::shared_ptr<IPipeline>& pipeline) = 0;
+    virtual void setVertexBuffer(const std::shared_ptr<IBuffer>& buffer) = 0;
+    virtual void setIndexBuffer(const std::shared_ptr<IBuffer>& buffer) = 0;
+    virtual void bindTexture(const std::shared_ptr<ITexture2D>& texture, unsigned int unit = 0) = 0;
+    virtual void draw(uint32_t vertexCount, uint32_t firstVertex = 0) = 0;
+    virtual void drawIndexed(uint32_t indexCount, uint32_t indexOffset = 0, uint32_t vertexOffset = 0) = 0;
+};
+
+} // namespace rhi
