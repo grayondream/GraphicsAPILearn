@@ -37,6 +37,7 @@ public:
         return p;
     }
     std::shared_ptr<IBuffer> createBuffer() override { return std::make_shared<GLBuffer>(); }
+    std::shared_ptr<IBuffer> createUniformBuffer() override { return std::make_shared<GLBuffer>(); }
     std::shared_ptr<ITexture2D> createTexture2D() override { return std::make_shared<GLTexture2D>(); }
     std::shared_ptr<ITexture3D> createTexture3D() override { return std::make_shared<GLTexture3D>(); }
     std::shared_ptr<IRenderTarget> createRenderTarget() override { return std::make_shared<GLRenderTarget>(); }
@@ -49,29 +50,75 @@ public:
         glClearColor(r, g, b, a);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
     }
-    void setViewport(const Viewport& vp) override { glViewport(vp.x, vp.y, vp.width, vp.height); }
+    void setViewport(const Viewport& vp) override {
+        _viewportW = vp.width;
+        _viewportH = vp.height;
+        glViewport(vp.x, vp.y, vp.width, vp.height);
+    }
     void setPipeline(const std::shared_ptr<IPipeline>& pipeline) override {
         if (pipeline) pipeline->use();
     }
     void setVertexBuffer(const std::shared_ptr<IBuffer>& buffer) override {
         if (buffer) buffer->bind();
     }
+    void setVertexBuffer(const std::shared_ptr<IBuffer>& buffer, uint32_t binding) override {
+        (void)binding;   // GL 顶点属性绑定由 VAO/布局决定，binding 仅索引，此处忽略
+        if (buffer) buffer->bind();
+    }
     void setIndexBuffer(const std::shared_ptr<IBuffer>& buffer) override {
         if (buffer) buffer->bind();
     }
+    void setRenderTarget(const std::shared_ptr<IRenderTarget>& target) override {
+        if (target) target->bind();
+        else glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    }
     void bindTexture(const std::shared_ptr<ITexture2D>& texture, unsigned int unit) override {
+        if (texture) texture->bind(unit);
+    }
+    void bindTexture(const std::shared_ptr<ITexture3D>& texture, unsigned int unit) override {
         if (texture) texture->bind(unit);
     }
     void draw(uint32_t vertexCount, uint32_t firstVertex) override {
         glDrawArrays(GL_TRIANGLES, firstVertex, vertexCount);
     }
     void drawIndexed(uint32_t indexCount, uint32_t indexOffset, uint32_t vertexOffset) override {
-        glDrawElements(GL_TRIANGLES, indexCount, GL_UNSIGNED_INT, reinterpret_cast<void*>(indexOffset * sizeof(unsigned int)));
+        (void)vertexOffset;
+        glDrawElements(GL_TRIANGLES, indexCount, GL_UNSIGNED_INT,
+                       reinterpret_cast<void*>(indexOffset * sizeof(unsigned int)));
+    }
+    void drawIndexedInstanced(uint32_t indexCount, uint32_t instanceCount,
+                              uint32_t indexOffset, uint32_t vertexOffset) override {
+        (void)vertexOffset;
+        glDrawElementsInstanced(GL_TRIANGLES, indexCount, GL_UNSIGNED_INT,
+                                reinterpret_cast<void*>(indexOffset * sizeof(unsigned int)), instanceCount);
+    }
+    void drawInstanced(uint32_t vertexCount, uint32_t instanceCount, uint32_t firstVertex) override {
+        glDrawArraysInstanced(GL_TRIANGLES, firstVertex, vertexCount, instanceCount);
+    }
+    void blitFramebuffer(const std::shared_ptr<IRenderTarget>& src,
+                         const std::shared_ptr<IRenderTarget>& dst) override {
+        if (!src) return;
+        glBindFramebuffer(GL_READ_FRAMEBUFFER,
+                          static_cast<GLuint>(reinterpret_cast<uintptr_t>(src->handle())));
+        glBindFramebuffer(GL_DRAW_FRAMEBUFFER,
+                          dst ? static_cast<GLuint>(reinterpret_cast<uintptr_t>(dst->handle())) : 0);
+        glBlitFramebuffer(0, 0, _viewportW, _viewportH, 0, 0, _viewportW, _viewportH,
+                          GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT, GL_NEAREST);
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    }
+    BackendCapabilities backendCapabilities() override {
+        BackendCapabilities caps;
+        GLint msaa = 0;
+        glGetIntegerv(GL_MAX_SAMPLES, &msaa);
+        caps.maxSamples = msaa;
+        caps.maxUniformBlockSize = 16384;   // GL 最低保证 16KB
+        return caps;
     }
 
 private:
     std::shared_ptr<ISurface> _surface{};
     std::shared_ptr<ISwapchain> _swapchain{};
+    int _viewportW{0}, _viewportH{0};
 };
 
 std::shared_ptr<IRenderer> createGLRenderer() {

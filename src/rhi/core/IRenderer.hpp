@@ -26,6 +26,7 @@ public:
     virtual std::shared_ptr<IShader> createShader() = 0;
     virtual std::shared_ptr<IPipeline> createPipeline(const VertexLayout& layout, const std::shared_ptr<IShader>& shader) = 0;
     virtual std::shared_ptr<IBuffer> createBuffer() = 0;
+    virtual std::shared_ptr<IBuffer> createUniformBuffer() = 0;               // 新增
     virtual std::shared_ptr<ITexture2D> createTexture2D() = 0;
     virtual std::shared_ptr<ITexture3D> createTexture3D() = 0;
     virtual std::shared_ptr<IRenderTarget> createRenderTarget() = 0;
@@ -40,11 +41,21 @@ public:
     virtual void clearColor(float r, float g, float b, float a) = 0;
     virtual void setViewport(const Viewport& vp) = 0;
     virtual void setPipeline(const std::shared_ptr<IPipeline>& pipeline) = 0;
-    virtual void setVertexBuffer(const std::shared_ptr<IBuffer>& buffer) = 0;
+    virtual void setVertexBuffer(const std::shared_ptr<IBuffer>& buffer) = 0;                                  // 保留（binding 0）
+    virtual void setVertexBuffer(const std::shared_ptr<IBuffer>& buffer, uint32_t binding) = 0;                // 新增：多 binding
     virtual void setIndexBuffer(const std::shared_ptr<IBuffer>& buffer) = 0;
+    virtual void setRenderTarget(const std::shared_ptr<IRenderTarget>& target) = 0;  // 新增：null=默认 framebuffer
     virtual void bindTexture(const std::shared_ptr<ITexture2D>& texture, unsigned int unit = 0) = 0;
+    virtual void bindTexture(const std::shared_ptr<ITexture3D>& texture, unsigned int unit = 0) = 0;          // 新增：cubemap
     virtual void draw(uint32_t vertexCount, uint32_t firstVertex = 0) = 0;
     virtual void drawIndexed(uint32_t indexCount, uint32_t indexOffset = 0, uint32_t vertexOffset = 0) = 0;
+    virtual void drawIndexedInstanced(uint32_t indexCount, uint32_t instanceCount,
+                                      uint32_t indexOffset = 0, uint32_t vertexOffset = 0) = 0;              // 新增
+    virtual void drawInstanced(uint32_t vertexCount, uint32_t instanceCount,
+                               uint32_t firstVertex = 0) = 0;                                                // 新增
+    virtual void blitFramebuffer(const std::shared_ptr<IRenderTarget>& src,
+                                 const std::shared_ptr<IRenderTarget>& dst) = 0;                              // 新增：MSAA resolve / 拷贝
+    virtual BackendCapabilities backendCapabilities() = 0;                                                    // 新增
 };
 
 } // namespace rhi
