@@ -29,6 +29,28 @@ std::shared_ptr<rhi::ITexture2D> Load2D(rhi::IRenderer* renderer, const std::str
     return tex;
 }
 
+std::shared_ptr<rhi::ITexture2D> Load2DHDR(rhi::IRenderer* renderer, const std::string& file) {
+    Image img(file, TextureOption{true});
+    img.load();
+    if (!img.data()) {
+        return {};
+    }
+
+    const int ch = img.size().channel;
+    rhi::TextureDesc desc;
+    desc.format = (ch == 4) ? rhi::TextureFormat::RGBA16F : rhi::TextureFormat::RGB16F;
+    desc.wrapS = rhi::TextureWrap::ClampToEdge;
+    desc.wrapT = rhi::TextureWrap::ClampToEdge;
+    desc.minFilter = rhi::TextureFilter::LinearMipLinear;
+    desc.magFilter = rhi::TextureFilter::Linear;
+    desc.generateMipmap = true;
+
+    rhi::TextureDataView2D view{img.data(), img.size().width, img.size().height, ch};
+    auto tex = renderer->createTexture2D();
+    tex->init(desc, view);
+    return tex;
+}
+
 std::shared_ptr<rhi::ITexture3D> LoadCube(rhi::IRenderer* renderer, const std::string& dir) {
     const std::array<std::string, 6> faces{
         "right.jpg", "left.jpg", "top.jpg",
