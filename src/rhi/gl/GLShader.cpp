@@ -8,6 +8,7 @@ static GLenum ToGLType(ShaderStage::Type type) {
         case ShaderStage::Vertex:   return GL_VERTEX_SHADER;
         case ShaderStage::Fragment: return GL_FRAGMENT_SHADER;
         case ShaderStage::Geometry: return GL_GEOMETRY_SHADER;
+        case ShaderStage::Compute:  return GL_COMPUTE_SHADER;
     }
     return GL_VERTEX_SHADER;
 }
@@ -32,6 +33,12 @@ GLuint GLShader::compileStage(const ShaderStage& stage) {
 
 bool GLShader::compile(const std::vector<ShaderStage>& stages) {
     _log.clear();
+    for (const auto& st : stages) {
+        if (st.type == ShaderStage::Compute) {
+            _log = "Compute shaders are not supported by the GL backend yet";
+            return false;
+        }
+    }
     GLuint vs = 0, fs = 0, gs = 0;
     for (const auto& st : stages) {
         auto id = compileStage(st);
