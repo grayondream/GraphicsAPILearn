@@ -1,13 +1,12 @@
 #pragma once
-#include "app/GL/GLApp.hpp"
-#include "native/GL/GLProgram.hpp"
-#include <memory>
-#include <array>
+#include "app/App.hpp"
 #include "geometry/Camera.hpp"
 #include "geometry/Vertex.hpp"
+#include <memory>
+#include <array>
 
 class GLImageTexture2D;
-class GLCameraBaseApp : public GLApp {
+class GLCameraBaseApp : public App {
 public:
 	virtual ~GLCameraBaseApp();
 

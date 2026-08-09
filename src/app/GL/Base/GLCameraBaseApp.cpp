@@ -1,14 +1,11 @@
 #include "GLCameraBaseApp.hpp"
-#include "native/GL/GLProgram.hpp"
 #include "base/StaticCollector.hpp"
 #include "base/ErrorHandle.hpp"
 #include "base/Log.hpp"
 #include "geometry/Cube.hpp"
-#include "native/GL/GLImageTexture2D.hpp"
 #include "utils/FileUtils.hpp"
 #include "utils/EventUtils.hpp"
 #include "base/Log.hpp"
-#include <glad/glad.h>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
