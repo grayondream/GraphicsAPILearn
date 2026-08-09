@@ -2,3 +2,4 @@ linux_build/
 build/
 *.TMP
 .cache/
+imgui.ini

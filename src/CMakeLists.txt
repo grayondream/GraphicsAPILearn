@@ -92,3 +92,6 @@ target_link_libraries(${PROJECT_NAME} glfw)
 target_include_directories(${PROJECT_NAME} PRIVATE ${GLFW_INCLUDE_DIR})
 target_include_directories(${PROJECT_NAME} PRIVATE glfw3::glfw3)
 
+find_package(cxxopts CONFIG REQUIRED)
+target_link_libraries(${PROJECT_NAME} cxxopts::cxxopts)
+

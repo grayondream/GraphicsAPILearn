@@ -1,5 +1,11 @@
 
 
+#include <cxxopts.hpp>
+#include <string>
+#include <vector>
+#include <optional>
+#include <iostream>
+
 #include "base/Log.hpp"
 #include "app/AppFactory.hpp"
 #include "app/IApplication.hpp"
@@ -7,66 +13,100 @@
 #include "base/Constexpr.hpp"
 
 using namespace Constexpr;
-/*
- * Application List:
- * Base: Draw a empty window
- *  Base:                           clear window's color into one color by OpenGL
- *  Triangle                        draw a colored triangle by OpenGL
- *  Rect                            draw a colored rect by OpenGL
- *  SimpleTexture                   read a image into texture and draw it on a rect by OpenGL
- *  Cube                            draw a cube by OpenGL
- *  Camera                          create a virtual camera
- *  SimpleLight_Ambination          Global Illumination
- *  SimpleLight_Diffuse             diffuse light
- *  SimpleLight_Specular            Specular light
- *  SimpleLight_Material            Material
- *  SimpleLight_Map                 Light Map
- *  SimpleLight_Source_Direction    Direction Light Source
- *  SimpleLight_Source_Point        Point Light Source
- *  SimpleLight_Source_Spot         Spot Light Source
- *  SimpleLight_Source_Mult         Multiple Light Source
- *  LoadModel                       Load Model
- *  DepthTest                       Depth Test
- *  TemplateTest                    Template Test
- *  Blend                           Blend Test
- *  CullFace                        Cull Face Test
- *  FrameBuffer                     Frame Buffer Test
- *  SkyBox                          Render a skybox around the camera
- *  AdvancedShader                    Advanced Shader Test
- *  UniformBuffer                   Uniform Buffer Test
- *  SimpleGeometry                  Simple Geometry Test
- *  Explode                         Explode Geometry Test
- *  NormalLine                      Draw Normal Line
- *  MultiInstance                   draw multiple instance
- *  MultiInstance_Saturn            draw multiple instance with saturn model
- *  Msaa                            Multi Sample Anti Aliasing
- *  BlinnPhong                      Blinn-Phong Lighting Model
- *  Gamma                           Gamma Correction
- *  Shadow_Map                      Shadow Mapping
- *  Shadow                          Render Shadow 
- *  Shadow_PointLight               Render Point light shadow
- *  NormalMap                       render object with normal map
- *  ParallaxMap                     render object with parallax map
- *  Hdr                             render hdr scene
- *  Bloom                           rende bloom light
- *  Defer                           render defer scene
- *  SSAO                            render SSAO scene
- *  PBR_Base                        render PBR base scene
- *  PBR_Texture                     render PBR texture scene
- *  PBR_IBL_Irradiance_Conversion   render PBR IBL Irradiance Conversion scene
- *  PBR_IBL_Irradiance              render PBR IBL Irradiance scene
- *  PBR_IBL_Specular                render PBR IBL Specular scene
- */
 
 namespace EnumUtil = Utils::Enum;
 
+static std::vector<std::pair<std::string, GraphicsType>> AvailableBackends() {
+    std::vector<std::pair<std::string, GraphicsType>> v;
+#if ENABLE_OPENGL
+    v.emplace_back("gl", GraphicsType::GL);
+#endif
+#if ENABLE_DX11
+    v.emplace_back("dx11", GraphicsType::DX11);
+#endif
+    return v;
+}
+
+static std::string_view StripEnumPrefix(const std::string_view name) {
+    const auto pos = name.rfind("::");
+    return pos == std::string_view::npos ? name : name.substr(pos + 2);
+}
+
+static std::optional<AppType> FindAppType(const std::string& name) {
+    for (int i = 0; i < static_cast<int>(AppType::Count); ++i) {
+        const auto t = static_cast<AppType>(i);
+        if (StripEnumPrefix(EnumUtil::EnumName(t)) == name) {
+            return t;
+        }
+    }
+    return std::nullopt;
+}
+
+static std::string ListAppNames() {
+    std::string s;
+    for (int i = 0; i < static_cast<int>(AppType::Count); ++i) {
+        if (i > 0) s += " ";
+        s += StripEnumPrefix(EnumUtil::EnumName(static_cast<AppType>(i)));
+    }
+    return s;
+}
+
+static std::string ListBackendNames(const std::vector<std::pair<std::string, GraphicsType>>& backends) {
+    std::string s;
+    for (size_t i = 0; i < backends.size(); ++i) {
+        if (i > 0) s += " ";
+        s += backends[i].first;
+    }
+    return s;
+}
+
 int main(int argc, char **argv) {
-    auto type = AppType::PBR_IBL_Specular;
-    auto api = GraphicsType::GL;
+    auto backends = AvailableBackends();
+
+    cxxopts::Options options("renderLearn", "Graphics Learn example runner");
+    options.add_options()
+        ("b,backend", "graphics backend (default: gl)", cxxopts::value<std::string>()->default_value("gl"))
+        ("a,app", "example app name (default: PBR_IBL_Specular)", cxxopts::value<std::string>()->default_value("PBR_IBL_Specular"))
+        ("h,help", "print usage");
+
+    auto result = options.parse(argc, argv);
+
+    if (result.count("help")) {
+        std::cout << options.help() << std::endl;
+        std::cout << "Available backends:\n  " << ListBackendNames(backends) << std::endl;
+        std::cout << "Available apps:\n  " << ListAppNames() << std::endl;
+        return 0;
+    }
+
+    const std::string backendName = result["backend"].as<std::string>();
+    const std::string appName = result["app"].as<std::string>();
+
+    std::optional<GraphicsType> gtype;
+    for (const auto& [name, type] : backends) {
+        if (name == backendName) {
+            gtype = type;
+            break;
+        }
+    }
+    if (!gtype) {
+        LOGE("Unknown backend '{}'. Available backends: {}", backendName, ListBackendNames(backends));
+        return 1;
+    }
+
+    auto type = FindAppType(appName);
+    if (!type) {
+        LOGE("Unknown app '{}'. Available apps:\n{}", appName, ListAppNames());
+        return 1;
+    }
+
     LOGI("Start Graphics Learn!!!");
-    LOGI("Select {} Application, Render App With {} API", EnumUtil::EnumName(type), EnumUtil::EnumName(api));
-    auto app = AppFactory::create(api, type);
+    LOGI("Select {} Application, Render App With {} API", StripEnumPrefix(EnumUtil::EnumName(*type)), StripEnumPrefix(EnumUtil::EnumName(*gtype)));
+    auto app = AppFactory::create(*gtype, *type);
     assert(app);
+    if (!app) {
+        LOGE("Failed to create app '{}' with backend '{}'", appName, backendName);
+        return 1;
+    }
 
     GLFWWindowProperties props(
         "Pure Window (No Graphics API)",

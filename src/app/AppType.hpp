@@ -56,5 +56,6 @@ enum class AppType : int{
     PBR_IBL_Irradiance_Conversion,
     PBR_IBL_Irradiance,
     PBR_IBL_Specular,
+    Count,
 };
 

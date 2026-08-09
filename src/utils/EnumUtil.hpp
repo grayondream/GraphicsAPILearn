@@ -20,16 +20,23 @@ namespace Detail {
 template<auto V>
 constexpr std::string_view EnumName() {
     auto str = Detail::sig<V>();
-#ifdef __clang__
-    return std::string_view(str.data() + 49, str.size() - 50);
-#elif defined(__GNUC__)
-    return std::string_view(str.data() + 49, str.size() - 50);
-#elif defined(_MSC_VER)
-    return std::string_view(str.data() + 99, str.size() - 106);
+#if defined(__GNUC__)
+    constexpr std::string_view tag = "[with auto V = ";
+    const auto start = str.find(tag);
+    if (start == str.npos) return str;
+    const auto begin = start + tag.size();
+    const auto end = str.find(';', begin);
+    return str.substr(begin, end - begin);
+#elif defined(__clang__)
+    constexpr std::string_view tag = " [V = ";
+    const auto pos = str.find(tag);
+    if (pos == str.npos) return str;
+    const auto begin = pos + tag.size();
+    const auto end = str.find(']', begin);
+    return str.substr(begin, end - begin);
 #else
-    return "";
+    return str;
 #endif
-
 }
 
 namespace Detail{
