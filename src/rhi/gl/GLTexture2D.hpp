@@ -14,9 +14,11 @@ public:
     void* handle() override;
     bool valid() const override { return _id != 0; }
     void release() override;
+    void adopt(GLuint id);        // 包装已有纹理（非拥有，不删除）
 
 private:
     GLuint _id{0};
+    bool _owns{true};
     TextureDesc _desc{};
 };
 

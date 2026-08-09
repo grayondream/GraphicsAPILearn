@@ -56,8 +56,16 @@ void* GLTexture2D::handle() {
     return reinterpret_cast<void*>(static_cast<uintptr_t>(_id));
 }
 
+void GLTexture2D::adopt(GLuint id) {
+    if (_id && _owns) glDeleteTextures(1, &_id);
+    _id = id;
+    _owns = false;
+}
+
 void GLTexture2D::release() {
-    if (_id) { glDeleteTextures(1, &_id); _id = 0; }
+    if (_id && _owns) glDeleteTextures(1, &_id);
+    _id = 0;
+    _owns = true;
 }
 
 } // namespace rhi
