@@ -20,6 +20,20 @@ public:
 
     bool bindShader(const std::shared_ptr<GLShader>& shader, const VertexLayout& layout);
 
+    void bindUniformBlock(uint32_t binding) override;
+    void setDepthFunc(CompareFunc func) override;
+    void setDepthMask(bool write) override;
+    void setStencilTest(bool enable) override;
+    void setStencilFunc(CompareFunc func, int ref, unsigned mask) override;
+    void setStencilOp(StencilOp sfail, StencilOp dpfail, StencilOp dppass) override;
+    void setStencilMask(unsigned mask) override;
+    void setBlendFunc(BlendFactor src, BlendFactor dst) override;
+    void setCullFaceEnable(bool enable) override;
+    void setCullFace(CullFace face) override;
+    void setFrontFace(bool ccw) override;
+    void setPolygonMode(PolygonMode mode) override;
+    void setMultisample(bool enable) override;
+
 private:
     std::shared_ptr<GLShader> _shader{};
     GLuint _vao{0};

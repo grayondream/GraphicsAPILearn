@@ -66,7 +66,23 @@ bool GLShader::compile(const std::vector<ShaderStage>& stages) {
     if (vs) glDeleteShader(vs);
     if (fs) glDeleteShader(fs);
     if (gs) glDeleteShader(gs);
+    collectUniformBlocks();
     return true;
+}
+
+void GLShader::collectUniformBlocks() {
+    _blocks.clear();
+    if (!_program) return;
+    GLint count = 0;
+    glGetProgramiv(_program, GL_ACTIVE_UNIFORM_BLOCKS, &count);
+    for (GLint i = 0; i < count; ++i) {
+        GLsizei len = 0;
+        glGetActiveUniformBlockiv(_program, i, GL_UNIFORM_BLOCK_NAME_LENGTH, &len);
+        std::string name(len > 0 ? static_cast<size_t>(len) : 1u, '\0');
+        glGetActiveUniformBlockName(_program, i, len, nullptr, &name[0]);
+        if (!name.empty() && name.back() == '\0') name.pop_back();
+        _blocks[name] = static_cast<GLuint>(i);
+    }
 }
 
 } // namespace rhi
