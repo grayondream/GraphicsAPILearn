@@ -1,8 +1,8 @@
 #pragma once
-#include "app/ImGuiWindow.hpp"
+#include "app/IImGuiWindow.hpp"
 
 struct GLFWwindow;
-class ImGuiOpenglWindow : public ImGuiWindow{
+class ImGuiOpenglWindow : public IImGuiWindow{
 public:
     ~ImGuiOpenglWindow();
 

@@ -1,8 +1,8 @@
 #pragma once
 struct GLFWwindow;
-class ImGuiWindow{
+class IImGuiWindow{
 public:
-    virtual ~ImGuiWindow() = default;
+    virtual ~IImGuiWindow() = default;
 
 public:
     virtual void init(GLFWwindow* win);
