@@ -56,17 +56,17 @@ public:
         glViewport(vp.x, vp.y, vp.width, vp.height);
     }
     void setPipeline(const std::shared_ptr<IPipeline>& pipeline) override {
+        _pipeline = pipeline;
         if (pipeline) pipeline->use();
     }
     void setVertexBuffer(const std::shared_ptr<IBuffer>& buffer) override {
-        if (buffer) buffer->bind();
+        if (_pipeline) _pipeline->setVertexBuffer(buffer, 0);
     }
     void setVertexBuffer(const std::shared_ptr<IBuffer>& buffer, uint32_t binding) override {
-        (void)binding;   // GL 顶点属性绑定由 VAO/布局决定，binding 仅索引，此处忽略
-        if (buffer) buffer->bind();
+        if (_pipeline) _pipeline->setVertexBuffer(buffer, binding);
     }
     void setIndexBuffer(const std::shared_ptr<IBuffer>& buffer) override {
-        if (buffer) buffer->bind();
+        if (_pipeline) _pipeline->setIndexBuffer(buffer);
     }
     void setRenderTarget(const std::shared_ptr<IRenderTarget>& target) override {
         if (target) target->bind();
@@ -118,6 +118,7 @@ public:
 private:
     std::shared_ptr<ISurface> _surface{};
     std::shared_ptr<ISwapchain> _swapchain{};
+    std::shared_ptr<IPipeline> _pipeline{};
     int _viewportW{0}, _viewportH{0};
 };
 

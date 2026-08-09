@@ -1,10 +1,12 @@
 #include "GLPipeline.hpp"
+#include "rhi/core/IBuffer.hpp"
 #include <glm/glm.hpp>
 
 namespace rhi {
 
 void GLPipeline::use() {
     if (_shader) glUseProgram(_shader->id());
+    if (_vao) glBindVertexArray(_vao);
 }
 
 void* GLPipeline::handle() {
@@ -18,6 +20,38 @@ bool GLPipeline::bindShader(const std::shared_ptr<GLShader>& shader, const Verte
     glBindVertexArray(_vao);
     // 顶点缓冲由 GLRenderer 统一创建；此处记录布局
     return true;
+}
+
+static GLenum ElementToGLFormat(VertexElement::Format f, GLint* sizeOut) {
+    switch (f) {
+        case VertexElement::Float2: *sizeOut = 2; return GL_FLOAT;
+        case VertexElement::Float3: *sizeOut = 3; return GL_FLOAT;
+        case VertexElement::Float4: *sizeOut = 4; return GL_FLOAT;
+        case VertexElement::Int4:   *sizeOut = 4; return GL_INT;
+    }
+    *sizeOut = 3; return GL_FLOAT;
+}
+
+void GLPipeline::setVertexBuffer(const std::shared_ptr<IBuffer>& buffer, uint32_t binding) {
+    if (_vao == 0) glGenVertexArrays(1, &_vao);
+    glBindVertexArray(_vao);
+    if (buffer) buffer->bind();   // Vertex 缓冲 → GL_ARRAY_BUFFER
+    for (const auto& e : _layout) {
+        if (e.binding != static_cast<int>(binding)) continue;
+        GLint size = 0;
+        const GLenum type = ElementToGLFormat(e.format, &size);
+        glVertexAttribPointer(e.semantic, size, type, GL_FALSE, e.stride,
+                              reinterpret_cast<void*>(e.offset));
+        glEnableVertexAttribArray(e.semantic);
+        glVertexAttribDivisor(e.semantic,
+                              (e.inputRate == VertexInputRate::PerInstance) ? 1 : 0);
+    }
+}
+
+void GLPipeline::setIndexBuffer(const std::shared_ptr<IBuffer>& buffer) {
+    if (_vao == 0) glGenVertexArrays(1, &_vao);
+    glBindVertexArray(_vao);
+    if (buffer) buffer->bind();   // Index 缓冲 → GL_ELEMENT_ARRAY_BUFFER（随 VAO 保存）
 }
 
 void GLPipeline::setDepthTest(bool enable) {

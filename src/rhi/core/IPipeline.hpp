@@ -5,6 +5,7 @@
 namespace rhi {
 
 class IShader;
+class IBuffer;
 
 class IPipeline {
 public:
@@ -39,6 +40,10 @@ public:
     virtual void setFrontFace(bool ccw) = 0;               // true=CCW 正面，false=CW
     virtual void setPolygonMode(PolygonMode mode) = 0;
     virtual void setMultisample(bool enable) = 0;
+
+    // 顶点输入装配：按当前 VertexLayout 把 buffer 挂到指定 binding
+    virtual void setVertexBuffer(const std::shared_ptr<IBuffer>& buffer, uint32_t binding) = 0;
+    virtual void setIndexBuffer(const std::shared_ptr<IBuffer>& buffer) = 0;
 };
 
 } // namespace rhi

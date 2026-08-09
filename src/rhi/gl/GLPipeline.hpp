@@ -34,6 +34,9 @@ public:
     void setPolygonMode(PolygonMode mode) override;
     void setMultisample(bool enable) override;
 
+    void setVertexBuffer(const std::shared_ptr<IBuffer>& buffer, uint32_t binding) override;
+    void setIndexBuffer(const std::shared_ptr<IBuffer>& buffer) override;
+
 private:
     std::shared_ptr<GLShader> _shader{};
     GLuint _vao{0};
