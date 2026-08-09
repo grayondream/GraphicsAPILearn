@@ -1,62 +1,57 @@
 #include "GLCubeApp.hpp"
-#include "native/GL/GLProgram.hpp"
 #include "base/StaticCollector.hpp"
 #include "base/ErrorHandle.hpp"
-#include "glad/glad.h"
+#include "rhi/core/IShader.hpp"
+#include "rhi/core/IPipeline.hpp"
+#include "rhi/core/ITexture2D.hpp"
 #include "geometry/Cube.hpp"
-#include "native/GL/GLImageTexture2D.hpp"
+#include "app/GL/RhiGeometry.hpp"
+#include "app/GL/RhiImage.hpp"
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
-#include "base/Log.hpp"
 #include "imgui.h"
 #include <utils/FileUtils.hpp>
-#include "native/GL/GLCube.hpp"
 
 using FileUtils::join;
-
 using namespace ErrorHandle;
 
 GLCubeApp::~GLCubeApp() {
-	cube_->destroy();
-	_program.destroy();
 }
 
 bool GLCubeApp::initApp() {
-	const auto prop = m_window->getProperties();
-	glViewport(0, 0, prop.width, prop.height);
 	const auto vfile = join(StaticCollector::getGLShaderPath(), "Base", "Cube.vert");
 	const auto ffile = join(StaticCollector::getGLShaderPath(), "Base", "Cube.frag");
-	auto ret = _program.init(vfile, ffile);
-	ErrorHandle::ExitIfFailed(ret, "Create OpenGL program failed!");
+
+	auto shader = renderer()->createShader();
+	auto ok = shader->compile({ {rhi::ShaderStage::Vertex, vfile, "main", false},
+	                            {rhi::ShaderStage::Fragment, ffile, "main", false} });
+	ExitIfFailed(ok, "Create RHI shader failed: {}", shader->getLog());
+
 	const auto imgFile = join(StaticCollector::getImagePath(), "dog.jpg");
-	_texture = std::make_shared<GLImageTexture2D>(imgFile);
-	const auto valid = _texture->load().texture()->valid();
-	ExitIfFailed(valid, "Failed to load texture from file {}", imgFile);
-	initializeCube();
-	glEnable(GL_DEPTH_TEST);
-	//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+	_texture = RhiImage::Load2D(renderer().get(), imgFile);
+	ExitIfFailed(_texture != nullptr, "Failed to load texture from file {}", imgFile);
+
+	Cube shape{};
+	auto geo = RhiGeometry::Create(renderer().get(), shape, true, true, false);
+	_layout = geo.layout;
+	_vb = geo.vertexBuffer;
+	_uv = geo.uvBuffer;
+	_normal = geo.normalBuffer;
+	_vertexCount = geo.vertexCount;
+
+	_pipeline = renderer()->createPipeline(_layout, shader);
+	_pipeline->setDepthTest(true);
 	return true;
 }
 
-void GLCubeApp::initializeCube() {
-	cube_ = std::make_shared<GLCube>();
-	cube_->init();
-}
-
-void GLCubeApp::clearColor() {
-	return GLApp::clearColor();
-}
-
-void GLCubeApp::beginDrawScene() {
-	_texture->texture()->bind(0);
-	_program.use();
-	return GLApp::beginDrawScene();
-}
-
 void GLCubeApp::drawScene(const float dt) {
-	GLApp::drawScene(dt);
-	glBindVertexArray(cube_->getVao());
+	renderer()->bindTexture(_texture, 0);
+	renderer()->setPipeline(_pipeline);
+	renderer()->setVertexBuffer(_vb);
+	renderer()->setVertexBuffer(_uv, 1);
+	renderer()->setVertexBuffer(_normal, 2);
+
 	ImGui::Begin("OpenGL");
 	static int count{ 1 };
 	ImGui::SetNextItemWidth(200);
@@ -86,16 +81,11 @@ void GLCubeApp::drawScene(const float dt) {
 		model = glm::rotate(model, glm::radians(angle), glm::vec3(1.0f, 0.3f, 0.5f));
 		view = glm::translate(view, glm::vec3(0.0f, 0.0f, -3.0f));
 		projection = glm::perspective(glm::radians(45.0f), aspectRatio(), 0.1f, 100.0f);
-		_program.update("model", model);
-		_program.update("view", view);
-		_program.update("projection", projection);
-		glDrawArrays(GL_TRIANGLES, 0, 36);
-		//glDrawElements(GL_TRIANGLES, cube_->idxSize(), GL_UNSIGNED_INT, 0);
+		_pipeline->setUniform("model", glm::value_ptr(model), 1);
+		_pipeline->setUniform("view", glm::value_ptr(view), 1);
+		_pipeline->setUniform("projection", glm::value_ptr(projection), 1);
+		renderer()->draw(_vertexCount, 0);
 	}
-	
-	glBindVertexArray(0);
-}
 
-void GLCubeApp::endDrawScene() {
-	return GLApp::endDrawScene();
+	return GLApp::drawScene(dt);
 }

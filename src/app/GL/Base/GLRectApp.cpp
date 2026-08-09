@@ -1,71 +1,40 @@
 #include "GLRectApp.hpp"
-#include "native/GL/GLProgram.hpp"
 #include "base/StaticCollector.hpp"
 #include "base/ErrorHandle.hpp"
-#include "glad/glad.h"
+#include "rhi/core/IShader.hpp"
 #include <geometry/Rect.hpp>
+#include "app/GL/RhiGeometry.hpp"
 #include <utils/FileUtils.hpp>
 using FileUtils::join;
-GLRectApp::~GLRectApp() {
-	if (_vao != 0) {
-		glDeleteVertexArrays(1, &_vao);
-		glDeleteBuffers(1, &_vbo);
-		glDeleteBuffers(1, &_ebo);
-	}
+using namespace ErrorHandle;
 
-	_program.destroy();
+GLRectApp::~GLRectApp() {
 }
 
 bool GLRectApp::initApp() {
 	const auto vfile = join(StaticCollector::getGLShaderPath(), "Base", "rect.vert");
 	const auto ffile = join(StaticCollector::getGLShaderPath(), "Base", "rect.frag");
-	auto ret = _program.init(vfile, ffile);
-	ErrorHandle::ExitIfFailed(ret, "Create OpenGL program failed!");
-	std::tie(_vao, _vbo, _ebo) = createVertexBuffer();
-	//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+
+	auto shader = renderer()->createShader();
+	auto ok = shader->compile({ {rhi::ShaderStage::Vertex, vfile, "main", false},
+	                            {rhi::ShaderStage::Fragment, ffile, "main", false} });
+	ExitIfFailed(ok, "Create RHI shader failed: {}", shader->getLog());
+
+	Rect shape{};
+	auto geo = RhiGeometry::Create(renderer().get(), shape, false, false, true);
+	_layout = geo.layout;
+	_vb = geo.vertexBuffer;
+	_ib = geo.indexBuffer;
+	_indexCount = geo.indexCount;
+
+	_pipeline = renderer()->createPipeline(_layout, shader);
 	return true;
 }
 
-std::tuple<unsigned int, unsigned int, unsigned int> GLRectApp::createVertexBuffer() {
-	Rect shape{};
-	unsigned int vbo{}, vao{}, ebo{};
-	glGenVertexArrays(1, &vao);
-	glGenBuffers(1, &vbo);
-	glGenBuffers(1, &ebo);
-
-	glBindVertexArray(vao);
-	{
-		glBindBuffer(GL_ARRAY_BUFFER, vbo);
-		glBufferData(GL_ARRAY_BUFFER, shape.byteSize(), shape.toGL().data(), GL_STATIC_DRAW);
-
-		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
-		glBufferData(GL_ELEMENT_ARRAY_BUFFER, shape.idxByteSize(), shape.idx(), GL_STATIC_DRAW);
-
-		glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 8 * sizeof(float), nullptr);
-		glEnableVertexAttribArray(0);
-
-		glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(4 * sizeof(float)));
-		glEnableVertexAttribArray(1);
-	}
-	glBindVertexArray(0);
-	return {vao, vbo, ebo};
-}
-
-void GLRectApp::clearColor() {
-	return GLApp::clearColor();
-}
-
-void GLRectApp::beginDrawScene() {
-	return GLApp::beginDrawScene();
-}
-
 void GLRectApp::drawScene(const float dt) {
-	_program.use();
-	glBindVertexArray(_vao);
-	glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+	renderer()->setPipeline(_pipeline);
+	renderer()->setVertexBuffer(_vb);
+	renderer()->setIndexBuffer(_ib);
+	renderer()->drawIndexed(_indexCount, 0);
 	return GLApp::drawScene(dt);
-}
-
-void GLRectApp::endDrawScene() {
-	return GLApp::endDrawScene();
 }

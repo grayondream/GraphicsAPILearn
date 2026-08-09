@@ -1,23 +1,17 @@
 #pragma once
-#include "app/GL/GLApp.hpp"
-#include "native/GL/GLProgram.hpp"
+#include "app/App.hpp"
+#include "rhi/core/IRenderer.hpp"
+#include <memory>
 
-class GLTriangleApp : public GLApp {
+class GLTriangleApp : public App {
 public:
 	virtual ~GLTriangleApp();
 protected:
 	virtual bool initApp() override;
-
-	virtual void clearColor();
-	virtual void beginDrawScene();
-	virtual void drawScene(const float dt);
-	virtual void endDrawScene();
-	
+	virtual void drawScene(const float dt) override;
 private:
-	std::pair<unsigned int, unsigned int> createVertexBuffer();
-
-private:
-	GLProgram _program{};
-	unsigned int _vbo{};
-	unsigned int _vao{};
+	std::shared_ptr<rhi::IPipeline> _pipeline{};
+	std::shared_ptr<rhi::IBuffer> _vb{};
+	rhi::VertexLayout _layout{};
+	uint32_t _vertexCount{0};
 };

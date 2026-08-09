@@ -1,13 +1,9 @@
 #pragma once
 #include "app/GL/Base/GLCameraBaseApp.hpp"
-#include "native/GL/GLProgram.hpp"
-#include "geometry/Camera.hpp"
-#include "geometry/Vertex.hpp"
+#include "rhi/core/IRenderer.hpp"
 #include <memory>
-#include <array>
 
 
-class GLImageTexture2D;
 class GLCameraApp : public GLCameraBaseApp {
 public:
 	virtual ~GLCameraApp();
@@ -15,16 +11,14 @@ public:
 protected:
 	virtual bool initApp() override;
 
-	virtual void beginDrawScene();
 	virtual void drawScene(const float dt);
 
 private:
-	void createVertexBuffer();
-
-private:
-	std::shared_ptr<GLImageTexture2D> _texture{};
-	GLProgram _program{};
-	unsigned int _vbo[2]{};
-	unsigned int _vao{};
-	float _curTime{};
+	std::shared_ptr<rhi::IPipeline> _pipeline{};
+	std::shared_ptr<rhi::IBuffer> _vb{};
+	std::shared_ptr<rhi::IBuffer> _uv{};
+	std::shared_ptr<rhi::IBuffer> _normal{};
+	std::shared_ptr<rhi::ITexture2D> _texture{};
+	rhi::VertexLayout _layout{};
+	uint32_t _vertexCount{0};
 };
