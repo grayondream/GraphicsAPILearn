@@ -1,8 +1,9 @@
 #include "GLApp.hpp"
 #include "base/ErrorHandle.hpp"
 #include "base/Log.hpp"
-#include "GL/GLHeader.hpp"
 #include "ImGuiOpenglWindow.hpp"
+#include "rhi/gl/GLBackend.hpp"
+#include "rhi/gl/GLFWSurface.hpp"
 #include <imgui.h>
 
 using namespace ErrorHandle;
@@ -16,33 +17,29 @@ GLApp::~GLApp() {
 }
 
 bool GLApp::initGraphics() {
-    // 设置OpenGL上下文
     if (!m_window->initGLContext()) {
         LOGE("Failed to initialize GL Context");
         return false;
     }
-   
-    // 打印OpenGL版本信息
-    LOGI("OpenGL Vendor: {}", (char*)glGetString(GL_VENDOR));
-    LOGI("OpenGL Renderer: {}", (char*)glGetString(GL_RENDERER));
-    LOGI("OpenGL Version: {}", (char*)glGetString(GL_VERSION));
-    
-    // 设置视口
-    int width, height;
+
     auto props = m_window->getProperties();
-    width = props.width;
-    height = props.height;
-    glViewport(0, 0, width, height);
-    // 启用深度测试
-    glEnable(GL_DEPTH_TEST);
+    auto surface = std::make_shared<rhi::GLFWSurface>(
+        m_window->getNativeGLFWWindow(), props.width, props.height);
+    _renderer = rhi::createGLRenderer();
+    if (!_renderer->init(surface)) {
+        LOGE("Failed to init renderer");
+        return false;
+    }
+    _renderer->setViewport(rhi::Viewport{0, 0, props.width, props.height});
+    _renderer->setPipeline(nullptr);
+
     m_imguiWindow = std::make_unique<ImGuiOpenglWindow>();
     m_imguiWindow->init(m_window->getNativeGLFWWindow());
     return true;
 }
 
 void GLApp::clearColor() {
-    glClearColor(0.1, 0.1, 0.1, 1.0);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
+    _renderer->clearColor(0.1f, 0.1f, 0.1f, 1.0f);
 }
 
 void GLApp::beginDrawScene() {
@@ -59,6 +56,6 @@ void GLApp::drawScene(const float dt) {
 }
 
 void GLApp::endDrawScene() {
-    m_window->swapBuffers();
+    _renderer->present();
     return Application::endDrawScene();
 }

@@ -7,6 +7,7 @@
 #include "GLTexture3D.hpp"
 #include "GLRenderTarget.hpp"
 #include "rhi/core/ISurface.hpp"
+#include "base/Log.hpp"
 #include "GLHeader.hpp"
 #include <glm/glm.hpp>
 
@@ -18,7 +19,12 @@ public:
         _surface = surface;
         _swapchain = std::make_shared<GLSwapchain>(
             static_cast<GLFWwindow*>(_surface->nativeHandle()));
-        return _swapchain != nullptr;
+        if (!_swapchain) return false;
+
+        LOGI("OpenGL Vendor: {}", (char*)glGetString(GL_VENDOR));
+        LOGI("OpenGL Renderer: {}", (char*)glGetString(GL_RENDERER));
+        LOGI("OpenGL Version: {}", (char*)glGetString(GL_VERSION));
+        return true;
     }
 
     void shutdown() override {}
