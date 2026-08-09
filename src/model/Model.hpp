@@ -1,8 +1,6 @@
 #ifndef MODEL_H
 #define MODEL_H
 
-#include <glad/glad.h> 
-
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <stb_image.h>
@@ -11,6 +9,8 @@
 #include <assimp/postprocess.h>
 
 #include <model/Mesh.hpp>
+#include "rhi/core/IPipeline.hpp"
+#include "rhi/core/IRenderer.hpp"
 
 #include <string>
 #include <fstream>
@@ -20,17 +20,18 @@
 #include <vector>
 using namespace std;
 
-unsigned int TextureFromFile(const char *path, const string &directory, bool gamma = false);
-
 class Model 
 {
 public:
     // constructor, expects a filepath to a 3D model.
-    Model(string const &path, bool gamma = false);
+    Model(rhi::IRenderer* renderer, string const &path, bool gamma = false);
 
     // draws the model, and thus all its meshes
-    void draw(GLProgram &shader, int count = 1);
-    
+    void draw(rhi::IRenderer* renderer, rhi::IPipeline* pipeline, int count = 1);
+
+    // vertex input layout shared by the model's meshes
+    const rhi::VertexLayout& vertexLayout() const;
+
 private:
     // loads a model with supported ASSIMP extensions from file and stores the resulting meshes in the meshes vector.
     void loadModel(string const &path);
@@ -49,6 +50,8 @@ public:
     vector<Mesh>    meshes;
     string directory;
     bool gammaCorrection;
+private:
+    rhi::IRenderer* _renderer{nullptr};
 };
 
 #endif

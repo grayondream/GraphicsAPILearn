@@ -1,6 +1,7 @@
 #pragma once
 #include "app/GL/Base/GLCameraBaseApp.hpp"
 #include "native/GL/GLProgram.hpp"
+#include "rhi/core/IPipeline.hpp"
 #include <memory>
 #include <array>
 #include "geometry/Camera.hpp"
@@ -21,13 +22,16 @@ protected:
 
 private:
 	void loadModel();
+	void initSaturnPipeline();
 
 private:
-	GLProgram _saturnProgram{};
+	std::shared_ptr<rhi::IPipeline> _saturnPipeline{};
 	GLProgram _rockProgram{};
 	std::shared_ptr<Model> _saturn;
 	std::shared_ptr<Model> _rock;
 	glm::vec3 _saturnPos{};
+	std::vector<unsigned int> _rockVAOs{};
+	std::vector<unsigned int> _rockIndexCounts{};
 	unsigned int _vbo[2]{};
 	unsigned int _vao{};
 	unsigned int _ebo{};

@@ -1,6 +1,5 @@
 #pragma once
 #include "app/GL/Base/GLCameraBaseApp.hpp"
-#include "native/GL/GLProgram.hpp"
 #include <memory>
 #include <array>
 #include "geometry/Camera.hpp"
@@ -8,7 +7,6 @@
 #include "geometry/Sphere.hpp"
 #include "geometry/Cube.hpp"
 
-class GLImageTexture2D;
 class Model;
 class GLLoadModelApp : public GLCameraBaseApp {
 public:
@@ -21,10 +19,10 @@ protected:
 private:
 	void loadModel();
 	void drawUI();
-	void initProgram(const std::string name, GLProgram& program);
+	void initShader();
 
 private:
-	GLProgram _program{};
+	std::shared_ptr<rhi::IPipeline> _pipeline{};
 	float _curTime{};
 	std::shared_ptr<Model> _model{};
 };

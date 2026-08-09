@@ -1,15 +1,15 @@
 #include "Mesh.hpp"
 
-Mesh::Mesh(vector<MeshVertex> vertices, vector<unsigned int> indices, vector<Texture> textures){
+Mesh::Mesh(rhi::IRenderer* renderer, vector<MeshVertex> vertices, vector<unsigned int> indices, vector<Texture> textures){
     this->vertices = vertices;
     this->indices = indices;
     this->textures = textures;
 
     // now that we have all the required data, set the vertex buffers and its attribute pointers.
-    setupMesh();
+    setupMesh(renderer);
 }
 
-void Mesh::draw(GLProgram &shader, int count) {
+void Mesh::draw(rhi::IRenderer* renderer, rhi::IPipeline* pipeline, int count) {
     // bind appropriate textures
     unsigned int diffuseNr  = 1;
     unsigned int specularNr = 1;
@@ -17,7 +17,6 @@ void Mesh::draw(GLProgram &shader, int count) {
     unsigned int heightNr   = 1;
     for(unsigned int i = 0; i < textures.size(); i++)
     {
-        glActiveTexture(GL_TEXTURE0 + i); // active proper texture unit before binding
         // retrieve texture number (the N in diffuse_textureN)
         string number;
         string name = textures[i].type;
@@ -31,64 +30,38 @@ void Mesh::draw(GLProgram &shader, int count) {
             number = std::to_string(heightNr++); // transfer unsigned int to string
 
         // now set the sampler to the correct texture unit
-        shader.update(name + number, (int)i);
+        pipeline->setUniform(name + number, (int)i);
         // and finally bind the texture
-        glBindTexture(GL_TEXTURE_2D, textures[i].id);
+        if (textures[i].texture) {
+            renderer->bindTexture(textures[i].texture, i);
+        }
     }
-    
-    // draw mesh
-    glBindVertexArray(_vao);
-    if (count == 1) {
-        glDrawElements(GL_TRIANGLES, static_cast<unsigned int>(indices.size()), GL_UNSIGNED_INT, 0);
-    }else {
-        glDrawElementsInstanced(GL_TRIANGLES, static_cast<unsigned int>(indices.size()), GL_UNSIGNED_INT, 0, count);
-    }
-    
-    glBindVertexArray(0);
 
-    // always good practice to set everything back to defaults once configured.
-    glActiveTexture(GL_TEXTURE0);
+    // draw mesh
+    renderer->setVertexBuffer(_vb);
+    renderer->setIndexBuffer(_ib);
+    if (count > 1) {
+        renderer->drawIndexedInstanced(static_cast<unsigned int>(indices.size()), static_cast<unsigned int>(count));
+    } else {
+        renderer->drawIndexed(static_cast<unsigned int>(indices.size()));
+    }
 }
 
-void Mesh::setupMesh(){
-    // create buffers/arrays
-    glGenVertexArrays(1, &_vao);
-    glGenBuffers(1, &_vbo);
-    glGenBuffers(1, &_ebo);
+void Mesh::setupMesh(rhi::IRenderer* renderer){
+    const int stride = static_cast<int>(sizeof(MeshVertex));
 
-    glBindVertexArray(_vao);
-    // load data into vertex buffers
-    glBindBuffer(GL_ARRAY_BUFFER, _vbo);
-    // A great thing about structs is that their memory layout is sequential for all its items.
-    // The effect is that we can simply pass a pointer to the struct and it translates perfectly to a glm::vec3/2 array which
-    // again translates to 3/2 floats which translates to a byte array.
-    glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(MeshVertex), &vertices[0], GL_STATIC_DRAW);  
+    _layout.elements = {
+        { rhi::VertexElement::Float3, 0, 0, rhi::VertexInputRate::PerVertex, 0,                                  stride },
+        { rhi::VertexElement::Float3, 1, 0, rhi::VertexInputRate::PerVertex, static_cast<int>(offsetof(MeshVertex, Normal)),     stride },
+        { rhi::VertexElement::Float2, 2, 0, rhi::VertexInputRate::PerVertex, static_cast<int>(offsetof(MeshVertex, TexCoords)),   stride },
+        { rhi::VertexElement::Float3, 3, 0, rhi::VertexInputRate::PerVertex, static_cast<int>(offsetof(MeshVertex, Tangent)),     stride },
+        { rhi::VertexElement::Float3, 4, 0, rhi::VertexInputRate::PerVertex, static_cast<int>(offsetof(MeshVertex, Bitangent)),   stride },
+        { rhi::VertexElement::Int4,   5, 0, rhi::VertexInputRate::PerVertex, static_cast<int>(offsetof(MeshVertex, m_BoneIDs)),   stride },
+        { rhi::VertexElement::Float4, 6, 0, rhi::VertexInputRate::PerVertex, static_cast<int>(offsetof(MeshVertex, m_Weights)),   stride },
+    };
 
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, _ebo);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(unsigned int), &indices[0], GL_STATIC_DRAW);
-
-    // set the vertex attribute pointers
-    // vertex Positions
-    glEnableVertexAttribArray(0);	
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(MeshVertex), (void*)0);
-    // vertex normals
-    glEnableVertexAttribArray(1);	
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(MeshVertex), (void*)offsetof(MeshVertex, Normal));
-    // vertex texture coords
-    glEnableVertexAttribArray(2);	
-    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(MeshVertex), (void*)offsetof(MeshVertex, TexCoords));
-    // vertex tangent
-    glEnableVertexAttribArray(3);
-    glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, sizeof(MeshVertex), (void*)offsetof(MeshVertex, Tangent));
-    // vertex bitangent
-    glEnableVertexAttribArray(4);
-    glVertexAttribPointer(4, 3, GL_FLOAT, GL_FALSE, sizeof(MeshVertex), (void*)offsetof(MeshVertex, Bitangent));
-    // ids
-    glEnableVertexAttribArray(5);
-    glVertexAttribIPointer(5, 4, GL_INT, sizeof(MeshVertex), (void*)offsetof(MeshVertex, m_BoneIDs));
-
-    // weights
-    glEnableVertexAttribArray(6);
-    glVertexAttribPointer(6, 4, GL_FLOAT, GL_FALSE, sizeof(MeshVertex), (void*)offsetof(MeshVertex, m_Weights));
-    glBindVertexArray(0);
+    _vb = renderer->createBuffer();
+    _ib = renderer->createBuffer();
+    _vb->init(vertices.data(), vertices.size() * sizeof(MeshVertex), rhi::BufferType::Vertex);
+    _ib->init(indices.data(), indices.size() * sizeof(unsigned int), rhi::BufferType::Index);
 }

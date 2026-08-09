@@ -5,6 +5,7 @@
 #include "glad/glad.h"
 #include "geometry/Cube.hpp"
 #include "native/GL/GLImageTexture2D.hpp"
+#include "rhi/core/IShader.hpp"
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
@@ -12,6 +13,7 @@
 #include "imgui.h"
 #include <utils/FileUtils.hpp>
 #include <model/Model.hpp>
+#include <cstddef>
 using FileUtils::join;
 
 using namespace ErrorHandle;
@@ -23,7 +25,7 @@ GLSaturnApp::~GLSaturnApp() {
 		glDeleteBuffers(1, &_ebo);
 	}
 
-	_saturnProgram.destroy();
+	_rockProgram.destroy();
 }
 
 std::vector<glm::mat4> GenerateRocksPosition(int amount, const glm::mat4& pos) {
@@ -76,15 +78,6 @@ bool GLSaturnApp::initApp() {
 	
 	_saturnPos = glm::vec3(0, 0, -3);
 	{
-		const auto vfile = join(StaticCollector::getGLShaderPath(), "Advanced", "Instance", "Saturn.vs");
-		const auto ffile = join(StaticCollector::getGLShaderPath(), "Advanced", "Instance", "Saturn.fs");
-		GLProgram program{};
-		auto ret = program.init(vfile, ffile);
-		ErrorHandle::ExitIfFailed(ret, "Create OpenGL program failed!");
-		_saturnProgram = program;
-	}
-	
-	{
 		const auto vfile = join(StaticCollector::getGLShaderPath(), "Advanced", "Instance", "Rock.vs");
 		const auto ffile = join(StaticCollector::getGLShaderPath(), "Advanced", "Instance", "Rock.fs");
 		GLProgram program{};
@@ -94,31 +87,61 @@ bool GLSaturnApp::initApp() {
 	}
 
 	loadModel();
+	initSaturnPipeline();
 	//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 	//createVertexBuffer();
 	return true;
+}
+
+void GLSaturnApp::initSaturnPipeline() {
+	const auto vfile = join(StaticCollector::getGLShaderPath(), "Advanced", "Instance", "Saturn.vs");
+	const auto ffile = join(StaticCollector::getGLShaderPath(), "Advanced", "Instance", "Saturn.fs");
+	auto shader = renderer()->createShader();
+	auto ok = shader->compile({ {rhi::ShaderStage::Vertex, vfile, "main", false},
+	                            {rhi::ShaderStage::Fragment, ffile, "main", false} });
+	ErrorHandle::ExitIfFailed(ok, "Create Saturn RHI shader failed: {}", shader->getLog());
+	_saturnPipeline = renderer()->createPipeline(_saturn->vertexLayout(), shader);
+	_saturnPipeline->setDepthTest(true);
 }
 
 void GLSaturnApp::loadModel() {
 	const auto modelPath = StaticCollector::getModelPath();
 	{
 		const auto modelFile = join(modelPath, "planet", "planet.obj");
-		_saturn = std::make_shared<Model>(modelFile);
+		_saturn = std::make_shared<Model>(renderer().get(), modelFile);
 	}
 
 	{
 		const auto modelFile = join(modelPath, "rock", "rock.obj");
-		_rock = std::make_shared<Model>(modelFile);
+		_rock = std::make_shared<Model>(renderer().get(), modelFile);
 	}
 
 	{
 		_count = 30000;
-		const auto buffer = GenerateRockPoisitonBuffer(_count);
-		for (unsigned int i = 0; i < _rock->meshes.size(); i++)
+		const auto instanceBuffer = GenerateRockPoisitonBuffer(_count);
+		_rockVAOs.resize(_rock->meshes.size());
+		_rockIndexCounts.resize(_rock->meshes.size());
+		for (size_t i = 0; i < _rock->meshes.size(); i++)
 		{
-			unsigned int VAO = _rock->meshes[i]._vao;
-			glBindVertexArray(VAO);
-			// set attribute pointers for matrix (4 times vec4)
+			const auto& mesh = _rock->meshes[i];
+			GLuint vao, vbo, ebo;
+			glGenVertexArrays(1, &vao);
+			glGenBuffers(1, &vbo);
+			glGenBuffers(1, &ebo);
+			glBindVertexArray(vao);
+			glBindBuffer(GL_ARRAY_BUFFER, vbo);
+			glBufferData(GL_ARRAY_BUFFER, mesh.vertices.size() * sizeof(MeshVertex), mesh.vertices.data(), GL_STATIC_DRAW);
+			glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
+			glBufferData(GL_ELEMENT_ARRAY_BUFFER, mesh.indices.size() * sizeof(unsigned int), mesh.indices.data(), GL_STATIC_DRAW);
+			// set attribute pointers for vertex data (positions / normals / texCoords)
+			glEnableVertexAttribArray(0);
+			glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(MeshVertex), (void*)0);
+			glEnableVertexAttribArray(1);
+			glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(MeshVertex), (void*)offsetof(MeshVertex, Normal));
+			glEnableVertexAttribArray(2);
+			glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(MeshVertex), (void*)offsetof(MeshVertex, TexCoords));
+			// set attribute pointers for matrix (4 times vec4) with instance divisor
+			glBindBuffer(GL_ARRAY_BUFFER, instanceBuffer);
 			glEnableVertexAttribArray(3);
 			glVertexAttribPointer(3, 4, GL_FLOAT, GL_FALSE, sizeof(glm::mat4), (void*)0);
 			glEnableVertexAttribArray(4);
@@ -134,6 +157,8 @@ void GLSaturnApp::loadModel() {
 			glVertexAttribDivisor(6, 1);
 
 			glBindVertexArray(0);
+			_rockVAOs[i] = vao;
+			_rockIndexCounts[i] = static_cast<unsigned int>(mesh.indices.size());
 		}
 	}
 }
@@ -153,12 +178,12 @@ void GLSaturnApp::drawScene(const float dt) {
 	model = glm::scale(model, glm::vec3(scale, scale, scale));
 	//draw light source
 	{
-		_saturnProgram.use();
-		_saturnProgram.update("projection", projection);
-		_saturnProgram.update("view", view);
+		renderer()->setPipeline(_saturnPipeline);
+		_saturnPipeline->setUniform("projection", glm::value_ptr(projection), 1);
+		_saturnPipeline->setUniform("view", glm::value_ptr(view), 1);
 		model = glm::rotate(model, glm::radians(curTime * 5), glm::vec3(1.0, 1.0, 0.0));
-		_saturnProgram.update("model", model);
-		_saturn->draw(_saturnProgram);
+		_saturnPipeline->setUniform("model", glm::value_ptr(model), 1);
+		_saturn->draw(renderer().get(), _saturnPipeline.get());
 	}
 
 	{
@@ -169,7 +194,11 @@ void GLSaturnApp::drawScene(const float dt) {
 		_rockProgram.update("model", model);
 		_rockProgram.update("time", curTime);
 		_rockProgram.update("radiusPos", _saturnPos);
-		_rock->draw(_rockProgram, _count);
+		for (size_t i = 0; i < _rockVAOs.size(); i++) {
+			glBindVertexArray(_rockVAOs[i]);
+			glDrawElementsInstanced(GL_TRIANGLES, _rockIndexCounts[i], GL_UNSIGNED_INT, 0, _count);
+		}
+		glBindVertexArray(0);
 	}
 
 	return GLApp::drawScene(dt);

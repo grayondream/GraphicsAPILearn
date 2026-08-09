@@ -1,18 +1,22 @@
 #include "Model.hpp"
 #include <utils/FileUtils.hpp>
-#include <native/GL/GLImageTexture2D.hpp>
+#include "app/GL/RhiImage.hpp"
 #include <base/Log.hpp>
-#include <utils/GL/GLUtils.hpp>
 using FileUtils::join;
 
-Model::Model(string const &path, bool gamma) : gammaCorrection(gamma){
+Model::Model(rhi::IRenderer* renderer, string const &path, bool gamma) : gammaCorrection(gamma), _renderer(renderer){
     loadModel(path);
 }
 
 // draws the model, and thus all its meshes
-void Model::draw(GLProgram &shader, int count){
+void Model::draw(rhi::IRenderer* renderer, rhi::IPipeline* pipeline, int count){
     for(unsigned int i = 0; i < meshes.size(); i++)
-        meshes[i].draw(shader, count);
+        meshes[i].draw(renderer, pipeline, count);
+}
+
+const rhi::VertexLayout& Model::vertexLayout() const {
+    static const rhi::VertexLayout s_empty{};
+    return meshes.empty() ? s_empty : meshes[0].layout();
 }
 
 void Model::loadModel(string const &path){
@@ -130,7 +134,7 @@ Mesh Model::processMesh(aiMesh *mesh, const aiScene *scene){
     textures.insert(textures.end(), heightMaps.begin(), heightMaps.end());
     
     // return a mesh object created from the extracted mesh data
-    return Mesh(vertices, indices, textures);
+    return Mesh(_renderer, vertices, indices, textures);
 }
 
 // checks all material textures of a given type and loads the textures if they're not loaded yet.
@@ -156,15 +160,13 @@ vector<Texture> Model::loadMaterialTextures(aiMaterial *mat, aiTextureType type,
         {   // if texture hasn't been loaded already, load it
             const std::string filename = join(directory, str.C_Str());
             LOGI("Load Texture from {}", filename);
-            auto imgTex = GLImageTexture2D(filename);
-            const auto ret = imgTex.load().texture()->valid();
-            if (!ret) {
+            auto tex = RhiImage::Load2D(_renderer, filename);
+            if (!tex || !tex->valid()) {
                 LOGE("Failed to load texture from {}", filename);
             }
 
-            const auto texid = GLUtils::Ptr2GLTextureId(imgTex.texture()->handle());
             Texture texture;
-            texture.id = texid;
+            texture.texture = tex;
             texture.type = typeName;
             texture.path = str.C_Str();
             textures.push_back(texture);

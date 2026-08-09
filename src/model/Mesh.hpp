@@ -1,13 +1,17 @@
 #ifndef MESH_H
 #define MESH_H
 
-#include <glad/glad.h> // holds all OpenGL type declarations
-
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
-#include <native/GL/GLProgram.hpp>
+#include "rhi/core/IBuffer.hpp"
+#include "rhi/core/IPipeline.hpp"
+#include "rhi/core/IRenderer.hpp"
+#include "rhi/core/ITexture2D.hpp"
+#include "rhi/core/VertexLayout.hpp"
 
+#include <cstddef>
+#include <memory>
 #include <string>
 #include <vector>
 using namespace std;
@@ -34,7 +38,7 @@ struct MeshVertex {
 };
 
 struct Texture {
-    unsigned int id;
+    std::shared_ptr<rhi::ITexture2D> texture;
     string type;
     string path;
 };
@@ -42,22 +46,26 @@ struct Texture {
 class Mesh {
 public:
     // constructor
-    Mesh(vector<MeshVertex> vertices, vector<unsigned int> indices, vector<Texture> textures);
+    Mesh(rhi::IRenderer* renderer, vector<MeshVertex> vertices, vector<unsigned int> indices, vector<Texture> textures);
 
     // render the mesh
-    void draw(GLProgram &shader, int count);
+    void draw(rhi::IRenderer* renderer, rhi::IPipeline* pipeline, int count);
+
+    // vertex input layout for this mesh
+    const rhi::VertexLayout& layout() const { return _layout; }
 
 public:
     // mesh Data
     vector<MeshVertex>       vertices;
     vector<unsigned int> indices;
     vector<Texture>      textures;
-    unsigned int _vao;
-    
+
 private:
-    // render data 
-    unsigned int _vbo, _ebo;
+    // render data
+    rhi::VertexLayout _layout{};
+    std::shared_ptr<rhi::IBuffer> _vb{};
+    std::shared_ptr<rhi::IBuffer> _ib{};
     // initializes all the buffer objects/arrays
-    void setupMesh();
+    void setupMesh(rhi::IRenderer* renderer);
 };
 #endif

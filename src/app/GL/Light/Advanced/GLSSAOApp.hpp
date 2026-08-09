@@ -1,6 +1,7 @@
 #pragma once
 #include "app/GL/Base/GLCameraBaseApp.hpp"
 #include "native/GL/GLProgram.hpp"
+#include "rhi/core/IPipeline.hpp"
 #include <memory>
 #include <array>
 #include "geometry/Camera.hpp"
@@ -30,6 +31,7 @@ private:
 	void createSSAOFbo();
 	void createQuadBuffer();
 	void loadModel();
+	void initModelPipeline();
 
 	void renderOneCube();
 	void renderGBuffer(GLProgram& program, const glm::mat4& projection, const glm::mat4& view);
@@ -61,6 +63,8 @@ private:
 	GLProgram m_ssaoProgram;
 	GLProgram m_ssaoBlurProgram;
 	GLProgram m_lightProgram;
+
+	std::shared_ptr<rhi::IPipeline> m_modelPipeline{};
 
 	unsigned int m_quadVAO{};
 	unsigned int m_quadVBO{};

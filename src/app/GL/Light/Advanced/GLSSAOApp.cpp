@@ -17,6 +17,7 @@
 #include "geometry/Rect.hpp"
 #include "utils/GL/GLUtils.hpp"
 #include "base/Constexpr.hpp"
+#include "rhi/core/IShader.hpp"
 
 
 using namespace Constexpr;
@@ -258,6 +259,7 @@ bool GLSSAOApp::initApp() {
 	loadModel();
 	createTextures();
 	compileShader();
+	initModelPipeline();
 	initShapes();
 	createCubeBuffer();
 	createFrameBuffers();
@@ -314,7 +316,19 @@ void GLSSAOApp::compileShader(){
 void GLSSAOApp::loadModel() {
 	const auto modelPath = StaticCollector::getModelPath();
 	const auto modelFile = join(modelPath, "backpack", "backpack.obj");
-	m_model = std::make_shared<Model>(modelFile);
+	m_model = std::make_shared<Model>(renderer().get(), modelFile);
+}
+
+void GLSSAOApp::initModelPipeline() {
+	const auto shaderDir = join(StaticCollector::getGLShaderPath(), "Light", "Advanced", "SSAO");
+	const auto vfile = join(shaderDir, "GBuffer.vs");
+	const auto ffile = join(shaderDir, "GBuffer.fs");
+	auto shader = renderer()->createShader();
+	auto ok = shader->compile({ {rhi::ShaderStage::Vertex, vfile, "main", false},
+	                            {rhi::ShaderStage::Fragment, ffile, "main", false} });
+	ExitIfFailed(ok, "Create GBuffer RHI shader failed: {}", shader->getLog());
+	m_modelPipeline = renderer()->createPipeline(m_model->vertexLayout(), shader);
+	m_modelPipeline->setDepthTest(true);
 }
 
 static float ourLerp(float a, float b, float f){
@@ -373,8 +387,12 @@ void GLSSAOApp::renderGBuffer(GLProgram &program, const glm::mat4 &projection, c
 		model = glm::translate(model, glm::vec3(0.0f, 0.5f, 0.0));
 		model = glm::rotate(model, glm::radians(-90.0f), glm::vec3(1.0, 0.0, 0.0));
 		model = glm::scale(model, glm::vec3(1.0f));
-		m_gBufferProgram.update("model", model);
-		m_model->draw(m_gBufferProgram);
+		renderer()->setPipeline(m_modelPipeline);
+		m_modelPipeline->setUniform("projection", glm::value_ptr(projection), 1);
+		m_modelPipeline->setUniform("view", glm::value_ptr(view), 1);
+		m_modelPipeline->setUniform("model", glm::value_ptr(model), 1);
+		m_modelPipeline->setUniform("invertedNormals", 0);
+		m_model->draw(renderer().get(), m_modelPipeline.get());
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
