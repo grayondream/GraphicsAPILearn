@@ -3,10 +3,10 @@ layout (triangles) in;
 layout (triangle_strip, max_vertices = 3) out;
 
 in VS_OUT {
-    vec2 texCoords;
+    vec4 color;
 } gs_in[];
 
-out vec2 TexCoords; 
+out vec4 fColor;
 
 uniform float time;
 
@@ -28,13 +28,13 @@ void main() {
     vec3 normal = GetNormal();
 
     gl_Position = explode(gl_in[0].gl_Position, normal);
-    TexCoords = gs_in[0].texCoords;
+    fColor = gs_in[0].color;
     EmitVertex();
     gl_Position = explode(gl_in[1].gl_Position, normal);
-    TexCoords = gs_in[1].texCoords;
+    fColor = gs_in[1].color;
     EmitVertex();
     gl_Position = explode(gl_in[2].gl_Position, normal);
-    TexCoords = gs_in[2].texCoords;
+    fColor = gs_in[2].color;
     EmitVertex();
     EndPrimitive();
 }
