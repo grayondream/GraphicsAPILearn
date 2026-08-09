@@ -38,10 +38,15 @@ void GLPipeline::setVertexBuffer(const std::shared_ptr<IBuffer>& buffer, uint32_
     if (buffer) buffer->bind();   // Vertex 缓冲 → GL_ARRAY_BUFFER
     for (const auto& e : _layout) {
         if (e.binding != static_cast<int>(binding)) continue;
-        GLint size = 0;
-        const GLenum type = ElementToGLFormat(e.format, &size);
-        glVertexAttribPointer(e.semantic, size, type, GL_FALSE, e.stride,
-                              reinterpret_cast<void*>(e.offset));
+        if (e.format == VertexElement::Int4) {
+            glVertexAttribIPointer(e.semantic, 4, GL_INT, e.stride,
+                                   reinterpret_cast<void*>(e.offset));
+        } else {
+            GLint size = 0;
+            const GLenum type = ElementToGLFormat(e.format, &size);
+            glVertexAttribPointer(e.semantic, size, type, GL_FALSE, e.stride,
+                                  reinterpret_cast<void*>(e.offset));
+        }
         glEnableVertexAttribArray(e.semantic);
         glVertexAttribDivisor(e.semantic,
                               (e.inputRate == VertexInputRate::PerInstance) ? 1 : 0);
