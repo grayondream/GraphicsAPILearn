@@ -26,7 +26,11 @@ Application::~Application() {
 }
 
 bool Application::init(const GLFWWindowProperties& properties){
-    m_window = std::make_unique<GLFWWindow>(properties);
+    auto props = properties;
+    if (props.samples == 0) {
+        props.samples = getSampleCount();
+    }
+    m_window = std::make_unique<GLFWWindow>(props);
     if(!m_window->initialize()){
         LOGE("GLFWWindow init failed");
         return false;

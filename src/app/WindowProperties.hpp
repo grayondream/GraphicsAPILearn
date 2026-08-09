@@ -8,9 +8,10 @@ struct GLFWWindowProperties {
         int xPos = 100,
         int yPos = 100,
         bool vsync = true,
-        bool fullscreen = false
+        bool fullscreen = false,
+        unsigned int samples = 0
     ) : title(title), width(width), height(height),
-        xPos(xPos), yPos(yPos), vsync(vsync), fullscreen(fullscreen) {}
+        xPos(xPos), yPos(yPos), vsync(vsync), fullscreen(fullscreen), samples(samples) {}
 
     std::string title;
     unsigned int width;
@@ -19,4 +20,5 @@ struct GLFWWindowProperties {
     int yPos;
     bool vsync;
     bool fullscreen;
+    unsigned int samples;
 };

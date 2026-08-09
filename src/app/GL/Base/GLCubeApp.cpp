@@ -34,6 +34,7 @@ bool GLCubeApp::initApp() {
 	const auto valid = _texture->load().texture()->valid();
 	ExitIfFailed(valid, "Failed to load texture from file {}", imgFile);
 	initializeCube();
+	glEnable(GL_DEPTH_TEST);
 	//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 	return true;
 }

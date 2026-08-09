@@ -3,3 +3,4 @@ build/
 *.TMP
 .cache/
 imgui.ini
+PROGRESS.md

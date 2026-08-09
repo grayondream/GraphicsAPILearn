@@ -10,6 +10,7 @@ class GLImageTexture2D;
 class GLMsaaApp : public GLCameraBaseApp {
 public:
 	virtual ~GLMsaaApp();
+	unsigned int getSampleCount() const override { return 4; }
 	
 protected:
 	virtual void beginDrawScene() override;

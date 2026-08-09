@@ -36,6 +36,7 @@ bool GLLightSourceMult::initApp() {
 	_objTex = initTexture("container2.jpg");
 	_objBorderTex = initTexture("container2_specular.jpg");
 	createVertexBuffer();
+	glEnable(GL_DEPTH_TEST);
 	//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 	return true;
 }

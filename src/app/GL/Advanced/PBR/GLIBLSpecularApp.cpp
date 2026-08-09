@@ -346,6 +346,7 @@ void GLIBLSpecularApp::renderPerfilterMap(){
         }
     }
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	glViewport(0, 0, m_window->getProperties().width, m_window->getProperties().height);
 }
 
 void GLIBLSpecularApp::renderBrdfLUT(){
@@ -376,6 +377,7 @@ void GLIBLSpecularApp::renderBrdfLUT(){
 
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	m_brdfLUTTexture = brdfLUTTexture;
+	glViewport(0, 0, m_window->getProperties().width, m_window->getProperties().height);
 }
 
 void GLIBLSpecularApp::loadTexture(){

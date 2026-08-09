@@ -27,7 +27,7 @@ GLMsaaApp::~GLMsaaApp() {
 }
 
 bool GLMsaaApp::initApp() {
-	if (!GLApp::initApp()) {
+	if (!GLCameraBaseApp::initApp()) {
 		return false;
 	}
 	
@@ -142,12 +142,10 @@ void GLMsaaApp::createFrameBuffer() {
     glRenderbufferStorageMultisample(GL_RENDERBUFFER, 4, GL_DEPTH24_STENCIL8, width, height);
     glBindRenderbuffer(GL_RENDERBUFFER, 0);
     glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, rbo);
-	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
 	if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE){
 		ExitIfFailed(false, "Failed to create framebuffer");
 	}
-
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	_screenFrameBuffer = framebuffer;
 	_screenRbo = rbo;
@@ -242,6 +240,7 @@ void GLMsaaApp::drawGLMssa() {
 	  } else {
 		  glDisable(GL_MULTISAMPLE);
 	  }
+	  glEnable(GL_DEPTH_TEST);
 	  
 	  const auto projection = glm::perspective(glm::radians(_camera.zoom()), aspectRatio(), 0.1f, 100.0f);
 	  _program.update("projection", projection);

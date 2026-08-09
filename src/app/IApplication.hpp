@@ -12,4 +12,6 @@ public:
     virtual int run() = 0; 
 
     virtual void exit() = 0;
+
+    virtual unsigned int getSampleCount() const { return 0; }
 };
