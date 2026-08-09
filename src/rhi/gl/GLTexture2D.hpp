@@ -8,6 +8,8 @@ class GLTexture2D : public ITexture2D {
 public:
     ~GLTexture2D();
     bool init(const TextureDataView2D& data) override;
+    bool init(const TextureDesc& desc, const TextureDataView2D& data) override;
+    bool createEmpty(const TextureDesc& desc, int width, int height) override;
     void bind(unsigned int unit = 0) override;
     void* handle() override;
     bool valid() const override { return _id != 0; }
@@ -15,6 +17,7 @@ public:
 
 private:
     GLuint _id{0};
+    TextureDesc _desc{};
 };
 
 } // namespace rhi
