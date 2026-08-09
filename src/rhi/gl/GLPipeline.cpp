@@ -196,4 +196,7 @@ void GLPipeline::setMultisample(bool enable) {
     if (enable) glEnable(GL_MULTISAMPLE); else glDisable(GL_MULTISAMPLE);
 }
 
+void GLPipeline::setPrimitiveType(PrimitiveType type) { _primitive = type; }
+PrimitiveType GLPipeline::primitiveType() const { return _primitive; }
+
 } // namespace rhi

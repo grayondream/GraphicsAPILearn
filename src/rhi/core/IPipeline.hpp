@@ -41,6 +41,10 @@ public:
     virtual void setPolygonMode(PolygonMode mode) = 0;
     virtual void setMultisample(bool enable) = 0;
 
+    // 图元拓扑：决定 draw* 发出的 GL 图元
+    virtual void setPrimitiveType(PrimitiveType type) = 0;
+    virtual PrimitiveType primitiveType() const = 0;
+
     // 顶点输入装配：按当前 VertexLayout 把 buffer 挂到指定 binding
     virtual void setVertexBuffer(const std::shared_ptr<IBuffer>& buffer, uint32_t binding) = 0;
     virtual void setIndexBuffer(const std::shared_ptr<IBuffer>& buffer) = 0;

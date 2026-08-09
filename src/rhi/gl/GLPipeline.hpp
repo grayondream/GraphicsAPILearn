@@ -33,12 +33,15 @@ public:
     void setFrontFace(bool ccw) override;
     void setPolygonMode(PolygonMode mode) override;
     void setMultisample(bool enable) override;
+    void setPrimitiveType(PrimitiveType type) override;
+    PrimitiveType primitiveType() const override;
 
     void setVertexBuffer(const std::shared_ptr<IBuffer>& buffer, uint32_t binding) override;
     void setIndexBuffer(const std::shared_ptr<IBuffer>& buffer) override;
 
 private:
     std::shared_ptr<GLShader> _shader{};
+    PrimitiveType _primitive{PrimitiveType::TriangleList};
     GLuint _vao{0};
     GLuint _vbo{0};
     std::vector<VertexElement> _layout{};

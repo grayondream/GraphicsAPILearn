@@ -13,6 +13,15 @@
 
 namespace rhi {
 
+static GLenum ToGLPrimitive(PrimitiveType t) {
+    switch (t) {
+        case PrimitiveType::TriangleStrip: return GL_TRIANGLE_STRIP;
+        case PrimitiveType::Lines:         return GL_LINES;
+        case PrimitiveType::Points:        return GL_POINTS;
+        default:                           return GL_TRIANGLES;
+    }
+}
+
 class GLRenderer final : public IRenderer {
 public:
     bool init(const std::shared_ptr<ISurface>& surface) override {
@@ -79,21 +88,25 @@ public:
         if (texture) texture->bind(unit);
     }
     void draw(uint32_t vertexCount, uint32_t firstVertex) override {
-        glDrawArrays(GL_TRIANGLES, firstVertex, vertexCount);
+        const GLenum mode = _pipeline ? ToGLPrimitive(_pipeline->primitiveType()) : GL_TRIANGLES;
+        glDrawArrays(mode, firstVertex, vertexCount);
     }
     void drawIndexed(uint32_t indexCount, uint32_t indexOffset, uint32_t vertexOffset) override {
         (void)vertexOffset;
-        glDrawElements(GL_TRIANGLES, indexCount, GL_UNSIGNED_INT,
+        const GLenum mode = _pipeline ? ToGLPrimitive(_pipeline->primitiveType()) : GL_TRIANGLES;
+        glDrawElements(mode, indexCount, GL_UNSIGNED_INT,
                        reinterpret_cast<void*>(indexOffset * sizeof(unsigned int)));
     }
     void drawIndexedInstanced(uint32_t indexCount, uint32_t instanceCount,
                               uint32_t indexOffset, uint32_t vertexOffset) override {
         (void)vertexOffset;
-        glDrawElementsInstanced(GL_TRIANGLES, indexCount, GL_UNSIGNED_INT,
+        const GLenum mode = _pipeline ? ToGLPrimitive(_pipeline->primitiveType()) : GL_TRIANGLES;
+        glDrawElementsInstanced(mode, indexCount, GL_UNSIGNED_INT,
                                 reinterpret_cast<void*>(indexOffset * sizeof(unsigned int)), instanceCount);
     }
     void drawInstanced(uint32_t vertexCount, uint32_t instanceCount, uint32_t firstVertex) override {
-        glDrawArraysInstanced(GL_TRIANGLES, firstVertex, vertexCount, instanceCount);
+        const GLenum mode = _pipeline ? ToGLPrimitive(_pipeline->primitiveType()) : GL_TRIANGLES;
+        glDrawArraysInstanced(mode, firstVertex, vertexCount, instanceCount);
     }
     void blitFramebuffer(const std::shared_ptr<IRenderTarget>& src,
                          const std::shared_ptr<IRenderTarget>& dst) override {

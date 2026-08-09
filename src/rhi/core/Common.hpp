@@ -6,7 +6,7 @@
 
 namespace rhi {
 
-enum class PrimitiveType : uint8_t { TriangleList, TriangleStrip, Lines };
+enum class PrimitiveType : uint8_t { TriangleList, TriangleStrip, Lines, Points };
 
 struct Viewport {
     int x{0}, y{0};
