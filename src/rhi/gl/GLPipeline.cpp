@@ -93,6 +93,13 @@ bool GLPipeline::setUniform(const std::string& name, const float* value, int cou
     return true;
 }
 
+bool GLPipeline::setUniformMatrix(const std::string& name, const float* value, int count, int matSize) {
+    if (matSize == 3) glUniformMatrix3fv(Locate(*_shader, name), count, GL_FALSE, value);
+    else if (matSize == 2) glUniformMatrix2fv(Locate(*_shader, name), count, GL_FALSE, value);
+    else glUniformMatrix4fv(Locate(*_shader, name), count, GL_FALSE, value);
+    return true;
+}
+
 // ---- 渲染状态命令全集 ----
 
 static GLenum ToGLCompare(CompareFunc f) {

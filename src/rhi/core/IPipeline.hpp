@@ -19,6 +19,9 @@ public:
     virtual bool setUniform(const std::string& name, const float* value, int count) = 0;   // 矩阵/数组
     virtual bool setUniform(const std::string& name, const float* value, int count, int vecSize) = 0;
 
+    // 矩阵数组 uniform（matSize=2/3/4 → glUniformMatrix2fv/3fv/4fv）
+    virtual bool setUniformMatrix(const std::string& name, const float* value, int count, int matSize) = 0;
+
     // 显式 UBO：声明本 pipeline 绑定的 uniform block 槽位
     virtual void bindUniformBlock(uint32_t binding) = 0;
 

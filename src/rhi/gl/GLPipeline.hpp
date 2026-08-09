@@ -17,6 +17,7 @@ public:
     bool setUniform(const std::string& name, float value) override;
     bool setUniform(const std::string& name, const float* value, int count) override;
     bool setUniform(const std::string& name, const float* value, int count, int vecSize) override;
+    bool setUniformMatrix(const std::string& name, const float* value, int count, int matSize) override;
 
     bool bindShader(const std::shared_ptr<GLShader>& shader, const VertexLayout& layout);
 

@@ -13,6 +13,7 @@ inline GLenum ToGLInternalFormat(TextureFormat f) {
         case TextureFormat::RGB16F:          return GL_RGB16F;
         case TextureFormat::RG16F:           return GL_RG16F;
         case TextureFormat::R32F:            return GL_R32F;
+        case TextureFormat::RGBA32F:         return GL_RGBA32F;
         case TextureFormat::Depth32F:        return GL_DEPTH_COMPONENT32F;
         case TextureFormat::Depth24Stencil8: return GL_DEPTH24_STENCIL8;
     }
@@ -25,7 +26,8 @@ inline bool IsDepthFormat(TextureFormat f) {
 
 inline bool IsFloatFormat(TextureFormat f) {
     return f == TextureFormat::RGBA16F || f == TextureFormat::RGB16F ||
-           f == TextureFormat::RG16F || f == TextureFormat::R32F;
+           f == TextureFormat::RG16F || f == TextureFormat::R32F ||
+           f == TextureFormat::RGBA32F;
 }
 
 inline GLenum ToGLFormat(TextureFormat f, int channels) {

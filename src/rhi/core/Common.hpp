@@ -43,7 +43,7 @@ struct DrawIndexedDesc {
 };
 
 // ---- 纹理 ----
-enum class TextureFormat : uint8_t { RGB8, RGBA8, RGBA16F, RGB16F, RG16F, R32F, Depth32F, Depth24Stencil8 };
+enum class TextureFormat : uint8_t { RGB8, RGBA8, RGBA16F, RGB16F, RG16F, R32F, RGBA32F, Depth32F, Depth24Stencil8 };
 enum class TextureWrap : uint8_t { Repeat, ClampToEdge, ClampToBorder };
 enum class TextureFilter : uint8_t { Linear, Nearest, LinearMipLinear };
 
