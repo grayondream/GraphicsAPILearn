@@ -17,6 +17,14 @@ struct Geometry {
     uint32_t indexCount{0};
 };
 
+// 可选布局参数：指定 uv / normal 的 location（GL semantic）。
+// 默认 uv=2、normal=3（与已迁移模板一致）；SimpleLight 系列用 uv=3、normal=2。
+struct Layout {
+    int uvLocation{2};
+    int normalLocation{3};
+};
+
 Geometry Create(rhi::IRenderer* renderer, Shape& shape,
-                bool useUv, bool useNormal, bool useIndex);
+                bool useUv, bool useNormal, bool useIndex,
+                const Layout& layout = {});
 }

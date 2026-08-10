@@ -6,7 +6,8 @@
 namespace RhiGeometry {
 
 Geometry Create(rhi::IRenderer* renderer, Shape& shape,
-                bool useUv, bool useNormal, bool useIndex) {
+                bool useUv, bool useNormal, bool useIndex,
+                const Layout& layout) {
     using namespace rhi;
     Geometry g;
 
@@ -26,14 +27,14 @@ Geometry Create(rhi::IRenderer* renderer, Shape& shape,
         auto ub = renderer->createBuffer();
         ub->init(shape.uv(), shape.uvSize(), BufferType::Vertex);
         g.uvBuffer = ub;
-        g.layout.elements.push_back(VertexElement{VertexElement::Float2, 2, 1,
+        g.layout.elements.push_back(VertexElement{VertexElement::Float2, layout.uvLocation, 1,
                                                   VertexInputRate::PerVertex, 0, 8});
     }
     if (useNormal && shape.normalSize() > 0) {
         auto nb = renderer->createBuffer();
         nb->init(shape.normal(), shape.normalSize(), BufferType::Vertex);
         g.normalBuffer = nb;
-        g.layout.elements.push_back(VertexElement{VertexElement::Float4, 3, 2,
+        g.layout.elements.push_back(VertexElement{VertexElement::Float4, layout.normalLocation, 2,
                                                   VertexInputRate::PerVertex, 0, 16});
     }
     if (useIndex && shape.idxSize() > 0) {
