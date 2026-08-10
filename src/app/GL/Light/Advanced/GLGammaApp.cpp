@@ -1,9 +1,11 @@
 #include "GLGammaApp.hpp"
-#include "native/GL/GLProgram.hpp"
 #include "base/StaticCollector.hpp"
 #include "base/ErrorHandle.hpp"
-#include "glad/glad.h"
-#include "native/GL/GLImageTexture2D.hpp"
+#include "rhi/core/IShader.hpp"
+#include "rhi/core/IPipeline.hpp"
+#include "rhi/core/ITexture2D.hpp"
+#include "app/GL/RhiGeometry.hpp"
+#include "app/GL/RhiImage.hpp"
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
@@ -15,118 +17,61 @@ using FileUtils::join;
 using namespace ErrorHandle;
 
 GLGammaApp::~GLGammaApp() {
-	if (_vao != 0) {
-		glDeleteVertexArrays(1, &_vao);
-		glDeleteBuffers(2, _vbo);
-		glDeleteBuffers(1, &_ebo);
-	}
-
-	_lightProgram.destroy();
-	_targetProgram.destroy();
 }
 
 bool GLGammaApp::initApp() {
 	if (!GLCameraBaseApp::initApp()) {
 		return false;
 	}
-	
+
 	const auto shaderDir = join(StaticCollector::getGLShaderPath(), "Light");
+
+	// 光源管线（Sphere shape，pos+color indexed；layout 来自 Create 返回值）
 	{
+		auto shader = renderer()->createShader();
 		const auto vfile = join(shaderDir, "Advanced", "Gamma", "Source.vs");
 		const auto ffile = join(shaderDir, "Advanced", "Gamma", "Source.fs");
-		auto ret = _lightProgram.init(vfile, ffile);
-		ErrorHandle::ExitIfFailed(ret, "Create OpenGL program failed!");
+		auto ok = shader->compile({ {rhi::ShaderStage::Vertex, vfile, "main", false},
+		                            {rhi::ShaderStage::Fragment, ffile, "main", false} });
+		ExitIfFailed(ok, "Create RHI shader failed: {}", shader->getLog());
+		auto geo = RhiGeometry::Create(renderer().get(), shape, false, false, true);
+		_vb = geo.vertexBuffer;
+		_ebo = geo.indexBuffer;
+		_indexCount = geo.indexCount;
+		_lightPipeline = renderer()->createPipeline(geo.layout, shader);
 	}
 
+	// 物体管线（Plane shape，pos+color+uv+normal，drawArrays；默认布局 uv=2/normal=3）
 	{
+		auto shader = renderer()->createShader();
 		const auto vfile = join(shaderDir, "Advanced", "Gamma", "Object.vs");
 		const auto ffile = join(shaderDir, "Advanced", "Gamma", "Object.fs");
-		auto ret = _targetProgram.init(vfile, ffile);
-		ErrorHandle::ExitIfFailed(ret, "Create OpenGL program failed!");
+		auto ok = shader->compile({ {rhi::ShaderStage::Vertex, vfile, "main", false},
+		                            {rhi::ShaderStage::Fragment, ffile, "main", false} });
+		ExitIfFailed(ok, "Create RHI shader failed: {}", shader->getLog());
+		Plane plane{};
+		auto geo = RhiGeometry::Create(renderer().get(), plane, true, true, false);
+		_planeVb = geo.vertexBuffer;
+		_planeUv = geo.uvBuffer;
+		_planeNormal = geo.normalBuffer;
+		_planeVertexCount = geo.vertexCount;
+		_targetPipeline = renderer()->createPipeline(geo.layout, shader);
+		_targetPipeline->setDepthTest(true);
 	}
-	
+
 	{
 		const auto imgFile = join(StaticCollector::getImagePath(), "wood.png");
-		_texture = std::make_shared<GLImageTexture2D>(imgFile);
-		const auto valid = _texture->load().texture()->valid();
-		ExitIfFailed(valid, "Failed to load texture from file {}", imgFile);
+		_texture = RhiImage::Load2D(renderer().get(), imgFile);
+		ExitIfFailed(_texture != nullptr, "Failed to load texture from file {}", imgFile);
 	}
-
-	createVertexBuffer();
-	createPlaneBuffer();
-	//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 	return true;
-}
-
-void GLGammaApp::createVertexBuffer() {
-	unsigned int vbo[2]{}, vao{}, ebo{};
-	glGenVertexArrays(1, &vao);
-	glGenBuffers(2, vbo);
-	glGenBuffers(1, &ebo);
-
-	glBindVertexArray(vao);
-	{
-		// �󶨵�һ�� VBO�����ö���λ��
-		glBindBuffer(GL_ARRAY_BUFFER, vbo[0]);
-		glBufferData(GL_ARRAY_BUFFER, shape.byteSize(), shape.toGL().data(), GL_STATIC_DRAW);
-		glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex), nullptr);
-		glEnableVertexAttribArray(0);
-
-		glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)(sizeof(float) * 4));
-		glEnableVertexAttribArray(1);
-
-		// ������������
-		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
-		glBufferData(GL_ELEMENT_ARRAY_BUFFER, shape.idxByteSize(), shape.idx(), GL_STATIC_DRAW);
-	}
-	glBindVertexArray(0);
-
-	// ��¼ VBO �� EBO
-	_vao = vao;
-	_vbo[0] = vbo[0], _vbo[1] = vbo[1];
-	_ebo = ebo;
-}
-
-void GLGammaApp::createPlaneBuffer() {
-	Plane shape{};
-	unsigned int vbo[3]{}, vao{}, ebo{};
-	glGenVertexArrays(1, &vao);
-	glGenBuffers(3, vbo);
-	glBindVertexArray(vao);
-	{
-		glBindBuffer(GL_ARRAY_BUFFER, vbo[0]);
-		glBufferData(GL_ARRAY_BUFFER, shape.byteSize(), shape.toGL().data(), GL_STATIC_DRAW);
-
-		glEnableVertexAttribArray(0);
-		glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex), nullptr);
-		
-		glEnableVertexAttribArray(1);
-		glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)(sizeof(float) * 4));
-
-		glBindBuffer(GL_ARRAY_BUFFER, vbo[1]);
-		glBufferData(GL_ARRAY_BUFFER, shape.uvSize(), shape.uv(), GL_STATIC_DRAW);
-
-		glEnableVertexAttribArray(2);
-		glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), nullptr);
-
-		glBindBuffer(GL_ARRAY_BUFFER, vbo[2]);
-		glBufferData(GL_ARRAY_BUFFER, shape.normalSize(), shape.normal(), GL_STATIC_DRAW);
-
-		glEnableVertexAttribArray(3);
-		glVertexAttribPointer(3, 4, GL_FLOAT, GL_FALSE, 4 * sizeof(float), nullptr);
-	}
-	glBindVertexArray(0);
-	_planeVao = vao;
-	_planeVbo[0] = vbo[0], _planeVbo[1] = vbo[1];
-	_planeVbo[2] = vbo[2];
 }
 
 void GLGammaApp::drawScene(const float dt) {
 	GLApp::drawScene(dt);
-	glBindVertexArray(_vao);
 	ImGui::Begin("OpenGL");
 	ImGui::Text("Color Picker with Alpha:");
-	ImGui::ColorEdit4("Color with Alpha", &_lightColor[0]); // ֧�� RGBA
+	ImGui::ColorEdit4("Color with Alpha", &_lightColor[0]);
 	ImGui::Checkbox("Enable Gamma", &_enableGamma);
 	ImGui::InputFloat("Gamma Value", &_gammaValue, 0.1f, 10.f, "%.1f");
 	ImGui::End();
@@ -134,9 +79,7 @@ void GLGammaApp::drawScene(const float dt) {
 	static float curTime = 0;
 	curTime += dt;
 	const auto projection = glm::perspective(glm::radians(_camera.zoom()), aspectRatio(), 0.1f, 100.0f);
-	
 	const auto view = _camera.getViewMatrix();
-	_texture->texture()->bind(0);
 
 	std::vector<glm::vec3> lightPoses = {
 		glm::vec3(-2.0f, 0.0f, 0.f),
@@ -145,7 +88,7 @@ void GLGammaApp::drawScene(const float dt) {
 		glm::vec3(1.0f, 0.0f, 0.f),
 		glm::vec3(2.0f, 0.0f, 0.f)
 	};
-	
+
 	std::vector<glm::vec3> lightColors = {
 		glm::vec3(1, 0, 0),
 		glm::vec3(0, 1, 0),
@@ -154,41 +97,43 @@ void GLGammaApp::drawScene(const float dt) {
 		glm::vec3(1, 1, 0),
 	};
 
-	//draw object
+	//draw object（Plane，drawArrays）
 	{
-		glm::mat4 model = glm::mat4(1.0f); // make sure to initialize matrix to identity matrix first
-		//model = glm::rotate(model, glm::radians(0.0f), glm::vec3(1.0f, 0.3f, 0.5f));
+		renderer()->bindTexture(_texture, 0);
+		glm::mat4 model = glm::mat4(1.0f);
 		model = glm::scale(model, glm::vec3(10.f));
-		_targetProgram.use();
-		glBindVertexArray(_planeVao);
-		_targetProgram.update("projection", projection);
-		_targetProgram.update("view", view);
-		_targetProgram.update("model", model); // ����ģ�;���
-		_targetProgram.update("textureSampler", 0);
-		_targetProgram.update("lightColor", _lightColor);
-		_targetProgram.update("lightPositions", lightPoses);
-		_targetProgram.update("lightColors", lightColors);
-		_targetProgram.update("viewPos", _camera.getAttr().pos);
-		_targetProgram.update("enableGamma", _enableGamma);
-		_targetProgram.update("gammaValue", _gammaValue);
-		glDrawArrays(GL_TRIANGLES, 0, 6); // ����������
-		glBindVertexArray(0);
+		renderer()->setPipeline(_targetPipeline);
+		renderer()->setVertexBuffer(_planeVb);
+		renderer()->setVertexBuffer(_planeUv, 1);
+		renderer()->setVertexBuffer(_planeNormal, 2);
+		_targetPipeline->setUniform("projection", glm::value_ptr(projection), 1);
+		_targetPipeline->setUniform("view", glm::value_ptr(view), 1);
+		_targetPipeline->setUniform("model", glm::value_ptr(model), 1);
+		_targetPipeline->setUniform("textureSampler", 0);
+		_targetPipeline->setUniform("lightColor", glm::value_ptr(_lightColor), 1, 4);
+		_targetPipeline->setUniform("lightPositions", glm::value_ptr(lightPoses[0]), static_cast<int>(lightPoses.size()), 3);
+		_targetPipeline->setUniform("lightColors", glm::value_ptr(lightColors[0]), static_cast<int>(lightColors.size()), 3);
+		_targetPipeline->setUniform("viewPos", glm::value_ptr(_camera.getAttr().pos), 1, 3);
+		_targetPipeline->setUniform("enableGamma", _enableGamma);
+		_targetPipeline->setUniform("gammaValue", _gammaValue);
+		renderer()->draw(_planeVertexCount, 0);
 	}
 
-	//draw light source
-	for(auto i = 0;i < lightPoses.size();i ++){
+	//draw light source（Sphere，drawIndexed，5 光源循环）
+	for (auto i = 0; i < 5; i++) {
 		const auto lightPos = lightPoses[i];
-		glBindVertexArray(_vao);
-		glm::mat4 model = glm::mat4(1.0f); // make sure to initialize matrix to identity matrix first
+		glm::mat4 model = glm::mat4(1.0f);
 		model = glm::translate(model, lightPos);
 		model = glm::scale(model, glm::vec3(0.05, 0.05, 0.05));
 
-		_lightProgram.use();
-		_lightProgram.update("projection", projection);
-		_lightProgram.update("view", view);
-		_lightProgram.update("model", model);
-		_lightProgram.update("lightColor", glm::vec4(lightColors[i], 1.0));
-		glDrawElements(GL_TRIANGLES, shape.idxSize(), GL_UNSIGNED_INT, 0);
-		glBindVertexArray(0);
+		renderer()->setPipeline(_lightPipeline);
+		renderer()->setVertexBuffer(_vb);
+		_lightPipeline->setUniform("projection", glm::value_ptr(projection), 1);
+		_lightPipeline->setUniform("view", glm::value_ptr(view), 1);
+		_lightPipeline->setUniform("model", glm::value_ptr(model), 1);
+		const glm::vec4 lc(lightColors[i], 1.0f);
+		_lightPipeline->setUniform("lightColor", glm::value_ptr(lc), 1, 4);
+		renderer()->setIndexBuffer(_ebo);
+		renderer()->drawIndexed(_indexCount, 0, 0);
 	}
 }

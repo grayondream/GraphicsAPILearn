@@ -1,6 +1,8 @@
 #pragma once
 #include "app/GL/Base/GLCameraBaseApp.hpp"
-#include "native/GL/GLProgram.hpp"
+#include "rhi/core/IPipeline.hpp"
+#include "rhi/core/IBuffer.hpp"
+#include "rhi/core/ITexture2D.hpp"
 #include <memory>
 #include <array>
 #include "geometry/Camera.hpp"
@@ -18,21 +20,19 @@ protected:
 	virtual void drawScene(const float dt);
 
 private:
-	void createVertexBuffer();
-	void createPlaneBuffer();
-	
-private:
 	Sphere shape{};
-	GLProgram _targetProgram{};
-	GLProgram _lightProgram{};
-	unsigned int _vbo[2]{};
-	unsigned int _vao{};
-	unsigned int _ebo{};
-	unsigned int _planeVbo[3]{};
-	unsigned int _planeVao{};
+	std::shared_ptr<rhi::IPipeline> _targetPipeline{};
+	std::shared_ptr<rhi::IPipeline> _lightPipeline{};
+	std::shared_ptr<rhi::IBuffer> _vb{};
+	std::shared_ptr<rhi::IBuffer> _ebo{};
+	uint32_t _indexCount{0};
+	std::shared_ptr<rhi::IBuffer> _planeVb{};
+	std::shared_ptr<rhi::IBuffer> _planeUv{};
+	std::shared_ptr<rhi::IBuffer> _planeNormal{};
+	uint32_t _planeVertexCount{0};
 	bool _enableGamma{};
 	float _gammaValue{ 2.2 };
 	float _curTime{};
 	glm::vec4 _lightColor{1.0, 1.0, 1.0, 1.0};
-	std::shared_ptr<GLImageTexture2D> _texture{};
+	std::shared_ptr<rhi::ITexture2D> _texture{};
 };
