@@ -48,6 +48,8 @@ static RhiGeometry::Geometry CreateRectBuffer(rhi::IRenderer* renderer) {
 	bitangent1.x = f * (-deltaUV2.x * edge1.x + deltaUV1.x * edge2.x);
 	bitangent1.y = f * (-deltaUV2.x * edge1.y + deltaUV1.x * edge2.y);
 	bitangent1.z = f * (-deltaUV2.x * edge1.z + deltaUV1.x * edge2.z);
+	tangent1 = glm::normalize(tangent1);
+	bitangent1 = glm::normalize(bitangent1);
 
 	edge1 = pos3 - pos1;
 	edge2 = pos4 - pos1;
@@ -60,6 +62,8 @@ static RhiGeometry::Geometry CreateRectBuffer(rhi::IRenderer* renderer) {
 	bitangent2.x = f * (-deltaUV2.x * edge1.x + deltaUV1.x * edge2.x);
 	bitangent2.y = f * (-deltaUV2.x * edge1.y + deltaUV1.x * edge2.y);
 	bitangent2.z = f * (-deltaUV2.x * edge1.z + deltaUV1.x * edge2.z);
+	tangent2 = glm::normalize(tangent2);
+	bitangent2 = glm::normalize(bitangent2);
 
 	float quadVertices[] = {
 		pos1.x, pos1.y, pos1.z, nm.x, nm.y, nm.z, uv1.x, uv1.y, tangent1.x, tangent1.y, tangent1.z, bitangent1.x, bitangent1.y, bitangent1.z,
