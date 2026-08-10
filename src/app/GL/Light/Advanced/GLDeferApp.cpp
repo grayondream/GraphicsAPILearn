@@ -1,11 +1,13 @@
 #include "GLDeferApp.hpp"
-#include "native/GL/GLProgram.hpp"
 #include "base/StaticCollector.hpp"
 #include "base/ErrorHandle.hpp"
-#include "glad/glad.h"
-#include "native/GL/GLImageTexture2D.hpp"
-#include "native/GL/GLCube.hpp"
-#include "native/GL/GLPlane.hpp"
+#include "rhi/core/IShader.hpp"
+#include "rhi/core/IPipeline.hpp"
+#include "rhi/core/IRenderTarget.hpp"
+#include "rhi/core/ITexture2D.hpp"
+#include "rhi/core/Common.hpp"
+#include "app/GL/RhiGeometry.hpp"
+#include "app/GL/RhiImage.hpp"
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
@@ -13,162 +15,76 @@
 #include "base/Log.hpp"
 #include "imgui.h"
 #include <utils/FileUtils.hpp>
-#include "geometry/Rect.hpp"
-#include "utils/GL/GLUtils.hpp"
-#include "base/Constexpr.hpp"
-
-
-using namespace Constexpr;
 using FileUtils::join;
 using namespace ErrorHandle;
 
 GLDeferApp::~GLDeferApp() {
-	m_cube->destroy();
-    m_plane->destroy();
-    // 释放帧缓冲资源
-    if (m_gBuffer.gbuffer) glDeleteFramebuffers(1, &m_gBuffer.gbuffer);
-    if (m_gBuffer.gPosition) glDeleteTextures(1, &m_gBuffer.gPosition);
-    if (m_gBuffer.gNormal) glDeleteTextures(1, &m_gBuffer.gNormal);
-    if (m_gBuffer.gAlbedoSpec) glDeleteTextures(1, &m_gBuffer.gAlbedoSpec);
-    if (m_gBuffer.rboDepth) glDeleteRenderbuffers(1, &m_gBuffer.rboDepth);
-    // 释放quad的VAO/VBO
-    glDeleteVertexArrays(1, &m_quadVAO);
-    glDeleteBuffers(1, &m_quadVBO);
 }
 
 void GLDeferApp::initShapes() {
-	m_cube = std::make_shared< GLCube>();
-	m_plane = std::make_shared< GLPlane>();
+	auto cubeGeo = RhiGeometry::Create(renderer().get(), m_cube, true, true, true);
+	m_cubeVb = cubeGeo.vertexBuffer;
+	m_cubeUv = cubeGeo.uvBuffer;
+	m_cubeNormal = cubeGeo.normalBuffer;
+	m_cubeEbo = cubeGeo.indexBuffer;
+	m_cubeIndexCount = cubeGeo.indexCount;
 
-	m_cube->init();
-	m_plane->init();
+	auto planeGeo = RhiGeometry::Create(renderer().get(), m_plane, true, true, false);
+	m_planeVb = planeGeo.vertexBuffer;
+	m_planeUv = planeGeo.uvBuffer;
+	m_planeNormal = planeGeo.normalBuffer;
+	m_planeVertexCount = planeGeo.vertexCount;
+	m_cubeLayout = cubeGeo.layout;
+}
+
+void GLDeferApp::createQuadBuffer() {
+	float quadVertices[] = {
+		-1.0f,  1.0f, 0.0f, 0.0f, 1.0f,
+		-1.0f, -1.0f, 0.0f, 0.0f, 0.0f,
+		1.0f,  1.0f, 0.0f, 1.0f, 1.0f,
+		1.0f, -1.0f, 0.0f, 1.0f, 0.0f,
+	};
+	constexpr int stride = 5 * static_cast<int>(sizeof(float));
+	rhi::VertexLayout layout;
+	layout.elements.push_back({rhi::VertexElement::Float3, 0, 0, rhi::VertexInputRate::PerVertex, 0, stride});
+	layout.elements.push_back({rhi::VertexElement::Float2, 1, 0, rhi::VertexInputRate::PerVertex, 12, stride});
+	auto geo = RhiGeometry::CreateFromArray(renderer().get(), quadVertices, sizeof(quadVertices), 4, layout);
+	m_quadVb = geo.vertexBuffer;
+	m_quadVertexCount = geo.vertexCount;
+	m_quadLayout = geo.layout;
 }
 
 void GLDeferApp::createFrameBuffers() {
-	unsigned int gBuffer;
-    glGenFramebuffers(1, &gBuffer);
-    glBindFramebuffer(GL_FRAMEBUFFER, gBuffer);
-    unsigned int gPosition, gNormal, gAlbedoSpec;
-    // position color buffer
-    glGenTextures(1, &gPosition);
-    glBindTexture(GL_TEXTURE_2D, gPosition);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, GetWindowWidth(), GetWindowHeight(), 0, GL_RGBA, GL_FLOAT, NULL);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, gPosition, 0);
-    // normal color buffer
-    glGenTextures(1, &gNormal);
-    glBindTexture(GL_TEXTURE_2D, gNormal);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, GetWindowWidth(), GetWindowHeight(), 0, GL_RGBA, GL_FLOAT, NULL);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, gNormal, 0);
-    // color + specular color buffer
-    glGenTextures(1, &gAlbedoSpec);
-    glBindTexture(GL_TEXTURE_2D, gAlbedoSpec);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, GetWindowWidth(), GetWindowHeight(), 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, GL_TEXTURE_2D, gAlbedoSpec, 0);
-    // tell OpenGL which color attachments we'll use (of this framebuffer) for rendering 
-    unsigned int attachments[3] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2 };
-    glDrawBuffers(3, attachments);
-    // create and attach depth buffer (renderbuffer)
-    unsigned int rboDepth;
-    glGenRenderbuffers(1, &rboDepth);
-    glBindRenderbuffer(GL_RENDERBUFFER, rboDepth);
-    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, GetWindowWidth(), GetWindowHeight());
-    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, rboDepth);
-    // finally check if framebuffer is complete
-    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE){
-		SPDLOG_INFO("Framebuffer not complete!");
-	}
-        
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
-	m_gBuffer.gbuffer = gBuffer;
-	m_gBuffer.gPosition = gPosition;
-	m_gBuffer.gNormal = gNormal;
-	m_gBuffer.gAlbedoSpec = gAlbedoSpec;
-	m_gBuffer.rboDepth = rboDepth;
-}
-
-void GLDeferApp::createQuadBuffer(){
-	unsigned int quadVAO;
-	unsigned int quadVBO;
-	float quadVertices[] = {
-		// positions        // texture Coords
-		-1.0f,  1.0f, 0.0f, 0.0f, 1.0f,
-		-1.0f, -1.0f, 0.0f, 0.0f, 0.0f,
-			1.0f,  1.0f, 0.0f, 1.0f, 1.0f,
-			1.0f, -1.0f, 0.0f, 1.0f, 0.0f,
-	};
-	// setup plane VAO
-	glGenVertexArrays(1, &quadVAO);
-	glGenBuffers(1, &quadVBO);
-	glBindVertexArray(quadVAO);
-	glBindBuffer(GL_ARRAY_BUFFER, quadVBO);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), &quadVertices, GL_STATIC_DRAW);
-	glEnableVertexAttribArray(0);
-	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);
-	glEnableVertexAttribArray(1);
-	glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
-	glBindVertexArray(0);
-	m_quadVAO = quadVAO;
-	m_quadVBO = quadVBO;
+	const int w = static_cast<int>(m_window->getProperties().width);
+	const int h = static_cast<int>(m_window->getProperties().height);
+	m_gBuffer = renderer()->createRenderTarget();
+	rhi::FramebufferDesc fbd;
+	fbd.width = w; fbd.height = h;
+	// 3 颜色附件，Nearest filter（避免 GBuffer 线性插值模糊）
+	fbd.attachments.push_back({rhi::AttachmentType::Color, rhi::TextureFormat::RGBA16F, false, 0,
+	                           rhi::TextureFilter::Nearest, rhi::TextureFilter::Nearest,
+	                           rhi::TextureWrap::ClampToEdge, rhi::TextureWrap::ClampToEdge});
+	fbd.attachments.push_back({rhi::AttachmentType::Color, rhi::TextureFormat::RGBA16F, false, 0,
+	                           rhi::TextureFilter::Nearest, rhi::TextureFilter::Nearest,
+	                           rhi::TextureWrap::ClampToEdge, rhi::TextureWrap::ClampToEdge});
+	fbd.attachments.push_back({rhi::AttachmentType::Color, rhi::TextureFormat::RGBA8, false, 0,
+	                           rhi::TextureFilter::Nearest, rhi::TextureFilter::Nearest,
+	                           rhi::TextureWrap::ClampToEdge, rhi::TextureWrap::ClampToEdge});
+	fbd.attachments.push_back({rhi::AttachmentType::Depth, rhi::TextureFormat::Depth24Stencil8, false, 0});
+	if (!m_gBuffer->create(fbd)) ExitIfFailed(false, "Failed to create GBuffer framebuffer");
 }
 
 bool GLDeferApp::initApp() {
 	if (!GLCameraBaseApp::initApp()) {
 		return false;
 	}
-	
-	createTextures();
-	compileShader();
+
 	initShapes();
-	createFrameBuffers();
 	createQuadBuffer();
-	glEnable(GL_DEPTH_TEST);
-	//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+	createTextures();
+	createFrameBuffers();
+	compileShader(m_cubeLayout, m_quadLayout);
 	return true;
-}
-
-static std::shared_ptr<GLImageTexture2D> CreateTexture(const std::string &imgname){
-	const auto resDir = StaticCollector::getImagePath();
-	const auto imgFile = join(resDir, imgname);
-	auto texture = std::make_shared<GLImageTexture2D>(imgFile);
-	const auto valid = texture->load().texture()->valid();
-	ExitIfFailed(valid, "Failed to load texture from file {}", imgFile);
-	return texture;
-}
-
-void GLDeferApp::createTextures(){
-	m_woodTexture = CreateTexture("wood.png");
-	m_brickTexture = CreateTexture("bricks2.jpg");
-}
-
-void GLDeferApp::compileShader(){
-	const auto shaderDir = join(StaticCollector::getGLShaderPath(), "Light", "Advanced", "Defer");
-	{
-		const auto vfile = join(shaderDir, "GBuffer.vs");
-		const auto ffile = join(shaderDir, "GBuffer.fs");
-		auto ret = m_gBufferProgram.init(vfile, ffile);
-		ErrorHandle::ExitIfFailed(ret, "Create OpenGL program failed!");
-	}
-
-	{
-		const auto vfile = join(shaderDir, "Light.vs");
-		const auto ffile = join(shaderDir, "Light.fs");
-		auto ret = m_lightProgram.init(vfile, ffile);
-		ErrorHandle::ExitIfFailed(ret, "Create OpenGL program failed!");
-	}
-
-	{
-		const auto vfile = join(shaderDir, "LightBox.vs");
-		const auto ffile = join(shaderDir, "LightBox.fs");
-		auto ret = m_lightBoxProgram.init(vfile, ffile);
-		ErrorHandle::ExitIfFailed(ret, "Create OpenGL program failed!");
-	}
 }
 
 static auto GetPositions(int count = 20, float gap = 0.04f, glm::vec3 center = glm::vec3(0)) {
@@ -219,128 +135,155 @@ static std::vector<std::pair<glm::vec3, glm::vec3>> GetLightPosAndColors(int cou
 	return lightPosAndColors;
 }
 
-void GLDeferApp::renderQuad(){
-	glBindVertexArray(m_quadVAO);
-	glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-	glBindVertexArray(0);
+void GLDeferApp::createTextures() {
+	const auto resDir = StaticCollector::getImagePath();
+	{
+		const auto imgFile = join(resDir, "wood.png");
+		m_woodTexture = RhiImage::Load2D(renderer().get(), imgFile);
+		ExitIfFailed(m_woodTexture != nullptr, "Failed to load texture from file {}", imgFile);
+	}
+	{
+		const auto imgFile = join(resDir, "bricks2.jpg");
+		m_brickTexture = RhiImage::Load2D(renderer().get(), imgFile);
+		ExitIfFailed(m_brickTexture != nullptr, "Failed to load texture from file {}", imgFile);
+	}
 }
 
-void GLDeferApp::renderOneCube(GLProgram& program, const glm::mat4& model, const glm::mat4& projection, const glm::mat4& view){
-	program.use();
-	glBindVertexArray(m_cube->getVao());
-	program.update("model", model);
-	program.update("projection", projection);
-	program.update("view", view);
-	glDrawElements(GL_TRIANGLES, m_cube->idxSize(), GL_UNSIGNED_INT, 0);
-	glBindVertexArray(0);
+void GLDeferApp::compileShader(const rhi::VertexLayout& cubeLayout, const rhi::VertexLayout& quadLayout) {
+	const auto shaderDir = join(StaticCollector::getGLShaderPath(), "Light", "Advanced", "Defer");
+	{
+		auto shader = renderer()->createShader();
+		auto ok = shader->compile({ {rhi::ShaderStage::Vertex, join(shaderDir, "GBuffer.vs"), "main", false},
+		                            {rhi::ShaderStage::Fragment, join(shaderDir, "GBuffer.fs"), "main", false} });
+		ExitIfFailed(ok, "Create RHI shader failed: {}", shader->getLog());
+		m_gBufferProgram = renderer()->createPipeline(cubeLayout, shader);
+		m_gBufferProgram->setDepthTest(true);
+	}
+	{
+		auto shader = renderer()->createShader();
+		auto ok = shader->compile({ {rhi::ShaderStage::Vertex, join(shaderDir, "LightBox.vs"), "main", false},
+		                            {rhi::ShaderStage::Fragment, join(shaderDir, "LightBox.fs"), "main", false} });
+		ExitIfFailed(ok, "Create RHI shader failed: {}", shader->getLog());
+		m_lightBoxProgram = renderer()->createPipeline(cubeLayout, shader);
+		m_lightBoxProgram->setDepthTest(true);
+	}
+	{
+		auto shader = renderer()->createShader();
+		auto ok = shader->compile({ {rhi::ShaderStage::Vertex, join(shaderDir, "Light.vs"), "main", false},
+		                            {rhi::ShaderStage::Fragment, join(shaderDir, "Light.fs"), "main", false} });
+		ExitIfFailed(ok, "Create RHI shader failed: {}", shader->getLog());
+		m_lightProgram = renderer()->createPipeline(quadLayout, shader);
+		m_lightProgram->setPrimitiveType(rhi::PrimitiveType::TriangleStrip);
+	}
 }
 
-void GLDeferApp::renderCubes(GLProgram &program, const glm::mat4 &projection, const glm::mat4 &view, const glm::vec3 &viewPos) {
+void GLDeferApp::renderQuad() {
+	renderer()->setVertexBuffer(m_quadVb);
+	renderer()->draw(m_quadVertexCount, 0);
+}
+
+void GLDeferApp::renderOneCube(std::shared_ptr<rhi::IPipeline>& program, const glm::mat4& model, const glm::mat4& projection, const glm::mat4& view){
+	renderer()->setPipeline(program);
+	renderer()->setVertexBuffer(m_cubeVb);
+	renderer()->setVertexBuffer(m_cubeUv, 1);
+	renderer()->setVertexBuffer(m_cubeNormal, 2);
+	renderer()->setIndexBuffer(m_cubeEbo);
+	program->setUniform("model", glm::value_ptr(model), 1);
+	program->setUniform("projection", glm::value_ptr(projection), 1);
+	program->setUniform("view", glm::value_ptr(view), 1);
+	renderer()->drawIndexed(m_cubeIndexCount, 0, 0);
+}
+
+void GLDeferApp::renderCubes(std::shared_ptr<rhi::IPipeline>& program, const glm::mat4 &projection, const glm::mat4 &view, const glm::vec3 &viewPos) {
 	auto cubePositions = GetPositions(m_Count, 1, glm::vec3(0,0.5,0));
-	program.use();
-	program.update("viewPos", viewPos);
-    m_woodTexture->texture()->bind(0);
-    program.update("diffuseTexture", 0);
+	renderer()->setPipeline(program);
+	program->setUniform("viewPos", glm::value_ptr(viewPos), 1, 3);
+	renderer()->bindTexture(m_woodTexture, 0);
+	program->setUniform("diffuseTexture", 0);
 	for (const auto& pos : cubePositions) {
-		glm::mat4 model = glm::mat4(1.0f); // make sure to initialize matrix to identity matrix first	
+		glm::mat4 model = glm::mat4(1.0f);
 		model = glm::translate(model, pos);
 		model = glm::scale(model, glm::vec3(0.1f));
 		renderOneCube(program, model, projection, view);
 	}
 }
 
-void GLDeferApp::renderPlane(GLProgram &program, const glm::mat4 &projection, const glm::mat4 &view, const glm::vec3 &viewPos) {
-	glBindVertexArray(m_plane->getVao());
-	{
-		program.use();
-		program.update("viewPos", viewPos);
-		glm::mat4 model = glm::mat4(1.0f); // make sure to initialize matrix to identity matrix first
-		m_brickTexture->texture()->bind(0);
-		program.update("diffuseTexture", 0);
-		model = glm::translate(model, glm::vec3(0.0));
-		program.update("model", model);
-		program.update("view", view);
-		program.update("projection", projection);
-		glDrawArrays(GL_TRIANGLES, 0, 6);
-	}
+void GLDeferApp::renderPlane(std::shared_ptr<rhi::IPipeline>& program, const glm::mat4 &projection, const glm::mat4 &view, const glm::vec3 &viewPos) {
+	renderer()->setPipeline(program);
+	renderer()->setVertexBuffer(m_planeVb);
+	renderer()->setVertexBuffer(m_planeUv, 1);
+	renderer()->setVertexBuffer(m_planeNormal, 2);
+	program->setUniform("viewPos", glm::value_ptr(viewPos), 1, 3);
+	glm::mat4 model = glm::mat4(1.0f);
+	renderer()->bindTexture(m_brickTexture, 0);
+	program->setUniform("diffuseTexture", 0);
+	model = glm::translate(model, glm::vec3(0.0));
+	program->setUniform("model", glm::value_ptr(model), 1);
+	program->setUniform("view", glm::value_ptr(view), 1);
+	program->setUniform("projection", glm::value_ptr(projection), 1);
+	renderer()->draw(m_planeVertexCount, 0);
 }
 
-void GLDeferApp::renderLight(GLProgram& program, const glm::mat4& projection, const glm::mat4& view) {
-    auto lightPositionsColor = GetLightPosAndColors(m_Count, 2);
-	program.use();
-	{
-		glActiveTexture(GL_TEXTURE0);
-		glBindTexture(GL_TEXTURE_2D, m_gBuffer.gPosition);
-		program.update("gPosition", 0);
-		glActiveTexture(GL_TEXTURE1);
-		glBindTexture(GL_TEXTURE_2D, m_gBuffer.gNormal);
-		program.update("gNormal", 1);
-		glActiveTexture(GL_TEXTURE2);
-		glBindTexture(GL_TEXTURE_2D, m_gBuffer.gAlbedoSpec);
-		program.update("gAlbedoSpec", 2);
-	}
-
-	program.update("viewPos", _camera.getAttr().pos);
-	const float linear = 0.7f;
-	const float quadratic = 1.8f;
-	const float constant = 1.0f;
-	program.update("enableVolume", m_enableVolume);
-	for (unsigned int i = 0; i < lightPositionsColor.size(); i++){
-		program.update("lights[" + std::to_string(i) + "].Position", lightPositionsColor[i].first);
-		program.update("lights[" + std::to_string(i) + "].Color", lightPositionsColor[i].second);
-		// update attenuation parameters and calculate radius
-		program.update("lights[" + std::to_string(i) + "].Linear", linear);
-		program.update("lights[" + std::to_string(i) + "].Quadratic", quadratic);
+void GLDeferApp::renderLight(std::shared_ptr<rhi::IPipeline>& program, const glm::mat4 &projection, const glm::mat4 &view) {
+	renderer()->setPipeline(program);
+	renderer()->bindTexture(m_gBuffer->colorTexture2D(0), 0); program->setUniform("gPosition", 0);
+	renderer()->bindTexture(m_gBuffer->colorTexture2D(1), 1); program->setUniform("gNormal", 1);
+	renderer()->bindTexture(m_gBuffer->colorTexture2D(2), 2); program->setUniform("gAlbedoSpec", 2);
+	program->setUniform("viewPos", glm::value_ptr(_camera.getAttr().pos), 1, 3);
+	const float linear = 0.7f, quadratic = 1.8f, constant = 1.0f;
+	program->setUniform("enableVolume", m_enableVolume);
+	auto lightPositionsColor = GetLightPosAndColors(m_Count, 2);
+	for (unsigned int i = 0; i < lightPositionsColor.size(); i++) {
+		program->setUniform("lights[" + std::to_string(i) + "].Position",
+		                    glm::value_ptr(lightPositionsColor[i].first), 1, 3);
+		program->setUniform("lights[" + std::to_string(i) + "].Color",
+		                    glm::value_ptr(lightPositionsColor[i].second), 1, 3);
+		program->setUniform("lights[" + std::to_string(i) + "].Linear", linear);
+		program->setUniform("lights[" + std::to_string(i) + "].Quadratic", quadratic);
 		const float maxBrightness = std::fmaxf(std::fmaxf(lightPositionsColor[i].second.r, lightPositionsColor[i].second.g), lightPositionsColor[i].second.b);
-        float radius = (-linear + std::sqrt(linear * linear - 4 * quadratic * (constant - (256.0f / 5.0f) * maxBrightness))) / (2.0f * quadratic);
-        program.update("lights[" + std::to_string(i) + "].Radius", radius);
+		float radius = (-linear + std::sqrt(linear * linear - 4 * quadratic * (constant - (256.0f / 5.0f) * maxBrightness))) / (2.0f * quadratic);
+		program->setUniform("lights[" + std::to_string(i) + "].Radius", radius);
 	}
-
-	renderQuad();
+	renderer()->setVertexBuffer(m_quadVb);
+	renderer()->draw(m_quadVertexCount, 0);
 }
 
-void GLDeferApp::renderLightBox(GLProgram &program, const glm::mat4 &projection, const glm::mat4 &view) {
-	program.use();
+void GLDeferApp::renderLightBox(std::shared_ptr<rhi::IPipeline>& program, const glm::mat4 &projection, const glm::mat4 &view) {
+	renderer()->setPipeline(program);
 	auto lightPositionsColor = GetLightPosAndColors(m_Count, 1);
 	for (const auto& posColor : lightPositionsColor) {
-		glm::mat4 model = glm::mat4(1.0f); // make sure to initialize matrix to identity matrix first
+		glm::mat4 model = glm::mat4(1.0f);
 		model = glm::translate(model, posColor.first);
 		model = glm::scale(model, glm::vec3(0.1f));
-		program.update("lightColor", posColor.second);
+		program->setUniform("lightColor", glm::value_ptr(posColor.second), 1, 3);
 		renderOneCube(program, model, projection, view);
 	}
 }
 
-void GLDeferApp::renderGBuffer(GLProgram &program, const glm::mat4 &projection, const glm::mat4 &view) {
-	glBindFramebuffer(GL_FRAMEBUFFER, m_gBuffer.gbuffer);
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-	program.use();
-	program.update("projection", projection);
-	program.update("view", view);
-	m_woodTexture->texture()->bind(0);
-	program.update("diffuseTexture", 0);
+void GLDeferApp::renderGBuffer(std::shared_ptr<rhi::IPipeline>& program, const glm::mat4 &projection, const glm::mat4 &view) {
+	renderer()->setRenderTarget(m_gBuffer);
+	renderer()->clearColor(0.0f, 0.0f, 0.0f, 1.0f);
+	renderer()->setPipeline(program);
+	program->setUniform("projection", glm::value_ptr(projection), 1);
+	program->setUniform("view", glm::value_ptr(view), 1);
+	renderer()->bindTexture(m_woodTexture, 0);
+	program->setUniform("diffuseTexture", 0);
 	renderCubes(program, projection, view, _camera.getAttr().pos);
-	m_brickTexture->texture()->bind(0);
-	program.update("diffuseTexture", 0);
+	renderer()->bindTexture(m_brickTexture, 0);
+	program->setUniform("diffuseTexture", 0);
 	renderPlane(program, projection, view, _camera.getAttr().pos);
-	
-	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	renderer()->setRenderTarget(nullptr);
 }
-
 
 void GLDeferApp::drawScene(const float dt) {
 	GLCameraBaseApp::drawScene(dt);
-	auto pos = _camera.getAttr().pos;
 	const auto projection = glm::perspective(glm::radians(_camera.zoom()), aspectRatio(), 0.1f, 100.0f);
 	const auto view = _camera.getViewMatrix();
 	renderGBuffer(m_gBufferProgram, projection, view);
 	renderLight(m_lightProgram, projection, view);
 
-	glBindFramebuffer(GL_READ_FRAMEBUFFER, m_gBuffer.gbuffer);
-	glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0); // write to default framebuffer
-	glBlitFramebuffer(0, 0, GetWindowWidth(), GetWindowHeight(), 0, 0, GetWindowWidth(), GetWindowHeight(), GL_DEPTH_BUFFER_BIT, GL_NEAREST);
-	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	// 深度-only blit：把 GBuffer 深度拷贝到默认 FBO，供 lightbox 深度测试
+	renderer()->blitFramebuffer(m_gBuffer, nullptr, rhi::BlitMask::Depth);
 
 	renderLightBox(m_lightBoxProgram, projection, view);
 
