@@ -1,14 +1,10 @@
 #pragma once
 #include "app/GL/Base/GLCameraBaseApp.hpp"
-#include "native/GL/GLProgram.hpp"
+#include "rhi/core/IRenderer.hpp"
 #include <memory>
 #include <array>
 #include "geometry/Camera.hpp"
-#include "geometry/Vertex.hpp"
-#include "geometry/Sphere.hpp"
-#include "geometry/Cube.hpp"
 
-class GLImageTexture2D;
 class GLHdrApp : public GLCameraBaseApp {
 public:
 	virtual ~GLHdrApp();
@@ -18,25 +14,23 @@ protected:
 	virtual void drawScene(const float dt);
 
 private:
-	void compileShader();
-	void createTextures();
+	void compileShader(const rhi::VertexLayout& cubeLayout, const rhi::VertexLayout& quadLayout);
 	void render2FrameBuffer();
 	void renderHdr();
 
 private:
-	GLProgram _objProgram;
-	GLProgram _hdrProgram;
-	float _curTime{};
-	unsigned int _vao{};
-	unsigned int _vbo{};
-	unsigned int _screenVao{};
-	unsigned int _screenVbo{};
-	unsigned int _colorBuffer{};
-	unsigned int _hdrFBO{};
+	std::shared_ptr<rhi::IPipeline> _objPipeline{};
+	std::shared_ptr<rhi::IPipeline> _hdrPipeline{};
+	std::shared_ptr<rhi::ITexture2D> _brick{};
+
+	std::shared_ptr<rhi::IBuffer> _vb{};            // cube 顶点
+	uint32_t _cubeVertexCount{0};
+	std::shared_ptr<rhi::IBuffer> _quadVb{};        // 全屏 quad 顶点
+	uint32_t _quadVertexCount{0};
+
+	std::shared_ptr<rhi::IRenderTarget> _hdrRT{};
+	std::shared_ptr<rhi::ITexture2D> _colorBuffer{};   // = _hdrRT->colorTexture2D(0)
 
 	bool _enableHdr = true;
 	float _exposure = 0.5f;
-	std::shared_ptr<GLImageTexture2D> _brick{};
-	std::shared_ptr<GLImageTexture2D> _brickNormal{};
-	std::shared_ptr<GLImageTexture2D> _brickDisp{};
 };
