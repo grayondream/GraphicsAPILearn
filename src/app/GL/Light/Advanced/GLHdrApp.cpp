@@ -135,6 +135,7 @@ void GLHdrApp::compileShader(const rhi::VertexLayout& cubeLayout, const rhi::Ver
 		                            {rhi::ShaderStage::Fragment, join(shaderDir, "Hdr.fs"), "main", false} });
 		ExitIfFailed(ok, "Create RHI shader failed: {}", shader->getLog());
 		_hdrPipeline = renderer()->createPipeline(quadLayout, shader);
+		_hdrPipeline->setPrimitiveType(rhi::PrimitiveType::TriangleStrip);
 	}
 }
 
