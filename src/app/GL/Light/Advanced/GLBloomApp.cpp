@@ -1,206 +1,156 @@
 #include "GLBloomApp.hpp"
-#include "native/GL/GLProgram.hpp"
 #include "base/StaticCollector.hpp"
 #include "base/ErrorHandle.hpp"
-#include "glad/glad.h"
-#include "native/GL/GLImageTexture2D.hpp"
-#include "native/GL/GLCube.hpp"
-#include "native/GL/GLPlane.hpp"
+#include "rhi/core/IShader.hpp"
+#include "rhi/core/IPipeline.hpp"
+#include "rhi/core/IRenderTarget.hpp"
+#include "rhi/core/ITexture2D.hpp"
+#include "rhi/core/Common.hpp"
+#include "app/GL/RhiGeometry.hpp"
+#include "app/GL/RhiImage.hpp"
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include "base/Log.hpp"
 #include "imgui.h"
 #include <utils/FileUtils.hpp>
-#include "geometry/Rect.hpp"
-#include "utils/GL/GLUtils.hpp"
-#include "base/Constexpr.hpp"
-
-using namespace Constexpr;
 using FileUtils::join;
 using namespace ErrorHandle;
 
 GLBloomApp::~GLBloomApp() {
-	m_cube->destroy();
-	m_plane->destroy();
 }
 
 void GLBloomApp::initShapes() {
-	m_cube = std::make_shared< GLCube>();
-	m_plane = std::make_shared< GLPlane>();
+	auto cubeGeo = RhiGeometry::Create(renderer().get(), m_cube, true, true, true);
+	m_cubeVb = cubeGeo.vertexBuffer;
+	m_cubeUv = cubeGeo.uvBuffer;
+	m_cubeNormal = cubeGeo.normalBuffer;
+	m_cubeEbo = cubeGeo.indexBuffer;
+	m_cubeIndexCount = cubeGeo.indexCount;
+	m_cubeLayout = cubeGeo.layout;
 
-	m_cube->init();
-	m_plane->init();
+	auto planeGeo = RhiGeometry::Create(renderer().get(), m_plane, true, true, false);
+	m_planeVb = planeGeo.vertexBuffer;
+	m_planeUv = planeGeo.uvBuffer;
+	m_planeNormal = planeGeo.normalBuffer;
+	m_planeVertexCount = planeGeo.vertexCount;
 }
 
-static auto CreateHdrFrameBuffer(int width, int height) {
-	unsigned int hdrFBO;
-	glGenFramebuffers(1, &hdrFBO);
-	glBindFramebuffer(GL_FRAMEBUFFER, hdrFBO);
-	// create 2 floating point color buffers (1 for normal rendering, other for brightness threshold values)
-	unsigned int colorBuffers[2];
-	glGenTextures(2, colorBuffers);
-	for (unsigned int i = 0; i < 2; i++)
-	{
-		glBindTexture(GL_TEXTURE_2D, colorBuffers[i]);
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, width, height, 0, GL_RGBA, GL_FLOAT, NULL);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);  // we clamp to the edge as the blur filter would otherwise sample repeated texture values!
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-		// attach texture to framebuffer
-		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + i, GL_TEXTURE_2D, colorBuffers[i], 0);
-	}
-	// create and attach depth buffer (renderbuffer)
-	unsigned int rboDepth;
-	glGenRenderbuffers(1, &rboDepth);
-	glBindRenderbuffer(GL_RENDERBUFFER, rboDepth);
-	glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, width, height);
-	glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, rboDepth);
-	// tell OpenGL which color attachments we'll use (of this framebuffer) for rendering 
-	unsigned int attachments[2] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1 };
-	glDrawBuffers(2, attachments);
-	// finally check if framebuffer is complete
-	if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
-		ErrorHandle::ExitIfFailed(false, "Failed to crate frame buffer");
-	}
-	
-	glBindFramebuffer(GL_FRAMEBUFFER, 0);
-	return std::pair(hdrFBO, std::pair(colorBuffers[0], colorBuffers[1]));
-}
-
-static auto CreateBloomFrameBuffer(int width, int height) {
-	unsigned int pingpongFBO[2];
-	unsigned int pingpongColorbuffers[2];
-	glGenFramebuffers(2, pingpongFBO);
-	glGenTextures(2, pingpongColorbuffers);
-	for (unsigned int i = 0; i < 2; i++)
-	{
-		glBindFramebuffer(GL_FRAMEBUFFER, pingpongFBO[i]);
-		glBindTexture(GL_TEXTURE_2D, pingpongColorbuffers[i]);
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, width, height, 0, GL_RGBA, GL_FLOAT, NULL);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE); // we clamp to the edge as the blur filter would otherwise sample repeated texture values!
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, pingpongColorbuffers[i], 0);
-		// also check if framebuffers are complete (no need for depth buffer)
-		if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
-			ErrorHandle::ExitIfFailed(false, "Failed to crate frame buffer");
-		}
-			
-
-		glBindFramebuffer(GL_FRAMEBUFFER, 0);
-	}
-
-	return std::pair(std::pair(pingpongFBO[0], pingpongFBO[1]), std::pair(pingpongColorbuffers[0], pingpongColorbuffers[1]));
+void GLBloomApp::createQuadBuffer() {
+	float quadVertices[] = {
+		-1.0f,  1.0f, 0.0f, 0.0f, 1.0f,
+		-1.0f, -1.0f, 0.0f, 0.0f, 0.0f,
+		1.0f,  1.0f, 0.0f, 1.0f, 1.0f,
+		1.0f, -1.0f, 0.0f, 1.0f, 0.0f,
+	};
+	constexpr int stride = 5 * static_cast<int>(sizeof(float));
+	rhi::VertexLayout layout;
+	layout.elements.push_back({rhi::VertexElement::Float3, 0, 0, rhi::VertexInputRate::PerVertex, 0, stride});
+	layout.elements.push_back({rhi::VertexElement::Float2, 1, 0, rhi::VertexInputRate::PerVertex, 12, stride});
+	auto geo = RhiGeometry::CreateFromArray(renderer().get(), quadVertices, sizeof(quadVertices), 4, layout);
+	m_quadVb = geo.vertexBuffer;
+	m_quadVertexCount = geo.vertexCount;
+	m_quadLayout = geo.layout;
 }
 
 bool GLBloomApp::initApp() {
 	if (!GLCameraBaseApp::initApp()) {
 		return false;
 	}
-	
-	createTextures();
-	compileShader();
+
 	initShapes();
-	const auto [fbo, buffers] = CreateHdrFrameBuffer(GetWindowWidth(), GetWindowHeight());
-	m_hdrFBO = fbo;
-	m_colorBuffers[0] = buffers.first;
-	m_colorBuffers[1] = buffers.second;
-	const auto [pfbos, ppcolorBuffers] = CreateBloomFrameBuffer(GetWindowWidth(), GetWindowHeight());
-	m_pingpongFBO[0] = pfbos.first;
-	m_pingpongFBO[1] = pfbos.second;
-	m_pingpongColorbuffers[0] = ppcolorBuffers.first;
-	m_pingpongColorbuffers[1] = ppcolorBuffers.second;
 	createQuadBuffer();
-	glEnable(GL_DEPTH_TEST);
-	//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+	compileShader(m_cubeLayout, m_quadLayout);
+	createTextures();
+
+	const int w = static_cast<int>(m_window->getProperties().width);
+	const int h = static_cast<int>(m_window->getProperties().height);
+	// HDR FBO：2 个 RGBA16F 颜色附件 + 深度
+	m_hdrFBO = renderer()->createRenderTarget();
+	rhi::FramebufferDesc fbd;
+	fbd.width = w; fbd.height = h;
+	fbd.attachments.push_back({rhi::AttachmentType::Color, rhi::TextureFormat::RGBA16F, false, 0});
+	fbd.attachments.push_back({rhi::AttachmentType::Color, rhi::TextureFormat::RGBA16F, false, 0});
+	fbd.attachments.push_back({rhi::AttachmentType::Depth, rhi::TextureFormat::Depth24Stencil8, false, 0});
+	if (!m_hdrFBO->create(fbd)) {
+		ExitIfFailed(false, "Failed to create Hdr framebuffer");
+	}
+	// pingpong FBO：2 个，各 1 个 RGBA16F 颜色附件，无深度
+	for (int i = 0; i < 2; i++) {
+		m_pingpongFBO[i] = renderer()->createRenderTarget();
+		rhi::FramebufferDesc pbd;
+		pbd.width = w; pbd.height = h;
+		pbd.attachments.push_back({rhi::AttachmentType::Color, rhi::TextureFormat::RGBA16F, false, 0});
+		if (!m_pingpongFBO[i]->create(pbd)) {
+			ExitIfFailed(false, "Failed to create pingpong framebuffer");
+		}
+	}
+
 	return true;
 }
 
-void GLBloomApp::createQuadBuffer() {
-	float quadVertices[] = {
-		// positions        // texture Coords
-		-1.0f,  1.0f, 0.0f, 0.0f, 1.0f,
-		-1.0f, -1.0f, 0.0f, 0.0f, 0.0f,
-			1.0f,  1.0f, 0.0f, 1.0f, 1.0f,
-			1.0f, -1.0f, 0.0f, 1.0f, 0.0f,
-	};
-	// setup plane VAO
-	unsigned int quadVAO, quadVBO;
-	glGenVertexArrays(1, &quadVAO);
-	glGenBuffers(1, &quadVBO);
-	glBindVertexArray(quadVAO);
-	glBindBuffer(GL_ARRAY_BUFFER, quadVBO);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), &quadVertices, GL_STATIC_DRAW);
-	glEnableVertexAttribArray(0);
-	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);
-	glEnableVertexAttribArray(1);
-	glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
-	glBindVertexArray(0);
-	m_quadVAO = quadVAO;
-	m_quadVBO = quadVBO;
+void GLBloomApp::compileShader(const rhi::VertexLayout& cubeLayout, const rhi::VertexLayout& quadLayout) {
+	const auto shaderDir = join(StaticCollector::getGLShaderPath(), "Light", "Advanced", "Bloom");
+	{
+		auto shader = renderer()->createShader();
+		auto ok = shader->compile({ {rhi::ShaderStage::Vertex, join(shaderDir, "Light.vs"), "main", false},
+		                            {rhi::ShaderStage::Fragment, join(shaderDir, "Light.fs"), "main", false} });
+		ExitIfFailed(ok, "Create RHI shader failed: {}", shader->getLog());
+		m_lightProgram = renderer()->createPipeline(cubeLayout, shader);
+		m_lightProgram->setDepthTest(true);
+	}
+	{
+		auto shader = renderer()->createShader();
+		auto ok = shader->compile({ {rhi::ShaderStage::Vertex, join(shaderDir, "Bloom.vs"), "main", false},
+		                            {rhi::ShaderStage::Fragment, join(shaderDir, "Bloom.fs"), "main", false} });
+		ExitIfFailed(ok, "Create RHI shader failed: {}", shader->getLog());
+		m_bloomProgram = renderer()->createPipeline(cubeLayout, shader);
+		m_bloomProgram->setDepthTest(true);
+	}
+	{
+		auto shader = renderer()->createShader();
+		auto ok = shader->compile({ {rhi::ShaderStage::Vertex, join(shaderDir, "Blur.vs"), "main", false},
+		                            {rhi::ShaderStage::Fragment, join(shaderDir, "Blur.fs"), "main", false} });
+		ExitIfFailed(ok, "Create RHI shader failed: {}", shader->getLog());
+		m_blurProgram = renderer()->createPipeline(quadLayout, shader);
+		m_blurProgram->setPrimitiveType(rhi::PrimitiveType::TriangleStrip);
+	}
+	{
+		auto shader = renderer()->createShader();
+		auto ok = shader->compile({ {rhi::ShaderStage::Vertex, join(shaderDir, "Final.vs"), "main", false},
+		                            {rhi::ShaderStage::Fragment, join(shaderDir, "Final.fs"), "main", false} });
+		ExitIfFailed(ok, "Create RHI shader failed: {}", shader->getLog());
+		m_finalProgram = renderer()->createPipeline(quadLayout, shader);
+		m_finalProgram->setPrimitiveType(rhi::PrimitiveType::TriangleStrip);
+	}
 }
 
-static std::shared_ptr<GLImageTexture2D> CreateTexture(const std::string &imgname){
+void GLBloomApp::createTextures() {
 	const auto resDir = StaticCollector::getImagePath();
-	const auto imgFile = join(resDir, imgname);
-	auto texture = std::make_shared<GLImageTexture2D>(imgFile);
-	const auto valid = texture->load().texture()->valid();
-	ExitIfFailed(valid, "Failed to load texture from file {}", imgFile);
-	return texture;
+	{
+		const auto imgFile = join(resDir, "wood.png");
+		m_woodTexture = RhiImage::Load2D(renderer().get(), imgFile);
+		ExitIfFailed(m_woodTexture != nullptr, "Failed to load texture from file {}", imgFile);
+	}
+	{
+		const auto imgFile = join(resDir, "bricks2.jpg");
+		m_brickTexture = RhiImage::Load2D(renderer().get(), imgFile);
+		ExitIfFailed(m_brickTexture != nullptr, "Failed to load texture from file {}", imgFile);
+	}
 }
 
 static auto GetLightPosAndColor(){
 	std::vector<glm::vec3> lightPositions;
-    lightPositions.push_back(glm::vec3( 0.0f, 0.5f,  1.5f));
-    lightPositions.push_back(glm::vec3(-4.0f, 0.5f, -3.0f));
-    lightPositions.push_back(glm::vec3( 3.0f, 0.5f,  1.0f));
-    lightPositions.push_back(glm::vec3(-.8f,  2.4f, -1.0f));
-    // colors
-    std::vector<glm::vec3> lightColors;
-    lightColors.push_back(glm::vec3(5.0f,   5.0f,  5.0f));
-    lightColors.push_back(glm::vec3(10.0f,  0.0f,  0.0f));
-    lightColors.push_back(glm::vec3(0.0f,   0.0f,  15.0f));
-    lightColors.push_back(glm::vec3(0.0f,   5.0f,  0.0f));
-
+	lightPositions.push_back(glm::vec3( 0.0f, 0.5f,  1.5f));
+	lightPositions.push_back(glm::vec3(-4.0f, 0.5f, -3.0f));
+	lightPositions.push_back(glm::vec3( 3.0f, 0.5f,  1.0f));
+	lightPositions.push_back(glm::vec3(-.8f,  2.4f, -1.0f));
+	std::vector<glm::vec3> lightColors;
+	lightColors.push_back(glm::vec3(5.0f,   5.0f,  5.0f));
+	lightColors.push_back(glm::vec3(10.0f,  0.0f,  0.0f));
+	lightColors.push_back(glm::vec3(0.0f,   0.0f,  15.0f));
+	lightColors.push_back(glm::vec3(0.0f,   5.0f,  0.0f));
 	return std::pair(lightPositions, lightColors);
-}
-void GLBloomApp::createTextures(){
-	m_woodTexture = CreateTexture("wood.png");
-	m_brickTexture = CreateTexture("bricks2.jpg");
-}
-
-void GLBloomApp::compileShader(){
-	const auto shaderDir = join(StaticCollector::getGLShaderPath(), "Light", "Advanced", "Bloom");
-	{
-		const auto vfile = join(shaderDir, "Bloom.vs");
-		const auto ffile = join(shaderDir, "Bloom.fs");
-		auto ret = m_bloomProgram.init(vfile, ffile);
-		ErrorHandle::ExitIfFailed(ret, "Create OpenGL program failed!");
-	}
-
-	{
-		const auto vfile = join(shaderDir, "Light.vs");
-		const auto ffile = join(shaderDir, "Light.fs");
-		auto ret = m_lightProgram.init(vfile, ffile);
-		ErrorHandle::ExitIfFailed(ret, "Create OpenGL program failed!");
-	}
-
-	{
-		const auto vfile = join(shaderDir, "Blur.vs");
-		const auto ffile = join(shaderDir, "Blur.fs");
-		auto ret = m_blurProgram.init(vfile, ffile);
-		ErrorHandle::ExitIfFailed(ret, "Create OpenGL program failed!");
-	}
-
-	{
-		const auto vfile = join(shaderDir, "Final.vs");
-		const auto ffile = join(shaderDir, "Final.fs");
-		auto ret = m_finalProgram.init(vfile, ffile);
-		ErrorHandle::ExitIfFailed(ret, "Create OpenGL program failed!");
-	}
 }
 
 static auto GetCubePositions() {
@@ -216,123 +166,113 @@ static auto GetCubePositions() {
 	  glm::vec3(1.5f,  0.2f, -1.5f),
 	  glm::vec3(-1.3f,  1.0f, -1.5f)
 	};
-
 	return cubePositions;
 }
 
-void GLBloomApp::renderOneCube(GLProgram& program, const glm::mat4& model, const glm::mat4& projection, const glm::mat4& view){
-	program.use();
-	glBindVertexArray(m_cube->getVao());
-	program.update("model", model);
-	program.update("projection", projection);
-	program.update("view", view);
-	m_woodTexture->texture()->bind(0);
-	program.update("diffuseTexture", 0);
-	glDrawElements(GL_TRIANGLES, m_cube->idxSize(), GL_UNSIGNED_INT, 0);
-	glBindVertexArray(0);
+void GLBloomApp::renderOneCube(std::shared_ptr<rhi::IPipeline>& program, const glm::mat4& model, const glm::mat4& projection, const glm::mat4& view){
+	renderer()->setPipeline(program);
+	renderer()->setVertexBuffer(m_cubeVb);
+	renderer()->setVertexBuffer(m_cubeUv, 1);
+	renderer()->setVertexBuffer(m_cubeNormal, 2);
+	renderer()->setIndexBuffer(m_cubeEbo);
+	program->setUniform("model", glm::value_ptr(model), 1);
+	program->setUniform("projection", glm::value_ptr(projection), 1);
+	program->setUniform("view", glm::value_ptr(view), 1);
+	renderer()->bindTexture(m_woodTexture, 0);
+	program->setUniform("diffuseTexture", 0);
+	renderer()->drawIndexed(m_cubeIndexCount, 0, 0);
 }
 
-void GLBloomApp::renderCubes(GLProgram &program, const glm::mat4 &projection, const glm::mat4 &view, const glm::vec3 &viewPos) {
+void GLBloomApp::renderCubes(std::shared_ptr<rhi::IPipeline>& program, const glm::mat4 &projection, const glm::mat4 &view, const glm::vec3 &viewPos) {
 	auto cubePositions = GetCubePositions();
-	program.use();
-	program.update("viewPos", viewPos);
+	renderer()->setPipeline(program);
+	program->setUniform("viewPos", glm::value_ptr(viewPos), 1, 3);
 	for (const auto& pos : cubePositions) {
-		glm::mat4 model = glm::mat4(1.0f); // make sure to initialize matrix to identity matrix first	
+		glm::mat4 model = glm::mat4(1.0f);
 		model = glm::translate(model, pos);
 		model = glm::scale(model, glm::vec3(0.5f));
 		renderOneCube(program, model, projection, view);
 	}
 }
 
-void GLBloomApp::renderPlane(GLProgram &program, const glm::mat4 &projection, const glm::mat4 &view, const glm::vec3 &viewPos) {
-	glBindVertexArray(m_plane->getVao());
-	{
-		program.use();
-		program.update("viewPos", viewPos);
-		glm::mat4 model = glm::mat4(1.0f); // make sure to initialize matrix to identity matrix first
-		m_brickTexture->texture()->bind(0);
-		program.update("diffuseTexture", 0);
-		model = glm::translate(model, glm::vec3(0.0));
-		program.update("model", model);
-		program.update("view", view);
-		program.update("projection", projection);
-		glDrawArrays(GL_TRIANGLES, 0, 6);
-	}
+void GLBloomApp::renderPlane(std::shared_ptr<rhi::IPipeline>& program, const glm::mat4 &projection, const glm::mat4 &view, const glm::vec3 &viewPos) {
+	renderer()->setPipeline(program);
+	renderer()->setVertexBuffer(m_planeVb);
+	renderer()->setVertexBuffer(m_planeUv, 1);
+	renderer()->setVertexBuffer(m_planeNormal, 2);
+	program->setUniform("viewPos", glm::value_ptr(viewPos), 1, 3);
+	glm::mat4 model = glm::mat4(1.0f);
+	renderer()->bindTexture(m_brickTexture, 0);
+	program->setUniform("diffuseTexture", 0);
+	model = glm::translate(model, glm::vec3(0.0));
+	program->setUniform("model", glm::value_ptr(model), 1);
+	program->setUniform("view", glm::value_ptr(view), 1);
+	program->setUniform("projection", glm::value_ptr(projection), 1);
+	renderer()->draw(m_planeVertexCount, 0);
 }
 
-// ���ʵ��ĵط����ô˺���
 void GLBloomApp::extractBrightPart(const glm::mat4 &projection, const glm::mat4 &view) {
-	glBindFramebuffer(GL_FRAMEBUFFER, m_hdrFBO);
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	renderer()->setRenderTarget(m_hdrFBO);
+	renderer()->clearColor(0.0f, 0.0f, 0.0f, 1.0f);
 	renderLight(m_lightProgram, projection, view);
 	const auto viewPos = _camera.getAttr().pos;
 	const auto [lightPositions, lightColors] = GetLightPosAndColor();
-	m_bloomProgram.use();
+	renderer()->setPipeline(m_bloomProgram);
 	for (int i = 0; i < lightPositions.size(); i++) {
-		m_bloomProgram.update("lights[" + std::to_string(i) + "].Position", lightPositions[i]);
-		m_bloomProgram.update("lights[" + std::to_string(i) + "].Color", lightColors[i]);
+		m_bloomProgram->setUniform("lights[" + std::to_string(i) + "].Position",
+		                           glm::value_ptr(lightPositions[i]), 1, 3);
+		m_bloomProgram->setUniform("lights[" + std::to_string(i) + "].Color",
+		                           glm::value_ptr(lightColors[i]), 1, 3);
 	}
 	renderCubes(m_bloomProgram, projection, view, viewPos);
 	renderPlane(m_bloomProgram, projection, view, viewPos);
-	glBindFramebuffer(GL_FRAMEBUFFER, 0);
-	//saveFramebufferAsImage(m_hdrFBO, GetWindowWidth(), GetWindowHeight());
+	renderer()->setRenderTarget(nullptr);
 }
 
 void GLBloomApp::blurBrightPart() {
-	m_blurProgram.use();
-	m_blurProgram.update("image", 0);
 	bool horizontal = true, first_iteration = true;
-	for (unsigned int i = 0; i < 10; i++){
-		glBindFramebuffer(GL_FRAMEBUFFER, m_pingpongFBO[horizontal]);
-		m_blurProgram.update("horizontal", horizontal);
-		glBindTexture(GL_TEXTURE_2D, first_iteration ? m_colorBuffers[1] : m_pingpongColorbuffers[!horizontal]);  // bind texture of other framebuffer (or scene if first iteration)
+	for (unsigned int i = 0; i < 10; i++) {
+		renderer()->setRenderTarget(m_pingpongFBO[horizontal]);
+		renderer()->setPipeline(m_blurProgram);
+		renderer()->bindTexture(first_iteration ? m_hdrFBO->colorTexture2D(1)
+		                                        : m_pingpongFBO[!horizontal]->colorTexture2D(0), 0);
+		m_blurProgram->setUniform("image", 0);
+		m_blurProgram->setUniform("horizontal", horizontal);
 		renderQuad();
 		horizontal = !horizontal;
-		if (first_iteration){
-			first_iteration = false;
-		}
-		
-		//saveFramebufferAsImage(m_pingpongFBO[horizontal], GetWindowWidth(), GetWindowHeight());
+		first_iteration = false;
 	}
-    
-	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	renderer()->setRenderTarget(nullptr);
 }
 
 void GLBloomApp::renderFinal() {
-	bool bloom = true;
-	float exposure = 1.0f;
-	m_finalProgram.use();
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-	m_finalProgram.use();
-	m_finalProgram.update("scene", 0);
-	m_finalProgram.update("bloomBlur", 1);
-	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(GL_TEXTURE_2D, m_colorBuffers[0]);
-	glActiveTexture(GL_TEXTURE1);
-	glBindTexture(GL_TEXTURE_2D, m_pingpongColorbuffers[1]);
-	m_finalProgram.update("bloom", m_enableBloom);
-	m_finalProgram.update("exposure", m_expose);
+	renderer()->clearColor(0.0f, 0.0f, 0.0f, 1.0f);
+	renderer()->setPipeline(m_finalProgram);
+	renderer()->bindTexture(m_hdrFBO->colorTexture2D(0), 0);
+	m_finalProgram->setUniform("scene", 0);
+	renderer()->bindTexture(m_pingpongFBO[1]->colorTexture2D(0), 1);
+	m_finalProgram->setUniform("bloomBlur", 1);
+	m_finalProgram->setUniform("bloom", m_enableBloom);
+	m_finalProgram->setUniform("exposure", m_expose);
 	renderQuad();
 }
 
 void GLBloomApp::renderQuad() {
-	glBindVertexArray(m_quadVAO);
-    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-    glBindVertexArray(0);
+	renderer()->setVertexBuffer(m_quadVb);
+	renderer()->draw(m_quadVertexCount, 0);
 }
 
-void GLBloomApp::renderLight(GLProgram& program, const glm::mat4& projection, const glm::mat4& view) {
+void GLBloomApp::renderLight(std::shared_ptr<rhi::IPipeline>& program, const glm::mat4& projection, const glm::mat4& view) {
 	auto lightPosAndColor = GetLightPosAndColor();
 	const auto& lightPositions = lightPosAndColor.first;
 	const auto& lightColors = lightPosAndColor.second;
-	program.use();
+	renderer()->setPipeline(program);
 	for (int i = 0; i < lightPositions.size(); i++) {
-		glm::mat4 model = glm::mat4(1.0f); // make sure to initialize matrix to identity matrix first	
+		glm::mat4 model = glm::mat4(1.0f);
 		model = glm::translate(model, lightPositions[i]);
 		model = glm::scale(model, glm::vec3(0.25f));
-		program.update("lightColor", lightColors[i]);
+		program->setUniform("lightColor", glm::value_ptr(lightColors[i]), 1, 3);
 		renderOneCube(program, model, projection, view);
-		
 	}
 }
 
