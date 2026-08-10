@@ -46,4 +46,16 @@ Geometry Create(rhi::IRenderer* renderer, Shape& shape,
     return g;
 }
 
+Geometry CreateFromArray(rhi::IRenderer* renderer, const float* data, size_t byteSize,
+                         uint32_t vertexCount, const rhi::VertexLayout& layout) {
+    using namespace rhi;
+    Geometry g;
+    g.vertexCount = vertexCount;
+    auto vb = renderer->createBuffer();
+    vb->init(data, byteSize, BufferType::Vertex);
+    g.vertexBuffer = vb;
+    g.layout = layout;
+    return g;
+}
+
 } // namespace RhiGeometry

@@ -27,4 +27,10 @@ struct Layout {
 Geometry Create(rhi::IRenderer* renderer, Shape& shape,
                 bool useUv, bool useNormal, bool useIndex,
                 const Layout& layout = {});
+
+// 上传一个手写交错顶点数组到 RHI 缓冲（单 VBO，binding 0），并直接使用调用方提供的 VertexLayout。
+// 用于 NormalMap/ParallaxMap 等非 Shape 几何（pos/normal/uv/tangent/bitangent 交错，glDrawArrays）。
+// 不创建 uv/normal/index buffer；绘制用 vertexCount + renderer()->draw(vertexCount, 0)。
+Geometry CreateFromArray(rhi::IRenderer* renderer, const float* data, size_t byteSize,
+                         uint32_t vertexCount, const rhi::VertexLayout& layout);
 }
