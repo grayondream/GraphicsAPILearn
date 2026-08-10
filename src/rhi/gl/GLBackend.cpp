@@ -87,6 +87,9 @@ public:
     void bindTexture(const std::shared_ptr<ITexture3D>& texture, unsigned int unit) override {
         if (texture) texture->bind(unit);
     }
+    void bindTexture(rhi::ITexture2D* texture, unsigned int unit) override {
+        if (texture) texture->bind(unit);
+    }
     void draw(uint32_t vertexCount, uint32_t firstVertex) override {
         const GLenum mode = _pipeline ? ToGLPrimitive(_pipeline->primitiveType()) : GL_TRIANGLES;
         glDrawArrays(mode, firstVertex, vertexCount);
@@ -109,14 +112,18 @@ public:
         glDrawArraysInstanced(mode, firstVertex, vertexCount, instanceCount);
     }
     void blitFramebuffer(const std::shared_ptr<IRenderTarget>& src,
-                         const std::shared_ptr<IRenderTarget>& dst) override {
+                         const std::shared_ptr<IRenderTarget>& dst,
+                         BlitMask mask = static_cast<BlitMask>(static_cast<uint8_t>(BlitMask::Color) |
+                                                               static_cast<uint8_t>(BlitMask::Depth))) override {
         if (!src) return;
         glBindFramebuffer(GL_READ_FRAMEBUFFER,
                           static_cast<GLuint>(reinterpret_cast<uintptr_t>(src->handle())));
         glBindFramebuffer(GL_DRAW_FRAMEBUFFER,
                           dst ? static_cast<GLuint>(reinterpret_cast<uintptr_t>(dst->handle())) : 0);
-        glBlitFramebuffer(0, 0, _viewportW, _viewportH, 0, 0, _viewportW, _viewportH,
-                          GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT, GL_NEAREST);
+        GLbitfield bits = 0;
+        if (static_cast<uint8_t>(mask) & static_cast<uint8_t>(BlitMask::Color)) bits |= GL_COLOR_BUFFER_BIT;
+        if (static_cast<uint8_t>(mask) & static_cast<uint8_t>(BlitMask::Depth)) bits |= GL_DEPTH_BUFFER_BIT;
+        glBlitFramebuffer(0, 0, _viewportW, _viewportH, 0, 0, _viewportW, _viewportH, bits, GL_NEAREST);
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
     }
     BackendCapabilities backendCapabilities() override {

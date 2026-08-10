@@ -47,6 +47,7 @@ public:
     virtual void setRenderTarget(const std::shared_ptr<IRenderTarget>& target) = 0;  // 新增：null=默认 framebuffer
     virtual void bindTexture(const std::shared_ptr<ITexture2D>& texture, unsigned int unit = 0) = 0;
     virtual void bindTexture(const std::shared_ptr<ITexture3D>& texture, unsigned int unit = 0) = 0;          // 新增：cubemap
+    virtual void bindTexture(rhi::ITexture2D* texture, unsigned int unit = 0) = 0;     // 新增：raw 指针（RT 颜色纹理）
     virtual void draw(uint32_t vertexCount, uint32_t firstVertex = 0) = 0;
     virtual void drawIndexed(uint32_t indexCount, uint32_t indexOffset = 0, uint32_t vertexOffset = 0) = 0;
     virtual void drawIndexedInstanced(uint32_t indexCount, uint32_t instanceCount,
@@ -54,7 +55,9 @@ public:
     virtual void drawInstanced(uint32_t vertexCount, uint32_t instanceCount,
                                uint32_t firstVertex = 0) = 0;                                                // 新增
     virtual void blitFramebuffer(const std::shared_ptr<IRenderTarget>& src,
-                                 const std::shared_ptr<IRenderTarget>& dst) = 0;                              // 新增：MSAA resolve / 拷贝
+                                 const std::shared_ptr<IRenderTarget>& dst,
+                                 BlitMask mask = static_cast<BlitMask>(static_cast<uint8_t>(BlitMask::Color) |
+                                                                       static_cast<uint8_t>(BlitMask::Depth))) = 0;  // 新增：MSAA resolve / 拷贝
     virtual BackendCapabilities backendCapabilities() = 0;                                                    // 新增
 };
 

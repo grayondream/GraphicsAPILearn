@@ -47,6 +47,9 @@ enum class TextureFormat : uint8_t { RGB8, RGBA8, RGBA16F, RGB16F, RG16F, R32F, 
 enum class TextureWrap : uint8_t { Repeat, ClampToEdge, ClampToBorder };
 enum class TextureFilter : uint8_t { Linear, Nearest, LinearMipLinear };
 
+// blitFramebuffer 拷贝哪些缓冲位
+enum class BlitMask : uint8_t { None = 0, Color = 1, Depth = 2 };
+
 struct TextureDesc {
     TextureFormat format{TextureFormat::RGBA8};
     TextureWrap wrapS{TextureWrap::Repeat};
@@ -67,6 +70,10 @@ struct FramebufferAttachment {
     TextureFormat format{TextureFormat::RGBA8};
     bool external{false};        // true=由 App 提供纹理句柄，false=内部创建
     int samples{0};              // >0 时 MSAA
+    TextureFilter minFilter{TextureFilter::Linear};
+    TextureFilter magFilter{TextureFilter::Linear};
+    TextureWrap wrapS{TextureWrap::ClampToEdge};
+    TextureWrap wrapT{TextureWrap::ClampToEdge};
 };
 
 struct FramebufferDesc {
