@@ -1,6 +1,9 @@
 #pragma once
 #include "app/GL/Base/GLCameraBaseApp.hpp"
-#include "native/GL/GLProgram.hpp"
+#include "rhi/core/IPipeline.hpp"
+#include "rhi/core/IBuffer.hpp"
+#include "rhi/core/ITexture2D.hpp"
+#include "rhi/core/IShader.hpp"
 #include <memory>
 #include <array>
 #include "geometry/Camera.hpp"
@@ -8,7 +11,6 @@
 #include "geometry/Sphere.hpp"
 #include "geometry/Cube.hpp"
 
-class GLImageTexture2D;
 class GLNormalMapApp : public GLCameraBaseApp {
 public:
 	virtual ~GLNormalMapApp();
@@ -22,11 +24,11 @@ private:
 	void createTextures();
 
 private:
-	GLProgram _program;
-	float _curTime{};
-	unsigned int _vao{};
-	unsigned int _vbo{};
+	std::shared_ptr<rhi::IPipeline> _pipeline{};
+	std::shared_ptr<rhi::IShader> _shader{};
+	uint32_t _vertexCount{0};
+	std::shared_ptr<rhi::IBuffer> _vb{};
 	bool _enableNormalMap{};
-	std::shared_ptr<GLImageTexture2D> _brick{};
-	std::shared_ptr<GLImageTexture2D> _brickNormal{};
+	std::shared_ptr<rhi::ITexture2D> _brick{};
+	std::shared_ptr<rhi::ITexture2D> _brickNormal{};
 };
