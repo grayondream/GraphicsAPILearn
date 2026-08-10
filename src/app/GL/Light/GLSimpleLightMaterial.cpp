@@ -69,6 +69,22 @@ void GLSimpleLightMaterial::drawScene(const float dt) {
 		0.0f,
 		radius * cos(curTime)
 	);
+	//draw light source（仅 pos+color，用独立管线）
+	{
+		renderer()->setPipeline(_lightPipeline);
+		renderer()->setVertexBuffer(_vb);
+		glm::mat4 model = glm::mat4(1.0f);
+		model = glm::translate(model, lightPos);
+		model = glm::rotate(model, 0.f, glm::vec3(1.0f, 0.f, 0.f));
+		model = glm::scale(model, glm::vec3(0.2, 0.2, 0.2));
+		_lightPipeline->setUniform("projection", glm::value_ptr(projection), 1);
+		_lightPipeline->setUniform("view", glm::value_ptr(view), 1);
+		_lightPipeline->setUniform("lightColor", glm::value_ptr(_lightColor), 1, 4);
+		_lightPipeline->setUniform("model", glm::value_ptr(model), 1);
+		renderer()->setIndexBuffer(_ebo);
+		renderer()->drawIndexed(_indexCount, 0, 0);
+	}
+
 	//draw object（pos+color+normal，normal=2）
 	{
 		renderer()->setPipeline(_targetPipeline);
