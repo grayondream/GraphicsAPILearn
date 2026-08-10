@@ -1,6 +1,8 @@
 #pragma once
 #include "app/GL/Base/GLCameraBaseApp.hpp"
-#include "native/GL/GLProgram.hpp"
+#include "rhi/core/IPipeline.hpp"
+#include "rhi/core/IBuffer.hpp"
+#include "rhi/core/ITexture2D.hpp"
 #include <memory>
 #include <array>
 #include "geometry/Camera.hpp"
@@ -8,7 +10,6 @@
 #include "geometry/Sphere.hpp"
 #include "geometry/Cube.hpp"
 
-class GLImageTexture2D;
 class GLLightSourceSpot : public GLCameraBaseApp {
 public:
 	virtual ~GLLightSourceSpot();
@@ -16,19 +17,17 @@ public:
 protected:
 	virtual bool initApp() override;
 	virtual void drawScene(const float dt);
-	
-private:
-	void createVertexBuffer();
 
 private:
 	Cube _object{};
-	GLProgram _targetProgram{};
-	GLProgram _lightProgram{};
-	unsigned int _vbo[3]{};
-	unsigned int _vao{};
-	unsigned int _ebo{};
-	float _curTime{};
+	std::shared_ptr<rhi::IPipeline> _targetPipeline{};
+	std::shared_ptr<rhi::IPipeline> _lightPipeline{};
+	std::shared_ptr<rhi::IBuffer> _vb{};
+	std::shared_ptr<rhi::IBuffer> _uv{};
+	std::shared_ptr<rhi::IBuffer> _normal{};
+	std::shared_ptr<rhi::IBuffer> _ebo{};
+	std::shared_ptr<rhi::ITexture2D> _diffuseTex{};
+	std::shared_ptr<rhi::ITexture2D> _specularTex{};
+	uint32_t _indexCount{0};
 	glm::vec4 _lightColor{1.0, 1.0, 1.0, 1.0};
-	std::shared_ptr<GLImageTexture2D> _objTex{};
-	std::shared_ptr<GLImageTexture2D> _objBorderTex{};
 };

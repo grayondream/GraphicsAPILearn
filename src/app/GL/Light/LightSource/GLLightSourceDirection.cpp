@@ -1,201 +1,171 @@
 #include "GLLightSourceDirection.hpp"
-#include "native/GL/GLProgram.hpp"
 #include "base/StaticCollector.hpp"
 #include "base/ErrorHandle.hpp"
-#include "glad/glad.h"
-#include "native/GL/GLImageTexture2D.hpp"
+#include "rhi/core/IShader.hpp"
+#include "rhi/core/IPipeline.hpp"
+#include "app/GL/RhiGeometry.hpp"
+#include "app/GL/RhiImage.hpp"
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
-#include "base/Log.hpp"
 #include "imgui.h"
 #include <utils/FileUtils.hpp>
 using FileUtils::join;
 using namespace ErrorHandle;
 
 GLLightSourceDirection::~GLLightSourceDirection() {
-	if (_vao != 0) {
-		glDeleteVertexArrays(1, &_vao);
-		glDeleteBuffers(2, _vbo);
-		glDeleteBuffers(1, &_ebo);
-	}
-
-	_lightProgram.destroy();
-	_targetProgram.destroy();
 }
 
 bool GLLightSourceDirection::initApp() {
 	if (!GLCameraBaseApp::initApp()) {
 		return false;
 	}
-	
+
 	const auto shaderDir = join(StaticCollector::getGLShaderPath(), "Light");
 	{
+		auto shader = renderer()->createShader();
 		const auto vfile = join(shaderDir, "LightSource", "Direction", "Light.vert");
 		const auto ffile = join(shaderDir, "LightSource", "Direction", "Light.frag");
-		auto ret = _lightProgram.init(vfile, ffile);
-		ErrorHandle::ExitIfFailed(ret, "Create OpenGL program failed!");
+		auto ok = shader->compile({ {rhi::ShaderStage::Vertex, vfile, "main", false},
+		                            {rhi::ShaderStage::Fragment, ffile, "main", false} });
+		ExitIfFailed(ok, "Create RHI shader failed: {}", shader->getLog());
+		auto geo = RhiGeometry::Create(renderer().get(), _object, false, false, true);
+		_lightPipeline = renderer()->createPipeline(geo.layout, shader);
 	}
 
 	{
+		auto shader = renderer()->createShader();
 		const auto vfile = join(shaderDir, "LightSource", "Direction", "Object.vert");
 		const auto ffile = join(shaderDir, "LightSource", "Direction", "Object.frag");
-		auto ret = _targetProgram.init(vfile, ffile);
-		ErrorHandle::ExitIfFailed(ret, "Create OpenGL program failed!");
+		auto ok = shader->compile({ {rhi::ShaderStage::Vertex, vfile, "main", false},
+		                            {rhi::ShaderStage::Fragment, ffile, "main", false} });
+		ExitIfFailed(ok, "Create RHI shader failed: {}", shader->getLog());
+
+		auto geo = RhiGeometry::Create(renderer().get(), _object, true, true, true, {.uvLocation = 3, .normalLocation = 2});
+		_vb = geo.vertexBuffer;
+		_uv = geo.uvBuffer;
+		_normal = geo.normalBuffer;
+		_ebo = geo.indexBuffer;
+		_indexCount = geo.indexCount;
+		_targetPipeline = renderer()->createPipeline(geo.layout, shader);
+		_targetPipeline->setDepthTest(true);
 	}
-	
+
 	{
 		const auto objImg = join(StaticCollector::getImagePath(), "container2.jpg");
-		_objTex = std::make_shared<GLImageTexture2D>(objImg);
-		const auto valid = _objTex->load().texture()->valid();
-		ExitIfFailed(valid, "Failed to load texture from file {}", objImg);
+		_diffuseTex = RhiImage::Load2D(renderer().get(), objImg);
+		ExitIfFailed(_diffuseTex != nullptr, "Failed to load texture from file {}", objImg);
 	}
 
 	{
 		const auto objImg = join(StaticCollector::getImagePath(), "container2_specular.jpg");
-		_objBorderTex = std::make_shared<GLImageTexture2D>(objImg);
-		const auto valid = _objBorderTex->load().texture()->valid();
-		ExitIfFailed(valid, "Failed to load texture from file {}", objImg);
+		_specularTex = RhiImage::Load2D(renderer().get(), objImg);
+		ExitIfFailed(_specularTex != nullptr, "Failed to load texture from file {}", objImg);
 	}
 
-	createVertexBuffer();
-	glEnable(GL_DEPTH_TEST);
-	//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 	return true;
-}
-
-void GLLightSourceDirection::createVertexBuffer() {
-	unsigned int vbo[3]{}, vao{}, ebo{};
-	glGenVertexArrays(1, &vao);
-	glGenBuffers(3, vbo);
-	glGenBuffers(1, &ebo);
-
-	glBindVertexArray(vao);
-	{
-		glBindBuffer(GL_ARRAY_BUFFER, vbo[0]);
-		glBufferData(GL_ARRAY_BUFFER, _object.byteSize(), _object.toGL().data(), GL_STATIC_DRAW);
-		glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex), nullptr);
-		glEnableVertexAttribArray(0);
-
-		glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)(sizeof(float) * 4));
-		glEnableVertexAttribArray(1);
-
-		// �󶨵ڶ��� VBO�����ö��㷨��
-		glBindBuffer(GL_ARRAY_BUFFER, vbo[1]);
-		glBufferData(GL_ARRAY_BUFFER, _object.normalSize(), _object.normal(), GL_STATIC_DRAW);
-		glVertexAttribPointer(2, 4, GL_FLOAT, GL_FALSE, sizeof(Vector4DBase<float>), nullptr);
-		glEnableVertexAttribArray(2); // ����
-
-		glBindBuffer(GL_ARRAY_BUFFER, vbo[2]);
-		glBufferData(GL_ARRAY_BUFFER, _object.uvSize(), _object.uv(), GL_STATIC_DRAW);
-		glVertexAttribPointer(3, 2, GL_FLOAT, GL_FALSE, sizeof(Vector2DBase<float>), nullptr);
-		glEnableVertexAttribArray(3);
-
-		// ������������
-		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
-		glBufferData(GL_ELEMENT_ARRAY_BUFFER, _object.idxByteSize(), _object.idx(), GL_STATIC_DRAW);
-	}
-	glBindVertexArray(0);
-
-	// ��¼ VBO �� EBO
-	_vao = vao;
-	_vbo[0] = vbo[0], _vbo[1] = vbo[1], _vbo[2] = vbo[2];
-	_ebo = ebo;
 }
 
 void GLLightSourceDirection::drawScene(const float dt) {
 	GLApp::drawScene(dt);
-	glBindVertexArray(_vao);
 	ImGui::Begin("OpenGL");
 	ImGui::Text("Color Picker with Alpha:");
-	ImGui::ColorEdit4("Color with Alpha", &_lightColor[0]); // ֧�� RGBA
-
-	static int count{ 1 };
+	ImGui::ColorEdit4("Color with Alpha", &_lightColor[0]);
 	ImGui::SetNextItemWidth(200);
+	static int count{ 1 };
 	int cnt = 125;
 	ImGui::SliderInt("Cube Count", &count, 1, cnt);
 	ImGui::End();
-	std::vector<glm::vec3> cubePositions;
-	cubePositions.reserve(cnt);
-	int gridSize = 5; // 5x5x5 = 125
-	float spacing = 2.0f;
-	glm::vec3 center(0.0f, 0.0f, 0.0f);
-
-	for (int i = 0; i < gridSize; i++) {
-		for (int j = 0; j < gridSize; j++) {
-			for (int k = 0; k < gridSize; k++) {
-				glm::vec3 position(
-					center.x + (i - gridSize / 2) * spacing,
-					center.y + (j - gridSize / 2) * spacing,
-					center.z + (k - gridSize / 2) * spacing - 10
-				);
-				cubePositions.push_back(position);
-			}
-		}
-	}
 
 	static float curTime = 0;
 	curTime += dt;
 	const auto projection = glm::perspective(glm::radians(_camera.zoom()), aspectRatio(), 0.1f, 100.0f);
-	
 	const auto view = _camera.getViewMatrix();
-	
-	float radius = 5.0f; // 旋转半径
+
+	float radius = 5.0f;
 	glm::vec3 lightPos = glm::vec3(
 		radius * sin(curTime),
 		0.0f,
 		radius * cos(curTime)
 	);
-	//draw light source
+
+	//draw light source（仅 pos+color，用独立管线）
 	{
-		glm::mat4 model = glm::mat4(1.0f); // make sure to initialize matrix to identity matrix first
+		renderer()->setPipeline(_lightPipeline);
+		renderer()->setVertexBuffer(_vb);
+		glm::mat4 model = glm::mat4(1.0f);
 		model = glm::translate(model, lightPos);
 		model = glm::rotate(model, 0.f, glm::vec3(1.0f, 0.f, 0.f));
 		model = glm::scale(model, glm::vec3(0.2, 0.2, 0.2));
-
-		_lightProgram.use();
-		_lightProgram.update("projection", projection);
-		_lightProgram.update("view", view);
-		_lightProgram.update("lightColor", _lightColor);
-		_lightProgram.update("model", model);
-		glDrawElements(GL_TRIANGLES, _object.idxSize(), GL_UNSIGNED_INT, 0);
+		_lightPipeline->setUniform("projection", glm::value_ptr(projection), 1);
+		_lightPipeline->setUniform("view", glm::value_ptr(view), 1);
+		_lightPipeline->setUniform("lightColor", glm::value_ptr(_lightColor), 1, 4);
+		_lightPipeline->setUniform("model", glm::value_ptr(model), 1);
+		renderer()->setIndexBuffer(_ebo);
+		renderer()->drawIndexed(_indexCount, 0, 0);
 	}
 
-	//draw object
+	//draw object（pos+color+normal+uv，normal=2/uv=3，双纹理，多实例）
 	{
-		{
-			_targetProgram.use();
-			_targetProgram.update("projection", projection);
-			_targetProgram.update("view", view);
-			_targetProgram.update("lightColor", _lightColor);
-			_targetProgram.update("objectColor", glm::vec4(1.0f, 0.5f, 0.31f, 1.0));
-			_targetProgram.update("light.direction", glm::vec4(-0.2f, -1.0f, -0.3f, 1.0f));
-			const auto camPos = _camera.getAttr().pos;
-			_targetProgram.update("viewPos", glm::vec4(camPos.x, camPos.y, camPos.z, 1.0));
-			_targetProgram.update("material.shininess", 1);
+		renderer()->setPipeline(_targetPipeline);
+		renderer()->setVertexBuffer(_vb);
+		renderer()->setVertexBuffer(_uv, 1);
+		renderer()->setVertexBuffer(_normal, 2);
 
-			_objTex->texture()->bind(0);
-			_targetProgram.update("material.diffuse", 0);
-			_objBorderTex->texture()->bind(1);
-			_targetProgram.update("material.specular", 1);
+		_targetPipeline->setUniform("projection", glm::value_ptr(projection), 1);
+		_targetPipeline->setUniform("view", glm::value_ptr(view), 1);
+		_targetPipeline->setUniform("lightColor", glm::value_ptr(_lightColor), 1, 4);
 
-			glm::vec4 diffuseColor = glm::vec4(0.5); // 降低影响
-			glm::vec4 ambientColor = glm::vec4(0.2f);
-			_targetProgram.update("light.ambient", ambientColor);
-			_targetProgram.update("light.diffuse", diffuseColor);
-			_targetProgram.update("light.specular", glm::vec4(1.0f));
+		glm::vec4 objectColor(1.0f, 0.5f, 0.31f, 1.0f);
+		_targetPipeline->setUniform("objectColor", glm::value_ptr(objectColor), 1, 4);
+
+		glm::vec4 lightDir(-0.2f, -1.0f, -0.3f, 1.0f);
+		_targetPipeline->setUniform("light.direction", glm::value_ptr(lightDir), 1, 4);
+
+		const auto camPos = _camera.getAttr().pos;
+		glm::vec4 viewPos(camPos.x, camPos.y, camPos.z, 1.0f);
+		_targetPipeline->setUniform("viewPos", glm::value_ptr(viewPos), 1, 4);
+
+		_targetPipeline->setUniform("material.shininess", 1);
+
+		renderer()->bindTexture(_diffuseTex, 0);
+		_targetPipeline->setUniform("material.diffuse", 0);
+		renderer()->bindTexture(_specularTex, 1);
+		_targetPipeline->setUniform("material.specular", 1);
+
+		glm::vec4 ambientColor(0.2f);
+		glm::vec4 diffuseColor(0.5f);
+		glm::vec4 specularColor(1.0f);
+		_targetPipeline->setUniform("light.ambient", glm::value_ptr(ambientColor), 1, 4);
+		_targetPipeline->setUniform("light.diffuse", glm::value_ptr(diffuseColor), 1, 4);
+		_targetPipeline->setUniform("light.specular", glm::value_ptr(specularColor), 1, 4);
+
+		std::vector<glm::vec3> cubePositions;
+		cubePositions.reserve(cnt);
+		int gridSize = 5;
+		float spacing = 2.0f;
+		glm::vec3 center(0.0f, 0.0f, 0.0f);
+		for (int i = 0; i < gridSize; i++) {
+			for (int j = 0; j < gridSize; j++) {
+				for (int k = 0; k < gridSize; k++) {
+					glm::vec3 position(
+						center.x + (i - gridSize / 2) * spacing,
+						center.y + (j - gridSize / 2) * spacing,
+						center.z + (k - gridSize / 2) * spacing - 10
+					);
+					cubePositions.push_back(position);
+				}
+			}
 		}
 
+		renderer()->setIndexBuffer(_ebo);
 		for (int i = 0; i < count; i++) {
-			glm::mat4 model = glm::mat4(1.0f); // make sure to initialize matrix to identity matrix first
+			glm::mat4 model = glm::mat4(1.0f);
 			model = glm::translate(model, cubePositions[i]);
-			float angle =  20.0f * curTime;
+			float angle = 20.0f * curTime;
 			model = glm::rotate(model, glm::radians(angle), glm::vec3(1.0f, 0.3f, 0.5f));
-			_targetProgram.update("model", model);
-
-			glDrawElements(GL_TRIANGLES, _object.idxSize(), GL_UNSIGNED_INT, 0);
+			_targetPipeline->setUniform("model", glm::value_ptr(model), 1);
+			renderer()->drawIndexed(_indexCount, 0, 0);
 		}
 	}
-
-	glBindVertexArray(0);
 }
