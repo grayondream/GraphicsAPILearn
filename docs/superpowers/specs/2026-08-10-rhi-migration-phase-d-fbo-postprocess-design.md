@@ -31,6 +31,12 @@ Defer 需把 GBuffer 的深度缓冲**仅拷贝**到默认 framebuffer（`glBlit
 - GL 后端按 mask 拼接 `GL_COLOR_BUFFER_BIT` / `GL_DEPTH_BUFFER_BIT`。
 - 语义明确，Vulkan 后端可对应映射。已有调用（若有）无需改动。
 
+### 2.2b RHI 扩展 A2：`bindTexture` 支持 raw 指针重载（后处理采样必需）
+
+`IRenderTarget::colorTexture2D(attachment)` 返回 **raw `ITexture2D*`**（其所有权在 render target 内部，用 `std::unique_ptr<GLTexture2D>` 持有），而 `IRenderer::bindTexture` 现只接受 `shared_ptr<ITexture2D>`。三个 App 后处理阶段都需要把 FBO 的颜色纹理采样给全屏 quad shader（Hdr 的 hdrBuffer、Bloom 的 scene/bloomBlur、Defer 的 gPosition/gNormal/gAlbedoSpec），无法直接绑定 raw 指针。
+
+**方案**：给 `IRenderer` 增加 raw 指针重载 `bindTexture(rhi::ITexture2D*, unsigned int unit = 0)`（与 `ITexture3D*` 同理）。GL 后端实现即 `if (tex) tex->bind(unit)`（与 shared_ptr 版一致，GLBackend 内部都调用 `texture->bind(unit)`）。这样 App 直接 `renderer()->bindTexture(fbo->colorTexture2D(0), 0)`。不改现有 shared_ptr 版，向后兼容。
+
 ### 2.2 RHI 扩展 B：`FramebufferAttachment` 增加采样参数（Bloom/Defer 必需）
 
 - Bloom 的 2 个颜色纹理必须 `ClampToEdge`（blur 越界否则错误重复采样）+ Linear。
@@ -91,7 +97,7 @@ Defer 需把 GBuffer 的深度缓冲**仅拷贝**到默认 framebuffer（`glBlit
 
 | 任务 | 内容 | 提交 | 验证 |
 |---|---|---|---|
-| T1 | RHI 扩展：BlitMask 枚举 + blitFramebuffer 掩码 + FramebufferAttachment filter/wrap + GL 后端实现 | feat(rhi) | build + 46/46 |
+| T1 | RHI 扩展：BlitMask 枚举 + blitFramebuffer 掩码 + FramebufferAttachment filter/wrap + bindTexture raw 指针重载 + GL 后端实现 | feat(rhi) | build + 46/46 |
 | T2 | Hdr 迁移 | refactor(app) | build + 46/46 + Hdr 单跑 |
 | T3 | Bloom 迁移 | refactor(app) | build + 46/46 + Bloom 单跑 |
 | T4 | Defer 迁移 | refactor(app) | build + 46/46 + Defer 单跑 |
