@@ -1,44 +1,27 @@
-#pragma once
+#ifndef GL_PBR_TEXTURE_APP_HPP
+#define GL_PBR_TEXTURE_APP_HPP
 
-#include "app/GL/Base/GLCameraApp.hpp"
-#include "native/GL/GLProgram.hpp"
-#include "native/GL/GLSphere.hpp" 
-#include "native/GL/GLCube.hpp"
-#include <glm/glm.hpp>
-#include <vector>
+#include "GLPBRBaseApp.hpp"
+#include "rhi/core/IRenderer.hpp"
+#include <memory>
 
-// PBR基础应用类，提供PBR渲染的核心功能
-class GLPBRTextureApp : public GLCameraBaseApp {
+class GLPBRTextureApp : public GLPBRBaseApp {
 public:
-    // 构造函数和析构函数
-    GLPBRTextureApp() = default;
-    virtual ~GLPBRTextureApp() override;
-    
+    virtual ~GLPBRTextureApp();
+
 public:
-    // 初始化应用
     virtual bool initApp() override;
-       
-    // 重写绘制场景函数
     virtual void drawScene(const float dt) override;
-    
+
 private:
-    void initShapes();
     void loadTexture();
-    void compileShader();
-    void renderSphere(GLProgram& program, const glm::mat4& model);
 
-protected:
-    // PBR着色器程序
-    GLProgram m_program;
-    
-    // 球体几何体（用于渲染PBR物体和光源）
-    GLSphere m_sphere;
-    
-    std::shared_ptr<GLImageTexture2D> m_albedoMap;
-    std::shared_ptr<GLImageTexture2D> m_roughnessMap;
-    std::shared_ptr<GLImageTexture2D> m_metallicMap;
-    std::shared_ptr<GLImageTexture2D> m_aoMap;
-    std::shared_ptr<GLImageTexture2D> m_normalMap;
-
+private:
+    std::shared_ptr<rhi::ITexture2D> m_albedoMap{};
+    std::shared_ptr<rhi::ITexture2D> m_roughnessMap{};
+    std::shared_ptr<rhi::ITexture2D> m_metallicMap{};
+    std::shared_ptr<rhi::ITexture2D> m_aoMap{};
+    std::shared_ptr<rhi::ITexture2D> m_normalMap{};
 };
 
+#endif

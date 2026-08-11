@@ -25,7 +25,7 @@ void GLPBRBaseApp::initShapes() {
     _sphereIndexCount = m_sphere.indexCount;
 }
 
-static auto GetLightPosAndColor() {
+std::pair<std::vector<glm::vec3>, std::vector<glm::vec3>> GLPBRBaseApp::GetLightPosAndColor() {
     std::vector<glm::vec3> lightPositions = {
         glm::vec3(-10.0f,  10.0f, 10.0f),
         glm::vec3( 10.0f,  10.0f, 10.0f),
@@ -58,7 +58,7 @@ void GLPBRBaseApp::compileShader(const rhi::VertexLayout& layout) {
     m_program->setDepthTest(true);
 }
 
-static std::vector<glm::vec3> GenreateObjPos(int radius = 5, float gap = 0.5f, const glm::vec3 &center = glm::vec3(0.0f)) {
+std::vector<glm::vec3> GLPBRBaseApp::GenreateObjPos(int radius, float gap, const glm::vec3& center) {
     std::vector<glm::vec3> positions;
     if (radius < 0) return positions;
     for (int row = -radius; row <= radius; ++row) {

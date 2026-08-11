@@ -23,6 +23,8 @@ private:
 
 protected:
     void renderSphere(const std::shared_ptr<rhi::IPipeline>& program, const glm::mat4& model);
+    static std::pair<std::vector<glm::vec3>, std::vector<glm::vec3>> GetLightPosAndColor();
+    static std::vector<glm::vec3> GenreateObjPos(int radius = 5, float gap = 0.5f, const glm::vec3& center = glm::vec3(0.0f));
 
 protected:
     std::shared_ptr<rhi::IPipeline> m_program;
