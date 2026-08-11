@@ -1,60 +1,49 @@
-#pragma once
+#ifndef GL_IBL_IRRADIANCE_CONVERSION_APP_HPP
+#define GL_IBL_IRRADIANCE_CONVERSION_APP_HPP
 
 #include "app/GL/Base/GLCameraApp.hpp"
-#include "native/GL/GLProgram.hpp"
-#include "native/GL/GLSphere.hpp" 
-#include "native/GL/GLCube.hpp"
+#include "rhi/core/IRenderer.hpp"
+#include "app/GL/RhiGeometry.hpp"
 #include <glm/glm.hpp>
 #include <vector>
+#include <memory>
 
-// PBR基础应用类，提供PBR渲染的核心功能
 class GLIBLIrradianceConversionApp : public GLCameraBaseApp {
 public:
-    // 构造函数和析构函数
-    GLIBLIrradianceConversionApp() = default;
-    virtual ~GLIBLIrradianceConversionApp() override;
-    
+    virtual ~GLIBLIrradianceConversionApp();
+
 public:
-    // 初始化应用
     virtual bool initApp() override;
-       
-    // 重写绘制场景函数
     virtual void drawScene(const float dt) override;
-    
+
 private:
     void initShapes();
-    void loadTexture();
-    void compileShader();
+    void compileShader(const rhi::VertexLayout& cubeLayout);
     void initFramebuffer();
     void initCaptureViews();
-    void renderBeforeLoop() override;
-
+    void loadTexture();
     void renderToCubemap();
+    void renderBeforeLoop();
+    void renderCube(const std::shared_ptr<rhi::IPipeline>& program, const glm::mat4& model);
+    void renderSphere(const std::shared_ptr<rhi::IPipeline>& program, const glm::mat4& model);
+    void renderBackground(const std::shared_ptr<rhi::IPipeline>& program, const glm::mat4& view, const glm::mat4& projection);
+    void renderObjectsAndLights(const std::shared_ptr<rhi::IPipeline>& program, const glm::mat4& view, const glm::mat4& projection);
 
-    void renderCube(GLProgram& program, const glm::mat4& model);
-    void renderSphere(GLProgram& program, const glm::mat4& model);
-
-    void renderObjectsAndLights(GLProgram& program, const glm::mat4& view, const glm::mat4& projection);
-    void renderBackground(GLProgram& program, const glm::mat4& view, const glm::mat4& projection);
-
-protected:
-    // PBR着色器程序
-    GLProgram m_cubeMapProgram;
-    GLProgram m_program;
-    GLProgram m_backgroundProgram;
-    
-    GLSphere m_sphere;
-    GLCube m_cube;
-
-    // PBR材质参数
-    float m_roughness = 0.5f;   // 粗糙度
-    float m_metallic = 0.0f;    // 金属度
-    glm::vec3 m_albedo = glm::vec3(0.5f, 0.5f, 0.5f); // 反照率
-    float m_ao = 1.0f;          // 环境光遮蔽
-    std::shared_ptr<GLImageTexture2D> m_hdrEnvTexture;
-
-    unsigned int m_captureFBO = 0;
-    unsigned int m_captureRBO = 0;
-    unsigned int m_envCubemap = 0;
+private:
+    RhiGeometry::Geometry m_cube;
+    RhiGeometry::Geometry m_sphere;
+    std::shared_ptr<rhi::IPipeline> m_program{};
+    std::shared_ptr<rhi::IPipeline> m_cubeMapProgram{};
+    std::shared_ptr<rhi::IPipeline> m_backgroundProgram{};
+    std::shared_ptr<rhi::ITexture2D> m_hdrEnvTexture{};
+    std::shared_ptr<rhi::ITexture3D> m_envCubemap{};
+    std::shared_ptr<rhi::IRenderTarget> m_captureRT{};
+    float m_roughness = 0.5f;
+    float m_metallic = 0.0f;
+    glm::vec3 m_albedo = glm::vec3(0.5f, 0.5f, 0.5f);
+    float m_ao = 1.0f;
+    std::vector<glm::vec3> m_lightPositions;
+    std::vector<glm::vec3> m_lightColors;
 };
 
+#endif
