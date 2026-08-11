@@ -33,6 +33,7 @@ public:
         LOGI("OpenGL Vendor: {}", (char*)glGetString(GL_VENDOR));
         LOGI("OpenGL Renderer: {}", (char*)glGetString(GL_RENDERER));
         LOGI("OpenGL Version: {}", (char*)glGetString(GL_VERSION));
+        glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
         return true;
     }
 

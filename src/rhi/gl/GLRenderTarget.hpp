@@ -12,7 +12,7 @@ public:
     ~GLRenderTarget();
     bool create(int width, int height) override;
     bool create(const FramebufferDesc& desc) override;
-    bool attachCubeFace(ITexture3D* cube, int face) override;
+    bool attachCubeFace(ITexture3D* cube, int face, int mip) override;
     bool bind() override;
     bool unbind() override;
     void* colorTexture() override;

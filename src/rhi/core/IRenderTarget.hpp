@@ -12,7 +12,7 @@ public:
     virtual ~IRenderTarget() = default;
     virtual bool create(int width, int height) = 0;                          // 保留（旧，默认 RGBA8 + Depth24Stencil8 RBO）
     virtual bool create(const FramebufferDesc& desc) = 0;                    // 新增：多 attachment + samples
-    virtual bool attachCubeFace(ITexture3D* cube, int face) = 0;             // 新增：IBL 动态挂接
+    virtual bool attachCubeFace(ITexture3D* cube, int face, int mip = 0) = 0; // 新增：IBL 动态挂接
     virtual bool bind() = 0;
     virtual bool unbind() = 0;
     virtual void* colorTexture() = 0;                                        // 保留（旧，返回句柄）
