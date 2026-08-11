@@ -124,7 +124,6 @@ bool GLRenderTarget::attachCubeFace(ITexture3D* cube, int face, int mip) {
                            GL_TEXTURE_CUBE_MAP_POSITIVE_X + face,
                            static_cast<GLuint>(reinterpret_cast<uintptr_t>(cube->handle())), mip);
     glDrawBuffer(GL_COLOR_ATTACHMENT0);
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
     return true;
 }
 

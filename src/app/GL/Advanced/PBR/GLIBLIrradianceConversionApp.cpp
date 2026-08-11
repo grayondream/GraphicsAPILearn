@@ -34,7 +34,6 @@ bool GLIBLIrradianceConversionApp::initApp() {
     loadTexture();
     initFramebuffer();
     initCaptureViews();
-    renderBeforeLoop();
     return true;
 }
 

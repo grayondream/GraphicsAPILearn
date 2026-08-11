@@ -54,7 +54,6 @@ bool GLIBLSpecularApp::initApp() {
     loadTexture();
     initFramebuffer();
     initCaptureViews();
-    renderBeforeLoop();
     return true;
 }
 
