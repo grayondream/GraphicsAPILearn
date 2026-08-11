@@ -60,7 +60,7 @@ inline GLenum ToGLFormat(TextureFormat f, int channels) {
 }
 ```
 
-这是修正（原 `channels!=4→GL_RGB` 对 R32F 是 GL_RED 语义、对 RG16F 是 GL_RG 语义）。影响面：Defer GBuffer 若有 R32F 附件会改路径；BRDF LUT（RG16F）从 GL_RGB→GL_RG 修正采样语义。T1 完成需回归后处理 + PBR/IBL App。
+这是修正（原 `channels!=4→GL_RGB` 对 R32F 是 GL_RED 语义、对 RG16F 是 GL_RG 语义）。影响面：已确认 Hdr/Bloom/Defer/GBuffer 均用 RGBA16F/RGBA8/Depth24Stencil8，无 R32F/RG16F 颜色附件——Defer 不受影响；BRDF LUT（RG16F）从 GL_RGB→GL_RG 修正采样语义。T1 完成需回归后处理 + PBR/IBL App。
 
 ### 3.2 T2：深度 cubemap attach
 
@@ -114,7 +114,7 @@ bool GLRenderTarget::attachDepthCube(ITexture3D* cube, int mip) {
 - `renderScene`：多 model 矩阵（平面 + 3 个缩放立方 + light 立方）+ 每立方 `type` uniform 切换；`renderCube/renderPlane` 严格渲染序。
 - ImGui：5 checkbox（Debug/DepthMap/Bias/CullFace/SimplePCF）。
 - `renderScene2FrameBuffer`：viewport→ShadowMap 尺寸、绑深度 FBO、清 depth、可 `cullFace(Front)`（`_enableCullFace`）、renderScene、恢复。
-- CullFace：需确认 RHI 有无 `setCullFace` 等效接口（参照已迁 App），缺失则补。
+- CullFace：RHI `IPipeline` 已有 `setCullFaceEnable(bool)`/`setCullFace(CullFace)`，直接使用即可。
 
 ### 4.4 T5 GLPointLightShadowApp（点光源 + 深度 cubemap + GS）
 
@@ -139,9 +139,9 @@ bool GLRenderTarget::attachDepthCube(ITexture3D* cube, int mip) {
 ## 5. 风险与对策
 
 1. **深度附件 filter/wrap/border 改动影响既有后处理（Hdr/Bloom/Defer）与 PBR/IBL**：T1 改完即全量回归 + 3 后处理 App + BRDF LUT App 单跑冒烟。
-2. **ToGLFormat R32F→GL_RED 改 Defer GBuffer、RG16F→GL_RG 改 BRDF LUT 采样**：验证同 1；视觉无法自动比对，靠无 GL error + run OK + 评审推理（沿用披露盲区）。
+2. **ToGLFormat R32F→GL_RED（SSAO 红缓冲）、RG16F→GL_RG（BRDF LUT）**：已确认既有颜色附件无 R32F/RG16F 冲突（Defer/Hdr/Bloom 均 RGBA16F/RGBA8）；BRDF LUT 采样语义修正。验证同 1；视觉无法自动比对，靠无 GL error + run OK + 评审推理（沿用披露盲区）。
 3. **PointLightShadow GS + 深度 cubemap 分层**：验证 `gl_Layer` 写入与 attachDepthCube 状态。
-4. **CullFace 接口**：实现时确认 RHI 有无；缺失则补对应状态接口（或 checklist 记录待 Vulkan）。
+4. **CullFace 需求**：GLShadowApp（_enableCullFace）/GLPointLightShadowApp（reverse_normals 时临时关 cull）需启停背面剔除。RHI `IPipeline::setCullFaceEnable/setCullFace` 已具备，直接使用。
 5. **SSAO noise/kernel**：noise initApp 上传一次；kernel 保留每帧重算忠实移植。
 
 ## 6. 验证与收尾
