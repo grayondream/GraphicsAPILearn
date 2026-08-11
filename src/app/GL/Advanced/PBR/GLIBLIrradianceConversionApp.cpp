@@ -133,6 +133,9 @@ void GLIBLIrradianceConversionApp::renderToCubemap() {
 
 void GLIBLIrradianceConversionApp::renderCube(const std::shared_ptr<rhi::IPipeline>& program, const glm::mat4& model) {
     renderer()->setPipeline(program);
+    renderer()->setVertexBuffer(m_cube.vertexBuffer);
+    renderer()->setVertexBuffer(m_cube.uvBuffer, 1);
+    renderer()->setVertexBuffer(m_cube.normalBuffer, 2);
     renderer()->setIndexBuffer(m_cube.indexBuffer);
     program->setUniform("model", glm::value_ptr(model), 1);
     renderer()->drawIndexed(m_cube.indexCount, 0, 0);
