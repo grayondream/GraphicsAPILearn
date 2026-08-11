@@ -2,165 +2,109 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
-#include <glm/gtc/random.hpp>
-#include <random>
-#include "native/GL/GLProgram.hpp"
+#include <cmath>
 #include "base/StaticCollector.hpp"
 #include "base/ErrorHandle.hpp"
-#include "glad/glad.h"
-#include "native/GL/GLImageTexture2D.hpp"
-#include "native/GL/GLCube.hpp"
-#include "native/GL/GLPlane.hpp"
-#include "base/Log.hpp"
+#include "rhi/core/IShader.hpp"
+#include "rhi/core/IPipeline.hpp"
+#include "rhi/core/IRenderTarget.hpp"
+#include "rhi/core/ITexture2D.hpp"
+#include "rhi/core/ITexture3D.hpp"
+#include "rhi/core/Common.hpp"
+#include "app/GL/RhiImage.hpp"
+#include "geometry/Cube.hpp"
+#include "geometry/Sphere.hpp"
 #include "imgui.h"
-#include "utils/FileUtils.hpp"
-#include "geometry/Rect.hpp"
-#include "utils/GL/GLUtils.hpp"
-#include "base/Constexpr.hpp"
-#include <stb_image.h>
-
-using namespace Constexpr;
+#include <utils/FileUtils.hpp>
 using FileUtils::join;
 using namespace ErrorHandle;
 
-GLIBLSpecularApp::~GLIBLSpecularApp() {
-    
+GLIBLSpecularApp::~GLIBLSpecularApp() {}
+
+static RhiGeometry::Geometry CreateQuadBuffer(rhi::IRenderer* renderer) {
+    float quadVertices[] = {
+        -1.0f,  1.0f, 0.0f, 0.0f, 1.0f,
+        -1.0f, -1.0f, 0.0f, 0.0f, 0.0f,
+         1.0f,  1.0f, 0.0f, 1.0f, 1.0f,
+         1.0f, -1.0f, 0.0f, 1.0f, 0.0f,
+    };
+    constexpr int stride = 5 * static_cast<int>(sizeof(float));
+    rhi::VertexLayout layout;
+    layout.elements.push_back({rhi::VertexElement::Float3, 0, 0, rhi::VertexInputRate::PerVertex, 0, stride});
+    layout.elements.push_back({rhi::VertexElement::Float2, 1, 0, rhi::VertexInputRate::PerVertex, 12, stride});
+    return RhiGeometry::CreateFromArray(renderer, quadVertices, sizeof(quadVertices), 4, layout);
+}
+
+static glm::mat4 GetCaptureProjection() {
+    return glm::perspective(glm::radians(90.0f), 1.0f, 0.1f, 10.0f);
 }
 
 void GLIBLSpecularApp::initShapes() {
-	m_sphere.init();	
-	m_cube.init();
-}
-
-static std::shared_ptr<GLImageTexture2D> CreateTexture(const std::string &imgFile, bool isHdr = false){
-	TextureOption option{};
-	option.IsHdr = isHdr;
-	auto texture = std::make_shared<GLImageTexture2D>(imgFile, option);
-	const auto valid = texture->load().texture()->valid();
-	ExitIfFailed(valid, "Failed to load texture from file {}", imgFile);
-	return texture;
+    Cube cube{};
+    m_cube = RhiGeometry::Create(renderer().get(), cube, true, true, true);
+    Sphere sphere{};
+    m_sphere = RhiGeometry::Create(renderer().get(), sphere, true, true, true);
+    m_quad = CreateQuadBuffer(renderer().get());
 }
 
 bool GLIBLSpecularApp::initApp() {
-	if (!GLCameraBaseApp::initApp()) {
-		return false;
-	}
-
-	compileShader();
-	initShapes();	
-	loadTexture();
-	initFramebuffer();
-	initCaptureViews();
-	glEnable(GL_DEPTH_TEST);\
-	glDepthFunc(GL_LEQUAL);  // change depth function so depth test passes when values are equal to depth buffer's content
-	glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
-	//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-	
-	return true;
+    if (!GLCameraBaseApp::initApp()) return false;
+    initShapes();
+    compileShader(m_cube.layout, m_quad.layout);
+    loadTexture();
+    initFramebuffer();
+    initCaptureViews();
+    renderBeforeLoop();
+    return true;
 }
 
-void GLIBLSpecularApp::initCaptureViews(){
-	unsigned int envCubemap;
-    glGenTextures(1, &envCubemap);
-    glBindTexture(GL_TEXTURE_CUBE_MAP, envCubemap);
-    for (unsigned int i = 0; i < 6; ++i)
-    {
-        glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB16F, 512, 512, 0, GL_RGB, GL_FLOAT, nullptr);
+void GLIBLSpecularApp::initCaptureViews() {
+    rhi::TextureDesc desc;
+    desc.format = rhi::TextureFormat::RGB16F;
+    desc.wrapS = desc.wrapT = desc.wrapR = rhi::TextureWrap::ClampToEdge;
+    desc.minFilter = rhi::TextureFilter::Linear;
+    desc.magFilter = rhi::TextureFilter::Linear;
+    desc.generateMipmap = false;
+    m_envCubemap = renderer()->createTexture3D();
+    m_envCubemap->createEmpty(desc, 512, 512);
+}
+
+void GLIBLSpecularApp::initFramebuffer() {
+    m_captureRT = renderer()->createRenderTarget();
+    rhi::FramebufferDesc fbd;
+    fbd.width = 512; fbd.height = 512;
+    fbd.attachments.push_back({rhi::AttachmentType::Depth, rhi::TextureFormat::Depth24Stencil8, false, 0});
+    if (!m_captureRT->create(fbd)) {
+        ExitIfFailed(false, "Failed to create capture framebuffer");
     }
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR); 
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    m_envCubemap = envCubemap;
 }
 
-void GLIBLSpecularApp::createIrradianceMap(){
-    // pbr: create an irradiance cubemap, and re-scale capture FBO to irradiance scale.
-    // --------------------------------------------------------------------------------
-    unsigned int irradianceMap;
-    glGenTextures(1, &irradianceMap);
-    glBindTexture(GL_TEXTURE_CUBE_MAP, irradianceMap);
-    for (unsigned int i = 0; i < 6; ++i)
-    {
-        glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB16F, 32, 32, 0, GL_RGB, GL_FLOAT, nullptr);
-    }
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-
-    glBindFramebuffer(GL_FRAMEBUFFER, m_captureFBO);
-    glBindRenderbuffer(GL_RENDERBUFFER, m_captureRBO);
-    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, 32, 32);
-    m_irradianceMap = irradianceMap;
+void GLIBLSpecularApp::compileShader(const rhi::VertexLayout& cubeLayout, const rhi::VertexLayout& quadLayout) {
+    const auto shaderDir = join(StaticCollector::getGLShaderPath(), "Advanced", "PBR", "IBL_Specular");
+    auto build = [&](const rhi::VertexLayout& layout, const std::string& vs, const std::string& fs) {
+        auto shader = renderer()->createShader();
+        auto ok = shader->compile({ {rhi::ShaderStage::Vertex, join(shaderDir, vs), "main", false},
+                                    {rhi::ShaderStage::Fragment, join(shaderDir, fs), "main", false} });
+        ExitIfFailed(ok, "Create RHI shader failed: {}", shader->getLog());
+        return renderer()->createPipeline(layout, shader);
+    };
+    m_cubeMapProgram = build(cubeLayout, "CUBE.vs", "CUBE.fs");
+    m_program = build(cubeLayout, "PBR.vs", "PBR.fs");
+    m_backgroundProgram = build(cubeLayout, "Background.vs", "Background.fs");
+    m_irradianceProgram = build(cubeLayout, "Irradiance.vs", "Irradiance.fs");
+    m_prefilterProgram = build(cubeLayout, "Prefilter.vs", "Prefilter.fs");
+    m_brdfLUTProgram = build(quadLayout, "Brdf.vs", "Brdf.fs");
+    m_program->setDepthTest(true);
+    m_cubeMapProgram->setDepthTest(true);
+    m_backgroundProgram->setDepthTest(true);
+    m_irradianceProgram->setDepthTest(true);
+    m_prefilterProgram->setDepthTest(true);
+    m_backgroundProgram->setDepthFunc(rhi::CompareFunc::LessEqual);
+    m_brdfLUTProgram->setPrimitiveType(rhi::PrimitiveType::TriangleStrip);
 }
 
-void GLIBLSpecularApp::initFramebuffer(){
-	unsigned int captureFBO;
-    unsigned int captureRBO;
-    glGenFramebuffers(1, &captureFBO);
-    glGenRenderbuffers(1, &captureRBO);
-
-    glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
-    glBindRenderbuffer(GL_RENDERBUFFER, captureRBO);
-    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, 512, 512);
-    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, captureRBO);
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
-	m_captureFBO = captureFBO;
-	m_captureRBO = captureRBO;
-}
-
-void GLIBLSpecularApp::compileShader(){
-	const auto shaderDir = join(StaticCollector::getGLShaderPath(), "Advanced", "PBR", "IBL_Specular");
-	{
-		const auto vfile = join(shaderDir, "CUBE.vs");
-		const auto ffile = join(shaderDir, "CUBE.fs");
-		auto ret = m_cubeMapProgram.init(vfile, ffile);
-		ErrorHandle::ExitIfFailed(ret, "Create OpenGL program failed!");
-	}
-
-	{
-		const auto vfile = join(shaderDir, "PBR.vs");
-		const auto ffile = join(shaderDir, "PBR.fs");
-		auto ret = m_program.init(vfile, ffile);
-		ErrorHandle::ExitIfFailed(ret, "Create OpenGL program failed!");
-	}
-
-	{
-		const auto vfile = join(shaderDir, "Background.vs");
-		const auto ffile = join(shaderDir, "Background.fs");
-		auto ret = m_backgroundProgram.init(vfile, ffile);
-		ErrorHandle::ExitIfFailed(ret, "Create OpenGL program failed!");
-	}
-
-	{
-		const auto vfile = join(shaderDir, "Irradiance.vs");
-		const auto ffile = join(shaderDir, "Irradiance.fs");
-		auto ret = m_irradianceProgram.init(vfile, ffile);
-		ErrorHandle::ExitIfFailed(ret, "Create OpenGL program failed!");
-	}
-
-	{
-		const auto vfile = join(shaderDir, "Prefilter.vs");
-		const auto ffile = join(shaderDir, "Prefilter.fs");
-		auto ret = m_prefilterProgram.init(vfile, ffile);
-		ErrorHandle::ExitIfFailed(ret, "Create OpenGL program failed!");
-	}
-
-	{
-		const auto vfile = join(shaderDir, "Brdf.vs");
-		const auto ffile = join(shaderDir, "Brdf.fs");
-		auto ret = m_brdfLUTProgram.init(vfile, ffile);
-		ErrorHandle::ExitIfFailed(ret, "Create OpenGL program failed!");
-	}
-}
-
-static std::vector<glm::mat4> GetCaptureViews(){
-	glm::mat4 captureViews[] =
-    {
+static std::vector<glm::mat4> GetCaptureViews() {
+    glm::mat4 captureViews[] = {
         glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3( 1.0f,  0.0f,  0.0f), glm::vec3(0.0f, -1.0f,  0.0f)),
         glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(-1.0f,  0.0f,  0.0f), glm::vec3(0.0f, -1.0f,  0.0f)),
         glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3( 0.0f,  1.0f,  0.0f), glm::vec3(0.0f,  0.0f,  1.0f)),
@@ -171,301 +115,244 @@ static std::vector<glm::mat4> GetCaptureViews(){
     return std::vector<glm::mat4>(captureViews, captureViews + 6);
 }
 
-static auto GetLightPosAndColor(){
-	std::vector<glm::vec3> lightPositions = {
-        glm::vec3(-10.0f,  10.0f, 10.0f),
-        glm::vec3( 10.0f,  10.0f, 10.0f),
-        glm::vec3(-10.0f, -10.0f, 10.0f),
-        glm::vec3( 10.0f, -10.0f, 10.0f),
+static auto GetLightPosAndColor() {
+    std::vector<glm::vec3> lightPositions = {
+        glm::vec3(-10.0f,  10.0f, 10.0f), glm::vec3( 10.0f,  10.0f, 10.0f),
+        glm::vec3(-10.0f, -10.0f, 10.0f), glm::vec3( 10.0f, -10.0f, 10.0f),
     };
     std::vector<glm::vec3> lightColors = {
-        glm::vec3(300.0f, 300.0f, 300.0f),
-        glm::vec3(300.0f, 300.0f, 300.0f),
-        glm::vec3(300.0f, 300.0f, 300.0f),
-        glm::vec3(300.0f, 300.0f, 300.0f)
+        glm::vec3(300.0f, 300.0f, 300.0f), glm::vec3(300.0f, 300.0f, 300.0f),
+        glm::vec3(300.0f, 300.0f, 300.0f), glm::vec3(300.0f, 300.0f, 300.0f)
     };
-
     return std::make_pair(lightPositions, lightColors);
 }
 
+void GLIBLSpecularApp::loadTexture() {
+    const auto resDir = StaticCollector::getImagePath();
+    m_hdrEnvTexture = RhiImage::Load2DHDR(renderer().get(), join(resDir, "newport_loft.hdr"));
+    ExitIfFailed(m_hdrEnvTexture != nullptr, "Failed to load HDR environment texture");
+}
 
-void GLIBLSpecularApp::renderToCubemap(){
-	glViewport(0, 0, 512, 512);
-	glm::mat4 captureProjection = glm::perspective(glm::radians(90.0f), 1.0f, 0.1f, 10.0f);
-	const auto captureViews = GetCaptureViews();
-	m_cubeMapProgram.use();
-	m_hdrEnvTexture->texture()->bind(0);
-    m_cubeMapProgram.update("equirectangularMap", 0);
-    m_cubeMapProgram.update("projection", captureProjection);
-    glBindFramebuffer(GL_FRAMEBUFFER, m_captureFBO);
-    for (unsigned int i = 0; i < 6; ++i){
-        m_cubeMapProgram.update("view", captureViews[i]);
-        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, m_envCubemap, 0);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+void GLIBLSpecularApp::createIrradianceMap() {
+    rhi::TextureDesc desc;
+    desc.format = rhi::TextureFormat::RGB16F;
+    desc.wrapS = desc.wrapT = desc.wrapR = rhi::TextureWrap::ClampToEdge;
+    desc.minFilter = rhi::TextureFilter::Linear;
+    desc.magFilter = rhi::TextureFilter::Linear;
+    desc.generateMipmap = false;
+    m_irradianceMap = renderer()->createTexture3D();
+    m_irradianceMap->createEmpty(desc, 32, 32);
+}
 
+void GLIBLSpecularApp::createPrefilterMap() {
+    rhi::TextureDesc desc;
+    desc.format = rhi::TextureFormat::RGB16F;
+    desc.wrapS = desc.wrapT = desc.wrapR = rhi::TextureWrap::ClampToEdge;
+    desc.minFilter = rhi::TextureFilter::LinearMipLinear;
+    desc.magFilter = rhi::TextureFilter::Linear;
+    desc.generateMipmap = true;
+    m_prefilterMap = renderer()->createTexture3D();
+    m_prefilterMap->createEmpty(desc, 128, 128);
+}
+
+void GLIBLSpecularApp::renderToCubemap() {
+    const auto captureProjection = GetCaptureProjection();
+    const auto captureViews = GetCaptureViews();
+    renderer()->setPipeline(m_cubeMapProgram);
+    renderer()->bindTexture(m_hdrEnvTexture, 0);
+    m_cubeMapProgram->setUniform("equirectangularMap", 0);
+    m_cubeMapProgram->setUniform("projection", glm::value_ptr(captureProjection), 1);
+    renderer()->setRenderTarget(m_captureRT);
+    renderer()->setVertexBuffer(m_cube.vertexBuffer);
+    renderer()->setVertexBuffer(m_cube.uvBuffer, 1);
+    renderer()->setVertexBuffer(m_cube.normalBuffer, 2);
+    const int size = 512;
+    for (int i = 0; i < 6; ++i) {
+        renderer()->setViewport(rhi::Viewport{0, 0, size, size});
+        m_cubeMapProgram->setUniform("view", glm::value_ptr(captureViews[i]), 1);
+        m_captureRT->attachCubeFace(m_envCubemap.get(), i);
+        renderer()->clearColor(0.0f, 0.0f, 0.0f, 1.0f);
         renderCube(m_cubeMapProgram, glm::mat4(1.0));
     }
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
-	//GLUtils::SaveFramebufferAsImage(m_captureFBO, 512, 512);
-	glViewport(0, 0, m_window->getProperties().width, m_window->getProperties().height);
-	glBindTexture(GL_TEXTURE_CUBE_MAP, m_envCubemap);
-    glGenerateMipmap(GL_TEXTURE_CUBE_MAP);
+    renderer()->setRenderTarget(nullptr);
+    const auto props = m_window->getProperties();
+    renderer()->setViewport(rhi::Viewport{0, 0, props.width, props.height});
 }
 
-glm::mat4 GetCaptureProjection(){
-	return glm::perspective(glm::radians(90.0f), 1.0f, 0.1f, 10.0f);
-}
-
-void GLIBLSpecularApp::renderIrradianceMap(){
-	m_irradianceProgram.use();
-    m_irradianceProgram.update("environmentMap", 0);
-	//should be same as capture projection in renderToCubemap
-	glm::mat4 captureProjection = GetCaptureProjection();
-    m_irradianceProgram.update("projection", captureProjection);
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_CUBE_MAP, m_envCubemap);
-
-    glViewport(0, 0, 32, 32); // don't forget to configure the viewport to the capture dimensions.
-    glBindFramebuffer(GL_FRAMEBUFFER, m_captureFBO);
-	const auto captureViews = GetCaptureViews();
-    for (unsigned int i = 0; i < 6; ++i)
-    {
-        m_irradianceProgram.update("view", captureViews[i]);
-        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, m_irradianceMap, 0);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
+void GLIBLSpecularApp::renderIrradianceMap() {
+    const auto captureProjection = GetCaptureProjection();
+    const auto captureViews = GetCaptureViews();
+    renderer()->setPipeline(m_irradianceProgram);
+    renderer()->bindTexture(m_envCubemap, 0);
+    m_irradianceProgram->setUniform("environmentMap", 0);
+    m_irradianceProgram->setUniform("projection", glm::value_ptr(captureProjection), 1);
+    renderer()->setRenderTarget(m_captureRT);
+    renderer()->setVertexBuffer(m_cube.vertexBuffer);
+    renderer()->setVertexBuffer(m_cube.uvBuffer, 1);
+    renderer()->setVertexBuffer(m_cube.normalBuffer, 2);
+    const int size = 32;
+    for (int i = 0; i < 6; ++i) {
+        renderer()->setViewport(rhi::Viewport{0, 0, size, size});
+        m_irradianceProgram->setUniform("view", glm::value_ptr(captureViews[i]), 1);
+        m_captureRT->attachCubeFace(m_irradianceMap.get(), i);
+        renderer()->clearColor(0.0f, 0.0f, 0.0f, 1.0f);
         renderCube(m_irradianceProgram, glm::mat4(1.0));
     }
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
-	glViewport(0, 0, m_window->getProperties().width, m_window->getProperties().height);
+    renderer()->setRenderTarget(nullptr);
+    const auto props = m_window->getProperties();
+    renderer()->setViewport(rhi::Viewport{0, 0, props.width, props.height});
 }
 
-void GLIBLSpecularApp::renderCube(GLProgram &program, const glm::mat4 &model) {
-	program.use();
-	program.update("model", model);
-	glBindVertexArray(m_cube.getVao());
-	glDrawElements(GL_TRIANGLES, m_cube.idxSize(), GL_UNSIGNED_INT, 0);
-	glBindVertexArray(0);
+void GLIBLSpecularApp::renderPerfilterMap() {
+    const auto captureProjection = GetCaptureProjection();
+    const auto captureViews = GetCaptureViews();
+    renderer()->setPipeline(m_prefilterProgram);
+    renderer()->bindTexture(m_envCubemap, 0);
+    m_prefilterProgram->setUniform("environmentMap", 0);
+    m_prefilterProgram->setUniform("projection", glm::value_ptr(captureProjection), 1);
+    renderer()->setRenderTarget(m_captureRT);
+    renderer()->setVertexBuffer(m_cube.vertexBuffer);
+    renderer()->setVertexBuffer(m_cube.uvBuffer, 1);
+    renderer()->setVertexBuffer(m_cube.normalBuffer, 2);
+    const unsigned int maxMipLevels = 5;
+    for (unsigned int mip = 0; mip < maxMipLevels; ++mip) {
+        const unsigned int mipSize = static_cast<unsigned int>(128 * std::pow(0.5, mip));
+        float roughness = static_cast<float>(mip) / static_cast<float>(maxMipLevels - 1);
+        m_prefilterProgram->setUniform("roughness", roughness);
+        for (int i = 0; i < 6; ++i) {
+            renderer()->setViewport(rhi::Viewport{0, 0, static_cast<int>(mipSize), static_cast<int>(mipSize)});
+            m_prefilterProgram->setUniform("view", glm::value_ptr(captureViews[i]), 1);
+            m_captureRT->attachCubeFace(m_prefilterMap.get(), i, static_cast<int>(mip));
+            renderer()->clearColor(0.0f, 0.0f, 0.0f, 1.0f);
+            renderCube(m_prefilterProgram, glm::mat4(1.0));
+        }
+    }
+    renderer()->setRenderTarget(nullptr);
+    const auto props = m_window->getProperties();
+    renderer()->setViewport(rhi::Viewport{0, 0, props.width, props.height});
 }
 
-void GLIBLSpecularApp::renderSphere(GLProgram& program, const glm::mat4& model) {
-	program.use();
-	program.update("model", model);
-	const auto normal = glm::transpose(glm::inverse(glm::mat3(model)));
-	program.update("normalMatrix", normal);
-	glBindVertexArray(m_sphere.getVao());
-	glDrawElements(GL_TRIANGLES, m_sphere.idxSize(), GL_UNSIGNED_INT, 0);
-	glBindVertexArray(0);
+void GLIBLSpecularApp::createBrdfLUT() {
+    m_brdfLUTRT = renderer()->createRenderTarget();
+    rhi::FramebufferDesc fbd;
+    fbd.width = 512; fbd.height = 512;
+    fbd.attachments.push_back({rhi::AttachmentType::Color, rhi::TextureFormat::RG16F, false, 0});
+    if (!m_brdfLUTRT->create(fbd)) {
+        ExitIfFailed(false, "Failed to create BRDF LUT framebuffer");
+    }
+    m_brdfLUTTexture = std::shared_ptr<rhi::ITexture2D>(m_brdfLUTRT->colorTexture2D(0),
+                                                        [](rhi::ITexture2D*){});
 }
 
-void GLIBLSpecularApp::createQuadBuffer() {
-	float quadVertices[] = {
-		// positions        // texture Coords
-		-1.0f,  1.0f, 0.0f, 0.0f, 1.0f,
-		-1.0f, -1.0f, 0.0f, 0.0f, 0.0f,
-			1.0f,  1.0f, 0.0f, 1.0f, 1.0f,
-			1.0f, -1.0f, 0.0f, 1.0f, 0.0f,
-	};
-	// setup plane VAO
-	unsigned int quadVAO, quadVBO;
-	glGenVertexArrays(1, &quadVAO);
-	glGenBuffers(1, &quadVBO);
-	glBindVertexArray(quadVAO);
-	glBindBuffer(GL_ARRAY_BUFFER, quadVBO);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), &quadVertices, GL_STATIC_DRAW);
-	glEnableVertexAttribArray(0);
-	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);
-	glEnableVertexAttribArray(1);
-	glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
-	glBindVertexArray(0);
-	m_quadVAO = quadVAO;
-	m_quadVBO = quadVBO;
+void GLIBLSpecularApp::renderBrdfLUT() {
+    renderer()->setRenderTarget(m_brdfLUTRT);
+    renderer()->setViewport(rhi::Viewport{0, 0, 512, 512});
+    renderer()->clearColor(0.0f, 0.0f, 0.0f, 1.0f);
+    renderer()->setPipeline(m_brdfLUTProgram);
+    renderer()->setVertexBuffer(m_quad.vertexBuffer);
+    renderer()->draw(m_quad.vertexCount, 0);
+    renderer()->setRenderTarget(nullptr);
+    const auto props = m_window->getProperties();
+    renderer()->setViewport(rhi::Viewport{0, 0, props.width, props.height});
+}
+
+void GLIBLSpecularApp::renderCube(const std::shared_ptr<rhi::IPipeline>& program, const glm::mat4& model) {
+    renderer()->setPipeline(program);
+    renderer()->setVertexBuffer(m_cube.vertexBuffer);
+    renderer()->setVertexBuffer(m_cube.uvBuffer, 1);
+    renderer()->setVertexBuffer(m_cube.normalBuffer, 2);
+    renderer()->setIndexBuffer(m_cube.indexBuffer);
+    program->setUniform("model", glm::value_ptr(model), 1);
+    renderer()->drawIndexed(m_cube.indexCount, 0, 0);
+}
+
+void GLIBLSpecularApp::renderSphere(const std::shared_ptr<rhi::IPipeline>& program, const glm::mat4& model) {
+    renderer()->setPipeline(program);
+    renderer()->setVertexBuffer(m_sphere.vertexBuffer);
+    renderer()->setVertexBuffer(m_sphere.uvBuffer, 1);
+    renderer()->setVertexBuffer(m_sphere.normalBuffer, 2);
+    renderer()->setIndexBuffer(m_sphere.indexBuffer);
+    program->setUniform("model", glm::value_ptr(model), 1);
+    const auto normal = glm::transpose(glm::inverse(glm::mat3(model)));
+    program->setUniformMatrix("normalMatrix", glm::value_ptr(normal), 1, 3);
+    renderer()->drawIndexed(m_sphere.indexCount, 0, 0);
 }
 
 static std::vector<glm::vec3> GenreateObjPos(int radius = 5, float gap = 0.5f, const glm::vec3 &center = glm::vec3(0.0f)) {
     std::vector<glm::vec3> positions;
-    if (radius < 0) {
-        return positions;
-    }
-
-    for (int row = -radius; row <= radius; ++row) {
-        for (int col = -radius; col <= radius; ++col) {
-            float x = center.x + static_cast<float>(col) * gap;
-            float y = center.y + static_cast<float>(row) * gap;
-            positions.push_back(glm::vec3(x, y, center.z));
-        }
-    }
-    
+    if (radius < 0) return positions;
+    for (int row = -radius; row <= radius; ++row)
+        for (int col = -radius; col <= radius; ++col)
+            positions.push_back(glm::vec3(center.x + col * gap, center.y + row * gap, center.z));
     return positions;
 }
 
-void GLIBLSpecularApp::createPrefilterMap(){
-	unsigned int prefilterMap;
-    glGenTextures(1, &prefilterMap);
-    glBindTexture(GL_TEXTURE_CUBE_MAP, prefilterMap);
-    for (unsigned int i = 0; i < 6; ++i){
-        glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB16F, 128, 128, 0, GL_RGB, GL_FLOAT, nullptr);
+void GLIBLSpecularApp::renderBeforeLoop() {
+    renderToCubemap();
+    createIrradianceMap();
+    renderIrradianceMap();
+    createPrefilterMap();
+    renderPerfilterMap();
+    createBrdfLUT();
+    renderBrdfLUT();
+}
+
+void GLIBLSpecularApp::renderBackground(const std::shared_ptr<rhi::IPipeline>& program, const glm::mat4& view, const glm::mat4& projection) {
+    renderer()->setPipeline(program);
+    renderer()->bindTexture(m_envCubemap, 0);
+    program->setUniform("view", glm::value_ptr(view), 1);
+    program->setUniform("environmentMap", 0);
+    program->setUniform("projection", glm::value_ptr(projection), 1);
+    renderCube(program, glm::mat4(1.0));
+}
+
+void GLIBLSpecularApp::renderObjectsAndLights(const std::shared_ptr<rhi::IPipeline>& program, const glm::mat4& view, const glm::mat4& projection) {
+    const auto objPos = GenreateObjPos(2, 1.0f, glm::vec3(0.0f));
+    auto pos = _camera.getAttr().pos;
+    renderer()->setPipeline(program);
+    renderer()->bindTexture(m_irradianceMap, 0);
+    renderer()->bindTexture(m_prefilterMap, 1);
+    renderer()->bindTexture(m_brdfLUTTexture, 2);
+    program->setUniform("prefilterMap", 1);
+    program->setUniform("brdfLUT", 2);
+    program->setUniform("texture", 0);
+    program->setUniform("irradianceMap", 0);
+    program->setUniform("projection", glm::value_ptr(projection), 1);
+    program->setUniform("view", glm::value_ptr(view), 1);
+    program->setUniform("camPos", glm::value_ptr(pos), 1, 3);
+    program->setUniform("roughness", m_roughness);
+    program->setUniform("metallic", m_metallic);
+    program->setUniform("ao", m_ao);
+    const int cnt = objPos.size();
+    for (int i = 0; i < cnt; ++i) {
+        program->setUniform("albedo", glm::value_ptr(glm::vec3(i * 1.0f / cnt, 0.0f, 0.0f)), 1, 3);
+        auto objectPos = glm::mat4(1.0f);
+        objectPos = glm::translate(objectPos, objPos[i]);
+        objectPos = glm::scale(objectPos, glm::vec3(0.4f));
+        renderSphere(program, objectPos);
     }
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR); // be sure to set minification filter to mip_linear 
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    // generate mipmaps for the cubemap so OpenGL automatically allocates the required memory.
-    glGenerateMipmap(GL_TEXTURE_CUBE_MAP);
-	m_prefilterMap = prefilterMap;	
-}
-
-void GLIBLSpecularApp::renderPerfilterMap(){
-	m_prefilterProgram.use();
-    m_prefilterProgram.update("environmentMap", 0);
-	glm::mat4 captureProjection = GetCaptureProjection();
-    m_prefilterProgram.update("projection", captureProjection);
-	glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_CUBE_MAP, m_envCubemap);
-
-    glBindFramebuffer(GL_FRAMEBUFFER, m_captureFBO);
-    unsigned int maxMipLevels = 5;
-    for (unsigned int mip = 0; mip < maxMipLevels; ++mip){
-        // reisze framebuffer according to mip-level size.
-        unsigned int mipWidth  = static_cast<unsigned int>(128 * std::pow(0.5, mip));
-        unsigned int mipHeight = static_cast<unsigned int>(128 * std::pow(0.5, mip));
-        glBindRenderbuffer(GL_RENDERBUFFER, m_captureRBO);
-        glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, mipWidth, mipHeight);
-        glViewport(0, 0, mipWidth, mipHeight);
-
-		const auto captureViews = GetCaptureViews();
-        float roughness = (float)mip / (float)(maxMipLevels - 1);
-        m_prefilterProgram.update("roughness", roughness);
-        for (unsigned int i = 0; i < 6; ++i){
-            m_prefilterProgram.update("view", captureViews[i]);
-            glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, m_prefilterMap, mip);
-
-            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-            renderCube(m_prefilterProgram, glm::mat4(1.0));
-        }
+    const auto [lightPositions, lightColors] = GetLightPosAndColor();
+    for (size_t i = 0; i < lightPositions.size(); ++i) {
+        auto lightModel = glm::mat4(1.0f);
+        lightModel = glm::translate(lightModel, lightPositions[i]);
+        lightModel = glm::scale(lightModel, glm::vec3(0.2f));
+        program->setUniform("lightPositions[" + std::to_string(i) + "]", glm::value_ptr(lightPositions[i]), 1, 3);
+        program->setUniform("lightColors[" + std::to_string(i) + "]", glm::value_ptr(lightColors[i]), 1, 3);
+        renderSphere(program, lightModel);
     }
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
-	glViewport(0, 0, m_window->getProperties().width, m_window->getProperties().height);
-}
-
-void GLIBLSpecularApp::renderBrdfLUT(){
-	// pbr: generate a 2D LUT from the BRDF equations used.
-    // ----------------------------------------------------
-    unsigned int brdfLUTTexture;
-    glGenTextures(1, &brdfLUTTexture);
-
-    // pre-allocate enough memory for the LUT texture.
-    glBindTexture(GL_TEXTURE_2D, brdfLUTTexture);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RG16F, 512, 512, 0, GL_RG, GL_FLOAT, 0);
-    // be sure to set wrapping mode to GL_CLAMP_TO_EDGE
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-
-    // then re-configure capture framebuffer object and render screen-space quad with BRDF shader.
-    glBindFramebuffer(GL_FRAMEBUFFER, m_captureFBO);
-    glBindRenderbuffer(GL_RENDERBUFFER, m_captureRBO);
-    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, 512, 512);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, brdfLUTTexture, 0);
-
-    glViewport(0, 0, 512, 512);
-    m_brdfLUTProgram.use();
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    renderQuad();
-
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
-	m_brdfLUTTexture = brdfLUTTexture;
-	glViewport(0, 0, m_window->getProperties().width, m_window->getProperties().height);
-}
-
-void GLIBLSpecularApp::loadTexture(){
-	auto resDir = StaticCollector::getImagePath();
-    m_hdrEnvTexture = CreateTexture(join(resDir, "newport_loft.hdr"), true);
-}
-
-void GLIBLSpecularApp::renderBeforeLoop(){
-	renderToCubemap();
-	createIrradianceMap();
-	renderIrradianceMap();
-	createPrefilterMap();
-	renderPerfilterMap();
-	renderBrdfLUT();
-}
-
-void GLIBLSpecularApp::renderQuad() {
-	glBindVertexArray(m_quadVAO);
-    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-    glBindVertexArray(0);
-}
-
-void GLIBLSpecularApp::renderBackground(GLProgram& program, const glm::mat4& view, const glm::mat4& projection) {
-	program.use();
-	glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_CUBE_MAP, m_envCubemap);
-	program.update("view", view);
-	program.update("environmentMap", 0);
-	program.update("projection", projection);
-	renderCube(program, glm::mat4(1.0));
-}
-
-void GLIBLSpecularApp::renderObjectsAndLights(GLProgram &program, const glm::mat4 &view, const glm::mat4 &projection) {
-	const auto objPos = GenreateObjPos(2, 1.0f, glm::vec3(0.0f));
-	auto pos = _camera.getAttr().pos;
-	program.use();
-	glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_CUBE_MAP, m_irradianceMap);
-
-	glActiveTexture(GL_TEXTURE1);
-    glBindTexture(GL_TEXTURE_CUBE_MAP, m_prefilterMap);
-    glActiveTexture(GL_TEXTURE2);
-    glBindTexture(GL_TEXTURE_2D, m_brdfLUTTexture);
-
-	program.update("prefilterMap", 1);
-    program.update("brdfLUT", 2);
-	program.update("texture", 0);
-    program.update("irradianceMap", 0);
-	program.update("projection", projection);
-	program.update("view", view);
-	program.update("camPos", pos);
-	program.update("roughness", m_roughness);
-    program.update("metallic", m_metallic);
-	program.update("ao", m_ao);
-	const int cnt = objPos.size();
-	for(int i = 0;i < cnt;i ++){
-		const auto pos = objPos[i];
-		program.update("albedo", glm::vec3(i * 1.0f/ cnt, 0.0f, 0.0f));
-		auto objectPos = glm::mat4(1.0f);
-		objectPos = glm::translate(objectPos, pos);
-		objectPos = glm::scale(objectPos, glm::vec3(0.4f));
-		renderSphere(program, objectPos);
-	}
-
-	const auto lightPosAndColor = GetLightPosAndColor();
-	for (int i = 0; i < lightPosAndColor.first.size(); ++i) {
-		const auto lightPos = lightPosAndColor.first[i];
-		auto lightModel = glm::mat4(1.0f);
-		lightModel = glm::translate(lightModel, lightPos);
-		lightModel = glm::scale(lightModel, glm::vec3(0.2f));
-		program.update("lightPositions[" + std::to_string(i) + "]", lightPosAndColor.first[i]);
-		program.update("lightColors[" + std::to_string(i) + "]", lightPosAndColor.second[i]);
-		renderSphere(program, lightModel);
-	}
 }
 
 void GLIBLSpecularApp::drawScene(const float dt) {
-	GLCameraBaseApp::drawScene(dt);
-	const auto projection = glm::perspective(glm::radians(_camera.zoom()), aspectRatio(), 0.1f, 100.0f);
-	const auto view = _camera.getViewMatrix();
-	
-	renderObjectsAndLights(m_program, view, projection);
-	renderBackground(m_backgroundProgram, view, projection);
+    GLCameraBaseApp::drawScene(dt);
+    const auto projection = glm::perspective(glm::radians(_camera.zoom()), aspectRatio(), 0.1f, 100.0f);
+    const auto view = _camera.getViewMatrix();
+    renderObjectsAndLights(m_program, view, projection);
+    renderBackground(m_backgroundProgram, view, projection);
 
-	ImGui::Begin("OpenGL");
-	ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
-	ImGui::SliderFloat("Roughness", &m_roughness, 0.0f, 1.0f);
-	ImGui::SliderFloat("Metallic", &m_metallic, 0.0f, 1.0f);
-	ImGui::SliderFloat("AO", &m_ao, 0.0f, 1.0f);
-	ImGui::End();
+    ImGui::Begin("OpenGL");
+    ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+    ImGui::SliderFloat("Roughness", &m_roughness, 0.0f, 1.0f);
+    ImGui::SliderFloat("Metallic", &m_metallic, 0.0f, 1.0f);
+    ImGui::SliderFloat("AO", &m_ao, 0.0f, 1.0f);
+    ImGui::End();
 }
