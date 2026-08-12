@@ -42,6 +42,8 @@ public:
     virtual void setCullFace(CullFace face) = 0;
     virtual void setFrontFace(bool ccw) = 0;               // true=CCW 正面，false=CW
     virtual void setPolygonMode(PolygonMode mode) = 0;
+    // GL_PROGRAM_POINT_SIZE 开关（gl_PointSize 生效需要）
+    virtual void setPointSizeProgramEnable(bool enable) = 0;
     virtual void setMultisample(bool enable) = 0;
 
     // 图元拓扑：决定 draw* 发出的 GL 图元

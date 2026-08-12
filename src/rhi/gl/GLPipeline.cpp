@@ -204,6 +204,11 @@ void GLPipeline::setPolygonMode(PolygonMode mode) {
     glPolygonMode(GL_FRONT_AND_BACK, ToGLPolygonMode(mode));
 }
 
+void GLPipeline::setPointSizeProgramEnable(bool enable) {
+    _pointSizeEnable = enable;
+    if (enable) glEnable(GL_PROGRAM_POINT_SIZE); else glDisable(GL_PROGRAM_POINT_SIZE);
+}
+
 void GLPipeline::setMultisample(bool enable) {
     if (enable) glEnable(GL_MULTISAMPLE); else glDisable(GL_MULTISAMPLE);
 }

@@ -33,6 +33,7 @@ public:
     void setCullFace(CullFace face) override;
     void setFrontFace(bool ccw) override;
     void setPolygonMode(PolygonMode mode) override;
+    void setPointSizeProgramEnable(bool enable) override;
     void setMultisample(bool enable) override;
     void setPrimitiveType(PrimitiveType type) override;
     PrimitiveType primitiveType() const override;
@@ -43,6 +44,7 @@ public:
 private:
     std::shared_ptr<GLShader> _shader{};
     PrimitiveType _primitive{PrimitiveType::TriangleList};
+    bool _pointSizeEnable{false};
     GLuint _vao{0};
     GLuint _vbo{0};
     std::vector<VertexElement> _layout{};
