@@ -74,6 +74,7 @@ struct FramebufferAttachment {
     TextureFilter magFilter{TextureFilter::Linear};
     TextureWrap wrapS{TextureWrap::ClampToEdge};
     TextureWrap wrapT{TextureWrap::ClampToEdge};
+    float borderColor[4]{0.0f, 0.0f, 0.0f, 1.0f};  // CLAMP_TO_BORDER 时生效
 };
 
 struct FramebufferDesc {

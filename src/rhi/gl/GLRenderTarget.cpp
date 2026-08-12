@@ -94,10 +94,13 @@ bool GLRenderTarget::create(const FramebufferDesc& desc) {
                 glBindTexture(GL_TEXTURE_2D, tex);
                 glTexImage2D(GL_TEXTURE_2D, 0, ToGLInternalFormat(a.format), _width, _height, 0,
                              ToGLFormat(a.format, 0), ToGLSrcType(a.format), nullptr);
-                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, ToGLMinFilter(a.minFilter));
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, ToGLMinFilter(a.magFilter));
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, ToGLWrap(a.wrapS));
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, ToGLWrap(a.wrapT));
+                if (a.wrapS == TextureWrap::ClampToBorder || a.wrapT == TextureWrap::ClampToBorder) {
+                    glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, a.borderColor);
+                }
                 glFramebufferTexture2D(GL_FRAMEBUFFER, attach, GL_TEXTURE_2D, tex, 0);
                 _depthTex = tex;
             }
@@ -105,7 +108,7 @@ bool GLRenderTarget::create(const FramebufferDesc& desc) {
     }
 
     if (!drawBufs.empty()) glDrawBuffers(static_cast<GLsizei>(drawBufs.size()), drawBufs.data());
-    else glDrawBuffer(GL_NONE);
+    else { glDrawBuffer(GL_NONE); glReadBuffer(GL_NONE); }
 
     const bool complete = (glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);

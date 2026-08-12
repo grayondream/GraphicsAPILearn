@@ -33,6 +33,8 @@ inline bool IsFloatFormat(TextureFormat f) {
 inline GLenum ToGLFormat(TextureFormat f, int channels) {
     if (f == TextureFormat::Depth24Stencil8) return GL_DEPTH_STENCIL;
     if (f == TextureFormat::Depth32F) return GL_DEPTH_COMPONENT;
+    if (f == TextureFormat::R32F) return GL_RED;
+    if (f == TextureFormat::RG16F) return GL_RG;
     return (channels == 4) ? GL_RGBA : GL_RGB;
 }
 
