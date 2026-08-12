@@ -130,6 +130,16 @@ bool GLRenderTarget::attachCubeFace(ITexture3D* cube, int face, int mip) {
     return true;
 }
 
+bool GLRenderTarget::attachDepthCube(ITexture3D* cube, int mip) {
+    if (!cube || mip < 0 || !_fbo) return false;
+    glBindFramebuffer(GL_FRAMEBUFFER, _fbo);
+    glFramebufferTexture(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT,
+                         static_cast<GLuint>(reinterpret_cast<uintptr_t>(cube->handle())), mip);
+    glDrawBuffer(GL_NONE);
+    glReadBuffer(GL_NONE);
+    return true;
+}
+
 bool GLRenderTarget::bind() {
     glBindFramebuffer(GL_FRAMEBUFFER, _fbo);
     return true;

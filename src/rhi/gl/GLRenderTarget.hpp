@@ -13,6 +13,7 @@ public:
     bool create(int width, int height) override;
     bool create(const FramebufferDesc& desc) override;
     bool attachCubeFace(ITexture3D* cube, int face, int mip) override;
+    bool attachDepthCube(ITexture3D* cube, int mip) override;
     bool bind() override;
     bool unbind() override;
     void* colorTexture() override;
