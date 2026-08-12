@@ -1,6 +1,7 @@
 #pragma once
 #include "app/GL/Base/GLCameraBaseApp.hpp"
-#include "native/GL/GLProgram.hpp"
+#include "rhi/core/IPipeline.hpp"
+#include "app/GL/RhiGeometry.hpp"
 #include <memory>
 #include <array>
 #include "geometry/Camera.hpp"
@@ -17,11 +18,8 @@ protected:
 	virtual void drawScene(const float dt);
 	
 private:
-	void createVertexBuffer();
-
-private:
-	GLProgram _program;
-	unsigned int _vbo{};
-	unsigned int _vao{};
+	std::shared_ptr<rhi::IPipeline> _pipeline{};
+	std::shared_ptr<rhi::IBuffer> _vb{};
+	uint32_t _vertexCount{0};
 	float _curTime{};
 };

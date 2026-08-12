@@ -1,10 +1,10 @@
 #include "GLSimpleGemoteryApp.hpp"
-#include "native/GL/GLProgram.hpp"
 #include "base/StaticCollector.hpp"
 #include "base/ErrorHandle.hpp"
-#include "glad/glad.h"
-#include "geometry/Cube.hpp"
-#include "native/GL/GLImageTexture2D.hpp"
+#include "rhi/core/IShader.hpp"
+#include "rhi/core/IPipeline.hpp"
+#include "rhi/core/Common.hpp"
+#include "app/GL/RhiGeometry.hpp"
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
@@ -16,12 +16,6 @@ using FileUtils::join;
 using namespace ErrorHandle;
 
 GLSimpleGemoteryApp::~GLSimpleGemoteryApp() {
-	if (_vao != 0) {
-		glDeleteVertexArrays(1, &_vao);
-		glDeleteBuffers(1, &_vbo);
-	}
-
-	_program.destroy();
 }
 
 bool GLSimpleGemoteryApp::initApp() {
@@ -33,46 +27,35 @@ bool GLSimpleGemoteryApp::initApp() {
 	const auto ffile = join(StaticCollector::getGLShaderPath(), "Advanced", "Geometry", "Base.fs");
 	const auto gfile = join(StaticCollector::getGLShaderPath(), "Advanced", "Geometry", "Base.gs");
 
-	GLProgram program{};
-	auto ret = program.init(vfile, ffile, gfile);
-	ErrorHandle::ExitIfFailed(ret, "Create OpenGL program failed!");
-	_program = program;
-	
-	createVertexBuffer();
-	return true;
-}
+	auto shader = renderer()->createShader();
+	auto ok = shader->compile({{rhi::ShaderStage::Vertex, vfile, "main", false},
+	                           {rhi::ShaderStage::Fragment, ffile, "main", false},
+	                           {rhi::ShaderStage::Geometry, gfile, "main", false}});
+	ErrorHandle::ExitIfFailed(ok, "Create RHI shader failed: {}", shader->getLog());
 
-void GLSimpleGemoteryApp::createVertexBuffer() {
 	float points[] = {
         -0.5f,  0.5f, 1.0f, 0.0f, 0.0f, // top-left
          0.5f,  0.5f, 0.0f, 1.0f, 0.0f, // top-right
          0.5f, -0.5f, 0.0f, 0.0f, 1.0f, // bottom-right
         -0.5f, -0.5f, 1.0f, 1.0f, 0.0f  // bottom-left
     };
-    unsigned int vbo, vao;
-    glGenBuffers(1, &vbo);
-    glGenVertexArrays(1, &vao);
-    glBindVertexArray(vao);
-    glBindBuffer(GL_ARRAY_BUFFER, vbo);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(points), &points, GL_STATIC_DRAW);
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), 0);
-    glEnableVertexAttribArray(1);
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(2 * sizeof(float)));
-    glBindVertexArray(0);
-	
-	_vao = vao;
-	_vbo = vbo;
+	rhi::VertexLayout layout;
+	layout.elements.push_back({rhi::VertexElement::Float2, 0, 0, rhi::VertexInputRate::PerVertex, 0, 5 * static_cast<int>(sizeof(float))});
+	layout.elements.push_back({rhi::VertexElement::Float3, 1, 0, rhi::VertexInputRate::PerVertex, 2 * static_cast<int>(sizeof(float)), 5 * static_cast<int>(sizeof(float))});
+	auto geo = RhiGeometry::CreateFromArray(renderer().get(), points, sizeof(points), 4, layout);
+	_vb = geo.vertexBuffer; _vertexCount = geo.vertexCount;
+	_pipeline = renderer()->createPipeline(geo.layout, shader);
+	_pipeline->setPrimitiveType(rhi::PrimitiveType::Points);
+	return true;
 }
 
 void GLSimpleGemoteryApp::drawScene(const float dt) {
 	ImGui::Begin("OpenGL");
 	ImGui::End();
 
-	_program.use();
-	glBindVertexArray(_vao);
-	glDrawArrays(GL_POINTS, 0, 4);
+	renderer()->setPipeline(_pipeline);
+	renderer()->setVertexBuffer(_vb);
+	renderer()->draw(_vertexCount, 0);
 
-	glBindVertexArray(0);
 	return GLApp::drawScene(dt);
 }
