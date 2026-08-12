@@ -1,262 +1,156 @@
 #include "GLMsaaApp.hpp"
-#include "native/GL/GLProgram.hpp"
 #include "base/StaticCollector.hpp"
 #include "base/ErrorHandle.hpp"
-#include "glad/glad.h"
-#include "geometry/Cube.hpp"
-#include "geometry/Rect.hpp"
-#include "native/GL/GLImageTexture2D.hpp"
+#include "rhi/core/IShader.hpp"
+#include "rhi/core/IPipeline.hpp"
+#include "rhi/core/IRenderTarget.hpp"
+#include "rhi/core/ITexture2D.hpp"
+#include "rhi/core/Common.hpp"
+#include "app/GL/RhiGeometry.hpp"
+#include "app/GL/RhiImage.hpp"
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include "base/Log.hpp"
 #include "imgui.h"
-#include <utils/FileUtils.hpp>
+#include "geometry/Cube.hpp"
+#include "geometry/Rect.hpp"
+#include "utils/FileUtils.hpp"
 using FileUtils::join;
+
 using namespace ErrorHandle;
 
 GLMsaaApp::~GLMsaaApp() {
-	if (_vao != 0) {
-		glDeleteVertexArrays(1, &_vao);
-		glDeleteBuffers(2, _vbo);
-	}
+}
 
-	glDeleteFramebuffers(1, &_screenFrameBuffer);
-	glDeleteRenderbuffers(1, &_screenRbo);
-	_program.destroy();
+std::shared_ptr<rhi::IPipeline> GLMsaaApp::compileShader(const std::string& name, const rhi::VertexLayout& layout) {
+	const auto vfile = join(StaticCollector::getGLShaderPath(), "Advanced", "MSAA", (name + ".vs"));
+	const auto ffile = join(StaticCollector::getGLShaderPath(), "Advanced", "MSAA", (name + ".fs"));
+	auto shader = renderer()->createShader();
+	auto ok = shader->compile({ {rhi::ShaderStage::Vertex, vfile, "main", false},
+	                            {rhi::ShaderStage::Fragment, ffile, "main", false} });
+	ExitIfFailed(ok, "Create RHI shader failed: {}", shader->getLog());
+	return renderer()->createPipeline(layout, shader);
+}
+
+void GLMsaaApp::compileShader(const rhi::VertexLayout& layout) {
+	_pipeline = compileShader("Cube", layout);
+	_postPipeline = compileShader("Post", layout);
 }
 
 bool GLMsaaApp::initApp() {
 	if (!GLCameraBaseApp::initApp()) {
 		return false;
 	}
-	
-	{
-		const auto vfile = join(StaticCollector::getGLShaderPath(), "Advanced", "MSAA", "Cube.vs");
-		const auto ffile = join(StaticCollector::getGLShaderPath(), "Advanced", "MSAA", "Cube.fs");
-		auto ret = _program.init(vfile, ffile);
-		ErrorHandle::ExitIfFailed(ret, "Create OpenGL program failed!");
-	}
-	
-	{
-		const auto vfile = join(StaticCollector::getGLShaderPath(), "Advanced", "MSAA", "Post.vs");
-		const auto ffile = join(StaticCollector::getGLShaderPath(), "Advanced", "MSAA", "Post.fs");
-		auto ret = _postProgram.init(vfile, ffile);
-		ErrorHandle::ExitIfFailed(ret, "Create OpenGL program failed!");
-	}
 
 	const auto imgFile = join(StaticCollector::getImagePath(), "dog.jpg");
-	_texture = std::make_shared<GLImageTexture2D>(imgFile);
-	const auto valid = _texture->load().texture()->valid();
-	ExitIfFailed(valid, "Failed to load texture from file {}", imgFile);
-	createVertexBuffer();
-	createScreenBuffer();
+	_texture = RhiImage::Load2D(renderer().get(), imgFile);
+	ExitIfFailed(_texture != nullptr, "Failed to load texture from file {}", imgFile);
+
+	Cube cubeShape{};
+	auto cubeGeo = RhiGeometry::Create(renderer().get(), cubeShape, true, false, true);
+	_cubeVb = cubeGeo.vertexBuffer; _cubeUv = cubeGeo.uvBuffer; _cubeEbo = cubeGeo.indexBuffer;
+
+	Rect rect{};
+	auto screenGeo = RhiGeometry::Create(renderer().get(), rect, true, false, true);
+	_screenVb = screenGeo.vertexBuffer; _screenUv = screenGeo.uvBuffer; _screenEbo = screenGeo.indexBuffer;
+
+	compileShader(cubeGeo.layout);
 	createFrameBuffer();
 	createPostFrameBuffer();
-	//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 	return true;
 }
 
-void GLMsaaApp::createVertexBuffer() {
-	Cube shape{};
-	unsigned int vbo[2]{}, vao{}, ebo{};
-	glGenVertexArrays(1, &vao);
-	glGenBuffers(2, vbo);
-	glBindVertexArray(vao);
-	{
-		glBindBuffer(GL_ARRAY_BUFFER, vbo[0]);
-		glBufferData(GL_ARRAY_BUFFER, shape.byteSize(), shape.toGL().data(), GL_STATIC_DRAW);
-
-		glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex), nullptr);
-		glEnableVertexAttribArray(0);
-
-		glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)(sizeof(float) * 4));
-		glEnableVertexAttribArray(1);
-
-		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
-		glBufferData(GL_ELEMENT_ARRAY_BUFFER, shape.idxByteSize(), shape.idx(), GL_STATIC_DRAW);
-
-		glBindBuffer(GL_ARRAY_BUFFER, vbo[1]);
-		glBufferData(GL_ARRAY_BUFFER, shape.uvSize(), shape.uv(), GL_STATIC_DRAW);
-
-		glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), nullptr);
-		glEnableVertexAttribArray(2);
-	}
-	glBindVertexArray(0);
-	_vao = vao;
-	_vbo[0] = vbo[0], _vbo[1] = vbo[1];
-}
-
-void GLMsaaApp::createScreenBuffer() {
-	Rect shape{};
-	unsigned int vbos[2]{}, vao{}, ebo{};
-	glGenVertexArrays(1, &vao);
-	glGenBuffers(2, vbos);
-	glGenBuffers(1, &ebo);
-
-	glBindVertexArray(vao);
-	{
-		glBindBuffer(GL_ARRAY_BUFFER, vbos[0]);
-		glBufferData(GL_ARRAY_BUFFER, shape.byteSize(), shape.toGL().data(), GL_STATIC_DRAW);
-
-		glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 8 * sizeof(float), nullptr);
-		glEnableVertexAttribArray(0);
-
-		glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(4 * sizeof(float)));
-		glEnableVertexAttribArray(1);
-
-		glBindBuffer(GL_ARRAY_BUFFER, vbos[1]);
-		glBufferData(GL_ARRAY_BUFFER, shape.uvSize(), shape.uv(), GL_STATIC_DRAW);
-
-		glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), nullptr);
-		glEnableVertexAttribArray(2);
-
-		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
-		glBufferData(GL_ELEMENT_ARRAY_BUFFER, shape.idxByteSize(), shape.idx(), GL_STATIC_DRAW);
-
-	}
-	glBindVertexArray(0);
-	_screenVao = vao;
-	_screenEbo = ebo;
-	_screenVbo[0] = vbos[0];
-	_screenVbo[1] = vbos[1];
-}
-
 void GLMsaaApp::createFrameBuffer() {
-	unsigned int framebuffer;
-    glGenFramebuffers(1, &framebuffer);
-    glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
-
 	const auto prop = m_window->getProperties();
-	const auto width = prop.width, height = prop.height;
-	unsigned int textureColorBufferMultiSampled;
-    glGenTextures(1, &textureColorBufferMultiSampled);
-    glBindTexture(GL_TEXTURE_2D_MULTISAMPLE, textureColorBufferMultiSampled);
-    glTexImage2DMultisample(GL_TEXTURE_2D_MULTISAMPLE, 4, GL_RGB, width, height, GL_TRUE);
-    glBindTexture(GL_TEXTURE_2D_MULTISAMPLE, 0);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D_MULTISAMPLE, textureColorBufferMultiSampled, 0);
-
-	unsigned int rbo;
-    glGenRenderbuffers(1, &rbo);
-    glBindRenderbuffer(GL_RENDERBUFFER, rbo);
-    glRenderbufferStorageMultisample(GL_RENDERBUFFER, 4, GL_DEPTH24_STENCIL8, width, height);
-    glBindRenderbuffer(GL_RENDERBUFFER, 0);
-    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, rbo);
-
-	if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE){
-		ExitIfFailed(false, "Failed to create framebuffer");
-	}
-	glBindFramebuffer(GL_FRAMEBUFFER, 0);
-	_screenFrameBuffer = framebuffer;
-	_screenRbo = rbo;
+	_msaaFbo = renderer()->createRenderTarget();
+	rhi::FramebufferDesc fbd;
+	fbd.width = prop.width; fbd.height = prop.height;
+	fbd.samples = 4;
+	rhi::FramebufferAttachment color;
+	color.type = rhi::AttachmentType::Color;
+	color.format = rhi::TextureFormat::RGB8;
+	color.samples = 4;
+	fbd.attachments.push_back(color);
+	rhi::FramebufferAttachment depth;
+	depth.type = rhi::AttachmentType::DepthStencil;
+	depth.format = rhi::TextureFormat::Depth24Stencil8;
+	depth.samples = 4;
+	fbd.attachments.push_back(depth);
+	if (!_msaaFbo->create(fbd)) ExitIfFailed(false, "Failed to create MSAA framebuffer");
 }
 
 void GLMsaaApp::createPostFrameBuffer() {
-	unsigned int intermediateFBO;
-    glGenFramebuffers(1, &intermediateFBO);
-    glBindFramebuffer(GL_FRAMEBUFFER, intermediateFBO);
-
 	const auto prop = m_window->getProperties();
-	const auto width = prop.width, height = prop.height;
-    // create a color attachment texture
-    unsigned int screenTexture;
-    glGenTextures(1, &screenTexture);
-    glBindTexture(GL_TEXTURE_2D, screenTexture);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, screenTexture, 0);	// we only need a color buffer
-
-    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE){
-		ExitIfFailed(false, "Failed to create framebuffer");
-	}
-        
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
-	_postFrameBuffer = intermediateFBO;
-	_postTexture = screenTexture;
-}
-
-void GLMsaaApp::beginDrawScene() {
-	_texture->texture()->bind(0);
-	_program.use();
-	return GLApp::beginDrawScene();
+	_postFbo = renderer()->createRenderTarget();
+	rhi::FramebufferDesc fbd;
+	fbd.width = prop.width; fbd.height = prop.height;
+	rhi::FramebufferAttachment color;
+	color.type = rhi::AttachmentType::Color;
+	color.format = rhi::TextureFormat::RGB8;
+	color.minFilter = color.magFilter = rhi::TextureFilter::Linear;
+	fbd.attachments.push_back(color);
+	if (!_postFbo->create(fbd)) ExitIfFailed(false, "Failed to create post framebuffer");
 }
 
 void GLMsaaApp::drawFrameBufferMssa() {
-	glBindFramebuffer(GL_FRAMEBUFFER, _screenFrameBuffer);
-	glClearColor(0.1, 0.1, 0.1, 1.0);
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-	glEnable(GL_DEPTH_TEST);
-
-	{
-		glm::vec3 cubePositions[] = {
-			glm::vec3(0.0f,  0.0f,  0.0f),
-		};
-
-		glBindVertexArray(_vao);
-		const auto projection = glm::perspective(glm::radians(_camera.zoom()), aspectRatio(), 0.1f, 100.0f);
-		_program.update("projection", projection);
-		const auto view = _camera.getViewMatrix();
-		_program.update("view", view);
-		glm::mat4 model = glm::mat4(1.0f); // make sure to initialize matrix to identity matrix first
-		model = glm::translate(model, cubePositions[0]);
-		model = glm::scale(model, glm::vec3(2.0f));
-		model = glm::rotate(model, glm::radians(45.f), glm::vec3(1.0f, 0.f, 0.f));
-		model = glm::rotate(model, glm::radians(45.f), glm::vec3(0.0f, 1.f, 0.f));
-		_program.update("model", model);
-
-		glDrawArrays(GL_TRIANGLES, 0, 36);
-
-
-		glBindVertexArray(0);
-	}
+	renderer()->setRenderTarget(_msaaFbo);
+	renderer()->clearColor(0.1f, 0.1f, 0.1f, 1.0f);
+	_pipeline->setDepthTest(true);
+	renderer()->setPipeline(_pipeline);
+	renderer()->bindTexture(_texture, 0);
+	const auto projection = glm::perspective(glm::radians(_camera.zoom()), aspectRatio(), 0.1f, 100.0f);
+	_pipeline->setUniform("projection", glm::value_ptr(projection), 1);
+	const auto view = _camera.getViewMatrix();
+	_pipeline->setUniform("view", glm::value_ptr(view), 1);
+	glm::mat4 model = glm::mat4(1.0f);
+	model = glm::translate(model, glm::vec3(0.0f, 0.0f, 0.0f));
+	model = glm::scale(model, glm::vec3(2.0f));
+	model = glm::rotate(model, glm::radians(45.f), glm::vec3(1.0f, 0.f, 0.f));
+	model = glm::rotate(model, glm::radians(45.f), glm::vec3(0.0f, 1.f, 0.f));
+	_pipeline->setUniform("model", glm::value_ptr(model), 1);
+	_pipeline->setUniform("textureSampler", 0);
+	renderer()->setVertexBuffer(_cubeVb);
+	renderer()->setVertexBuffer(_cubeUv, 1);
+	renderer()->setIndexBuffer(_cubeEbo);
+	renderer()->drawIndexed(36, 0, 0);
 
 	const auto attr = m_window->getProperties();
-	const auto width = attr.width, height = attr.height;
-	glBindFramebuffer(GL_READ_FRAMEBUFFER, _screenFrameBuffer);
-	glBindFramebuffer(GL_DRAW_FRAMEBUFFER, _postFrameBuffer);
-	glBlitFramebuffer(0, 0, width, height, 0, 0, width, height, GL_COLOR_BUFFER_BIT, GL_NEAREST);
-	glBindFramebuffer(GL_FRAMEBUFFER, 0);
-	glClearColor(0.1, 0.1, 0.1, 1.0);
-	glClear(GL_COLOR_BUFFER_BIT);
-    glDisable(GL_DEPTH_TEST);
-
-	_postProgram.use();
-	glBindVertexArray(_screenVao);
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, _postTexture); // use the now resolved color attachment as the quad's texture
-    glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
-	glBindVertexArray(0);
+	renderer()->setViewport(rhi::Viewport{0, 0, attr.width, attr.height});
+	renderer()->blitFramebuffer(_msaaFbo, _postFbo, rhi::BlitMask::Color);
+	renderer()->setRenderTarget(nullptr);
+	renderer()->clearColor(0.1f, 0.1f, 0.1f, 1.0f);
+	_postPipeline->setDepthTest(false);
+	renderer()->setPipeline(_postPipeline);
+	renderer()->bindTexture(_postFbo->colorTexture2D(0), 0);
+	_postPipeline->setUniform("textureSampler", 0);
+	renderer()->setVertexBuffer(_screenVb);
+	renderer()->setVertexBuffer(_screenUv, 1);
+	renderer()->setIndexBuffer(_screenEbo);
+	renderer()->drawIndexed(6, 0, 0);
 }
 
 void GLMsaaApp::drawGLMssa() {
-	glm::vec3 cubePositions[] = {
-		glm::vec3(0.0f,  0.0f,  0.0f),
-	  };
-  
-	  glBindVertexArray(_vao);
-	  if(_enableMsaa){
-		  glEnable(GL_MULTISAMPLE);
-	  } else {
-		  glDisable(GL_MULTISAMPLE);
-	  }
-	  glEnable(GL_DEPTH_TEST);
-	  
-	  const auto projection = glm::perspective(glm::radians(_camera.zoom()), aspectRatio(), 0.1f, 100.0f);
-	  _program.update("projection", projection);
-	  const auto view = _camera.getViewMatrix();
-	  _program.update("view", view);
-	  glm::mat4 model = glm::mat4(1.0f); // make sure to initialize matrix to identity matrix first
-	  model = glm::translate(model, cubePositions[0]);
-	  model = glm::scale(model, glm::vec3(2.0f));
-	  model = glm::rotate(model, glm::radians(45.f), glm::vec3(1.0f, 0.f, 0.f));
-	  model = glm::rotate(model, glm::radians(45.f), glm::vec3(0.0f, 1.f, 0.f));
-	  _program.update("model", model);
-  
-	  glDrawArrays(GL_TRIANGLES, 0, 36);
-	  
-  
-	  glBindVertexArray(0);
+	renderer()->clearColor(0.1f, 0.1f, 0.1f, 1.0f);
+	_pipeline->setDepthTest(true);
+	_pipeline->setMultisample(_enableMsaa);
+	renderer()->setPipeline(_pipeline);
+	renderer()->bindTexture(_texture, 0);
+	const auto projection = glm::perspective(glm::radians(_camera.zoom()), aspectRatio(), 0.1f, 100.0f);
+	_pipeline->setUniform("projection", glm::value_ptr(projection), 1);
+	const auto view = _camera.getViewMatrix();
+	_pipeline->setUniform("view", glm::value_ptr(view), 1);
+	glm::mat4 model = glm::mat4(1.0f);
+	model = glm::translate(model, glm::vec3(0.0f, 0.0f, 0.0f));
+	model = glm::scale(model, glm::vec3(2.0f));
+	model = glm::rotate(model, glm::radians(45.f), glm::vec3(1.0f, 0.f, 0.f));
+	model = glm::rotate(model, glm::radians(45.f), glm::vec3(0.0f, 1.f, 0.f));
+	_pipeline->setUniform("model", glm::value_ptr(model), 1);
+	_pipeline->setUniform("textureSampler", 0);
+	renderer()->setVertexBuffer(_cubeVb);
+	renderer()->setVertexBuffer(_cubeUv, 1);
+	renderer()->setIndexBuffer(_cubeEbo);
+	renderer()->drawIndexed(36, 0, 0);
 }
 
 void GLMsaaApp::drawScene(const float dt) {
