@@ -1,106 +1,57 @@
 #include "GLUniformBufferApp.hpp"
-#include "native/GL/GLProgram.hpp"
 #include "base/StaticCollector.hpp"
 #include "base/ErrorHandle.hpp"
-#include "glad/glad.h"
-#include "geometry/Cube.hpp"
-#include "native/GL/GLImageTexture2D.hpp"
+#include "rhi/core/IShader.hpp"
+#include "rhi/core/IPipeline.hpp"
+#include "rhi/core/Common.hpp"
+#include "app/GL/RhiGeometry.hpp"
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include "base/Log.hpp"
 #include "imgui.h"
-#include "utils/FileUtils.hpp"
+#include "geometry/Cube.hpp"
+#include <utils/FileUtils.hpp>
 using FileUtils::join;
 
 using namespace ErrorHandle;
 
-GLUniformBufferApp::~GLUniformBufferApp() {
-	if (_vao != 0) {
-		glDeleteVertexArrays(1, &_vao);
-		glDeleteBuffers(2, _vbo);
-	}
-
-	for(auto& program : _programs) {
-		program.destroy();
-	}
-}
+GLUniformBufferApp::~GLUniformBufferApp() {}
 
 bool GLUniformBufferApp::initApp() {
 	if (!GLCameraBaseApp::initApp()) {
 		return false;
 	}
-	
+
 	const auto vfile = join(StaticCollector::getGLShaderPath(), "Advanced", "UniformBuffer", "Cube.vert");
 	const auto ffile = join(StaticCollector::getGLShaderPath(), "Advanced", "UniformBuffer", "Cube.frag");
+
+	Cube cubeShape{};
+	auto geo = RhiGeometry::Create(renderer().get(), cubeShape, true, false, true);
+	_vb = geo.vertexBuffer; _uv = geo.uvBuffer; _ebo = geo.indexBuffer;
+	_indexCount = geo.indexCount;
+
 	for(int i = 0;i < 4;i ++) {
-		GLProgram program{};
-		auto ret = program.init(vfile, ffile);
-		ErrorHandle::ExitIfFailed(ret, "Create OpenGL program failed!");
-		_programs.push_back(program);
+		auto shader = renderer()->createShader();
+		auto ok = shader->compile({{rhi::ShaderStage::Vertex, vfile, "main", false},
+		                           {rhi::ShaderStage::Fragment, ffile, "main", false}});
+		ExitIfFailed(ok, "Create RHI shader failed: {}", shader->getLog());
+		auto pipeline = renderer()->createPipeline(geo.layout, shader);
+		pipeline->bindUniformBlock(0);
+		_pipelines.push_back(pipeline);
 	}
 
-	createVertexBuffer();
-	createUniformBuffer();
+	_ubo = renderer()->createUniformBuffer();
+	_ubo->init(nullptr, sizeof(glm::mat4) * 2, rhi::BufferType::Uniform);
+	_ubo->bindRange(0, 0, sizeof(glm::mat4) * 2);
+	const auto projection = glm::perspective(glm::radians(_camera.zoom()), aspectRatio(), 0.1f, 100.0f);
+	const auto view = _camera.getViewMatrix();
+	_ubo->update(glm::value_ptr(projection), sizeof(glm::mat4), 0);
+	_ubo->update(glm::value_ptr(view), sizeof(glm::mat4), sizeof(glm::mat4));
 	return true;
 }
 
-void GLUniformBufferApp::createVertexBuffer() {
-	Cube shape{};
-	unsigned int vbo[2]{}, vao{}, ebo{};
-	glGenVertexArrays(1, &vao);
-	glGenBuffers(2, vbo);
-	glBindVertexArray(vao);
-	{
-		glBindBuffer(GL_ARRAY_BUFFER, vbo[0]);
-		glBufferData(GL_ARRAY_BUFFER, shape.byteSize(), shape.toGL().data(), GL_STATIC_DRAW);
-
-		glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex), nullptr);
-		glEnableVertexAttribArray(0);
-
-		glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)(sizeof(float) * 4));
-		glEnableVertexAttribArray(1);
-
-		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
-		glBufferData(GL_ELEMENT_ARRAY_BUFFER, shape.idxByteSize(), shape.idx(), GL_STATIC_DRAW);
-
-		glBindBuffer(GL_ARRAY_BUFFER, vbo[1]);
-		glBufferData(GL_ARRAY_BUFFER, shape.uvSize(), shape.uv(), GL_STATIC_DRAW);
-
-		glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), nullptr);
-		glEnableVertexAttribArray(2);
-	}
-	glBindVertexArray(0);
-	_vao = vao;
-	_vbo[0] = vbo[0], _vbo[1] = vbo[1];
-}
-
-unsigned int GLUniformBufferApp::createUniformBuffer() {
-	for(auto i = 0;i < 4;i ++) {
-		auto program = _programs[i];
-		program.uniformBind("Matrices", 0);
-	}
-
-	unsigned int uboMatrices;
-	glGenBuffers(1, &uboMatrices);
-	glBindBuffer(GL_UNIFORM_BUFFER, uboMatrices);
-	glBufferData(GL_UNIFORM_BUFFER, sizeof(glm::mat4) * 2, nullptr, GL_STATIC_DRAW);
-	glBindBuffer(GL_UNIFORM_BUFFER, 0);
-
-	glBindBufferRange(GL_UNIFORM_BUFFER, 0, uboMatrices, 0, 2 * sizeof(glm::mat4));
-
-	const auto projection = glm::perspective(glm::radians(_camera.zoom()), aspectRatio(), 0.1f, 100.0f);
-	const auto view = _camera.getViewMatrix();
-
-	glBindBuffer(GL_UNIFORM_BUFFER, uboMatrices);
-    glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(glm::mat4), glm::value_ptr(projection));
-	glBufferSubData(GL_UNIFORM_BUFFER, sizeof(glm::mat4), sizeof(glm::mat4), glm::value_ptr(view));
-    glBindBuffer(GL_UNIFORM_BUFFER, 0);
-	return uboMatrices;
-}
-
 void GLUniformBufferApp::drawScene(const float dt) {
-	glBindVertexArray(_vao);
 	ImGui::Begin("OpenGL");
 	ImGui::End();
 	const auto x = 1;
@@ -122,17 +73,18 @@ void GLUniformBufferApp::drawScene(const float dt) {
 	curTime += dt;
 
 	for (int i = 0; i < 4; i++) {
-		auto program = _programs[i];
-		program.use();
+		renderer()->setPipeline(_pipelines[i]);
+		renderer()->setVertexBuffer(_vb);
+		renderer()->setVertexBuffer(_uv, 1);
+		renderer()->setIndexBuffer(_ebo);
 		glm::mat4 model = glm::mat4(1.0f); // make sure to initialize matrix to identity matrix first
 		model = glm::translate(model, cubePositions[i]);
 		float angle = 20.0f * (i + 1) * curTime;
 		model = glm::rotate(model, glm::radians(angle), glm::vec3(1.0f, 0.3f, 0.5f));
-		program.update("model", model);
-		program.update("cubeColor", colors[i]);
-		glDrawArrays(GL_TRIANGLES, 0, 36);
+		_pipelines[i]->setUniform("model", glm::value_ptr(model), 1);
+		_pipelines[i]->setUniform("cubeColor", glm::value_ptr(colors[i]), 1, 4);
+		renderer()->drawIndexed(_indexCount, 0, 0);
 	}
 
-	glBindVertexArray(0);
 	return GLApp::drawScene(dt);
 }
