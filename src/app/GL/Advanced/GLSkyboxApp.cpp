@@ -1,152 +1,98 @@
 
 #include "GLSkyboxApp.hpp"
-#include "native/GL/GLProgram.hpp"
 #include "base/StaticCollector.hpp"
 #include "base/ErrorHandle.hpp"
-#include "glad/glad.h"
-#include "geometry/Cube.hpp"
-#include "geometry/Sphere.hpp"
-#include "native/GL/GLImageTexture2D.hpp"
-#include "native/GL/GLImageTexture3D.hpp"
+#include "rhi/core/IShader.hpp"
+#include "rhi/core/IPipeline.hpp"
+#include "app/GL/RhiGeometry.hpp"
+#include "app/GL/RhiImage.hpp"
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include "base/Log.hpp"
 #include "imgui.h"
-#include "geometry/Image.hpp"
-#include "utils/GL/GLUtils.hpp"
-#include "utils/GL/GLAppUtils.hpp"
-#include "utils/FileUtils.hpp"
+#include "geometry/Cube.hpp"
+#include <utils/FileUtils.hpp>
 using FileUtils::join;
 using namespace ErrorHandle;
 
-GLSkyboxApp::~GLSkyboxApp() {
-	if (_vao != 0) {
-		glDeleteVertexArrays(1, &_vao);
-		glDeleteBuffers(3, _vbo);
-	}
-
-	glDeleteVertexArrays(1, &_skyVao);
-	glDeleteBuffers(1, &_skyVbo);
-	_program.destroy();
-}
-
-static std::pair<unsigned int, unsigned int> CreateSkyBoxBuffer() {
-	Cube shape{};
-	unsigned int skyboxVAO, skyboxVBO;
-	glGenVertexArrays(1, &skyboxVAO);
-	glGenBuffers(1, &skyboxVBO);
-	glBindVertexArray(skyboxVAO);
-	glBindBuffer(GL_ARRAY_BUFFER, skyboxVBO);
-	glBufferData(GL_ARRAY_BUFFER, shape.byteSize(), shape.toGL().data(), GL_STATIC_DRAW);
-	glEnableVertexAttribArray(0);
-	glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex), nullptr);
-	return { skyboxVAO, skyboxVBO };
-}
+GLSkyboxApp::~GLSkyboxApp() {}
 
 bool GLSkyboxApp::initApp() {
-	if (!GLCameraBaseApp::initApp()) {
-		return false;
-	}
-	
-	_program = GLUtils::CompileShader("Advanced", "SkyBox", "Cube");
-	_skyboxProgram = GLUtils::CompileShader("Advanced", "SkyBox", "SkyBox");
-	const auto imgPath = StaticCollector::getImagePath();
-	const auto imgFile = join(imgPath, "dog.jpg");
-	_texture = std::make_shared<GLImageTexture2D>(imgFile);
-	_skyBoxTexture = std::make_shared<GLImageTexture3D>(join(imgPath, "Skybox"));
-	auto valid = _skyBoxTexture->load().texture()->valid();
-	ExitIfFailed(valid, "Failed to load texture from file {}", imgFile);
+    if (!GLCameraBaseApp::initApp()) return false;
+    Cube cubeShape{};
+    auto cg = RhiGeometry::Create(renderer().get(), cubeShape, true, true, true,
+                                  RhiGeometry::Layout{3, 2});
+    _cubeVb = cg.vertexBuffer; _cubeNormal = cg.normalBuffer;
+    _cubeUv = cg.uvBuffer; _cubeEbo = cg.indexBuffer; _cubeIndexCount = cg.indexCount;
+    _skyVb = cg.vertexBuffer;
+    _skyVertexCount = cg.vertexCount;
 
-	valid = _texture->load().texture()->valid();
-	ExitIfFailed(valid, "Failed to load texture from file {}", imgFile);
-	createVertexBuffer();
-	std::tie(_skyVao, _skyVbo) = CreateSkyBoxBuffer();
-	//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-	return true;
-}
+    const auto cubeVFile = join(StaticCollector::getGLShaderPath(), "Advanced", "SkyBox", "Cube.vert");
+    const auto cubeFFile = join(StaticCollector::getGLShaderPath(), "Advanced", "SkyBox", "Cube.frag");
+    auto cubeShader = renderer()->createShader();
+    auto cubeOk = cubeShader->compile({{rhi::ShaderStage::Vertex, cubeVFile, "main", false},
+                                       {rhi::ShaderStage::Fragment, cubeFFile, "main", false}});
+    ExitIfFailed(cubeOk, "Create RHI shader failed: {}", cubeShader->getLog());
+    _cubePipeline = renderer()->createPipeline(cg.layout, cubeShader);
+    _cubePipeline->setDepthTest(true);
 
-void GLSkyboxApp::createVertexBuffer() {
-	Cube shape{};
-	unsigned int vbo[3]{}, vao{}, ebo{};
-	glGenVertexArrays(1, &vao);
-	glGenBuffers(3, vbo);
-	glBindVertexArray(vao);
-	{
-		glBindBuffer(GL_ARRAY_BUFFER, vbo[0]);
-		glBufferData(GL_ARRAY_BUFFER, shape.byteSize(), shape.toGL().data(), GL_STATIC_DRAW);
+    const auto skyVFile = join(StaticCollector::getGLShaderPath(), "Advanced", "SkyBox", "SkyBox.vert");
+    const auto skyFFile = join(StaticCollector::getGLShaderPath(), "Advanced", "SkyBox", "SkyBox.frag");
+    auto skyShader = renderer()->createShader();
+    auto skyOk = skyShader->compile({{rhi::ShaderStage::Vertex, skyVFile, "main", false},
+                                     {rhi::ShaderStage::Fragment, skyFFile, "main", false}});
+    ExitIfFailed(skyOk, "Create RHI shader failed: {}", skyShader->getLog());
+    rhi::VertexLayout skyLayout;
+    skyLayout.elements.push_back({rhi::VertexElement::Float4, 0, 0, rhi::VertexInputRate::PerVertex, 0, 32});
+    _skyboxPipeline = renderer()->createPipeline(skyLayout, skyShader);
 
-		glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex), nullptr);
-		glEnableVertexAttribArray(0);
-
-		glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)(sizeof(float) * 4));
-		glEnableVertexAttribArray(1);
-
-		glBindBuffer(GL_ARRAY_BUFFER, vbo[1]);
-		glBufferData(GL_ARRAY_BUFFER, shape.normalSize(), shape.normal(), GL_STATIC_DRAW);
-		glVertexAttribPointer(2, 4, GL_FLOAT, GL_FALSE, sizeof(Vector4DBase<float>), nullptr);
-		glEnableVertexAttribArray(2); // ����
-
-		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
-		glBufferData(GL_ELEMENT_ARRAY_BUFFER, shape.idxByteSize(), shape.idx(), GL_STATIC_DRAW);
-
-		glBindBuffer(GL_ARRAY_BUFFER, vbo[2]);
-		glBufferData(GL_ARRAY_BUFFER, shape.uvSize(), shape.uv(), GL_STATIC_DRAW);
-
-		glVertexAttribPointer(3, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), nullptr);
-		glEnableVertexAttribArray(3);
-	}
-	glBindVertexArray(0);
-	_vao = vao;
-	_vbo[0] = vbo[0], _vbo[1] = vbo[1], _vbo[2] = vbo[2];
-}
-
-void GLSkyboxApp::beginDrawScene() {
-	_texture->texture()->bind(0);
-	_program.use();
-	return GLApp::beginDrawScene();
+    const auto imgPath = StaticCollector::getImagePath();
+    _texture = RhiImage::Load2D(renderer().get(), join(imgPath, "dog.jpg"));
+    _skyBoxTexture = RhiImage::LoadCube(renderer().get(), join(imgPath, "Skybox"));
+    ExitIfFailed(_skyBoxTexture != nullptr && _skyBoxTexture->valid(),
+                 "Failed to load texture from file {}", join(imgPath, "Skybox"));
+    return true;
 }
 
 void GLSkyboxApp::drawCube() {
-	glBindVertexArray(_vao);
-	const auto projection = glm::perspective(glm::radians(_camera.zoom()), aspectRatio(), 0.1f, 100.0f);
-	_program.update("projection", projection);
-	const auto view = _camera.getViewMatrix();
-	_program.update("view", view);
-	glm::mat4 model = glm::mat4(1.0f); // make sure to initialize matrix to identity matrix first
-	model = glm::translate(model, glm::vec3(0, 0, 0));
-	model = glm::rotate(model, glm::radians(0.f), glm::vec3(1, 0, 0));
-	model = glm::rotate(model, glm::radians(45.f), glm::vec3(0, 1, 0));
-	_program.update("model", model);
-	auto attr = _camera.getAttr();
-	_program.update("cameraPos", attr.pos);
-	_program.update("textureSampler", 0);
-	_program.update("skyBoxSampler", 1);
-	_program.update("enableReflection", _enableReflect);
-	_program.update("enableRefraction", _enableRefraction);
-	glDrawArrays(GL_TRIANGLES, 0, 36);
-	glBindVertexArray(0);
+    renderer()->setPipeline(_cubePipeline);
+    renderer()->setVertexBuffer(_cubeVb);
+    renderer()->setVertexBuffer(_cubeNormal, 2);
+    renderer()->setVertexBuffer(_cubeUv, 1);
+    renderer()->setIndexBuffer(_cubeEbo);
+    const auto projection = glm::perspective(glm::radians(_camera.zoom()), aspectRatio(), 0.1f, 100.0f);
+    _cubePipeline->setUniform("projection", glm::value_ptr(projection), 1);
+    const auto view = _camera.getViewMatrix();
+    _cubePipeline->setUniform("view", glm::value_ptr(view), 1);
+    glm::mat4 model = glm::mat4(1.0f);
+    model = glm::translate(model, glm::vec3(0, 0, 0));
+    model = glm::rotate(model, glm::radians(0.f), glm::vec3(1, 0, 0));
+    model = glm::rotate(model, glm::radians(45.f), glm::vec3(0, 1, 0));
+    _cubePipeline->setUniform("model", glm::value_ptr(model), 1);
+    auto attr = _camera.getAttr();
+    _cubePipeline->setUniform("cameraPos", glm::value_ptr(attr.pos), 1, 3);
+    _cubePipeline->setUniform("textureSampler", 0);
+    _cubePipeline->setUniform("skyBoxSampler", 1);
+    _cubePipeline->setUniform("enableReflection", _enableReflect);
+    _cubePipeline->setUniform("enableRefraction", _enableRefraction);
+    renderer()->drawIndexed(_cubeIndexCount, 0, 0);
 }
 
 void GLSkyboxApp::drawSkybox() {
-    glDepthFunc(GL_LEQUAL);
-    glDepthMask(GL_FALSE);  // 禁用深度写入
-    
-    _skyboxProgram.use();
+    _skyboxPipeline->setDepthFunc(rhi::CompareFunc::LessEqual);
+    _skyboxPipeline->setDepthMask(false);
+    renderer()->setPipeline(_skyboxPipeline);
     const auto projection = glm::perspective(glm::radians(_camera.zoom()), aspectRatio(), 0.1f, 100.0f);
-    _skyboxProgram.update("projection", projection);
-
-    // 使用仅含旋转分量的视图矩阵
+    _skyboxPipeline->setUniform("projection", glm::value_ptr(projection), 1);
     auto view = glm::mat4(glm::mat3(_camera.getViewMatrix()));
-    _skyboxProgram.update("view", view);
-    
-    _skyboxProgram.update("skybox", 1);
-    glBindVertexArray(_skyVao);
-    glDrawArrays(GL_TRIANGLES, 0, 36);
-    glBindVertexArray(0);
-    
-    glDepthMask(GL_TRUE);   // 恢复深度写入
-    glDepthFunc(GL_LESS);
+    _skyboxPipeline->setUniform("view", glm::value_ptr(view), 1);
+    renderer()->bindTexture(_skyBoxTexture, 1);
+    _skyboxPipeline->setUniform("skybox", 1);
+    renderer()->setVertexBuffer(_skyVb);
+    renderer()->draw(_skyVertexCount, 0);
+    _skyboxPipeline->setDepthMask(true);
+    _skyboxPipeline->setDepthFunc(rhi::CompareFunc::Less);
 }
 
 void GLSkyboxApp::drawScene(const float dt) {
@@ -158,11 +104,10 @@ void GLSkyboxApp::drawScene(const float dt) {
 	}
 
 	ImGui::End();
-	_texture->texture()->bind(0);
-	_skyBoxTexture->texture()->bind(1);
+	renderer()->bindTexture(_texture, 0);
+	renderer()->bindTexture(_skyBoxTexture, 1);
 	
 	drawCube();
-	// 修改渲染顺序：先绘制天空盒，再绘制其他物体
 	drawSkybox();
 	
 	return GLApp::drawScene(dt);

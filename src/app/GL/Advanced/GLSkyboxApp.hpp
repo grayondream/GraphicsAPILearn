@@ -1,37 +1,36 @@
 
 #pragma once
 #include "app/GL/Base/GLCameraBaseApp.hpp"
-#include "native/GL/GLProgram.hpp"
+#include "rhi/core/ITexture2D.hpp"
+#include "rhi/core/ITexture3D.hpp"
+#include "rhi/core/IBuffer.hpp"
+#include "rhi/core/IPipeline.hpp"
 #include <memory>
 #include <array>
 #include "geometry/Camera.hpp"
 #include "geometry/Vertex.hpp"
 
-class GLImageTexture2D;
-class GLImageTexture3D;
 class GLSkyboxApp : public GLCameraBaseApp {
 public:
 	virtual ~GLSkyboxApp();
 
 	protected:
 	virtual bool initApp() override;
-	virtual void beginDrawScene();
 	virtual void drawScene(const float dt);
 	
 private:
-	void createVertexBuffer();
 	void drawCube();
 	void drawSkybox();
 
 private:
-	std::shared_ptr<GLImageTexture2D> _texture{};
-	std::shared_ptr<GLImageTexture3D> _skyBoxTexture{};
-	GLProgram _program{};
-	GLProgram _skyboxProgram{};
-	unsigned int _vbo[3]{};
-	unsigned int _vao{};
-	unsigned int _skyVao{};
-	unsigned int _skyVbo{};
+	std::shared_ptr<rhi::ITexture2D> _texture{};
+	std::shared_ptr<rhi::ITexture3D> _skyBoxTexture{};
+	std::shared_ptr<rhi::IPipeline> _cubePipeline{};
+	std::shared_ptr<rhi::IPipeline> _skyboxPipeline{};
+	std::shared_ptr<rhi::IBuffer> _cubeVb{}, _cubeNormal{}, _cubeUv{}, _cubeEbo{};
+	std::shared_ptr<rhi::IBuffer> _skyVb{};
+	uint32_t _cubeIndexCount{};
+	uint32_t _skyVertexCount{};
 	float _curTime{};
 	bool _enableReflect{};
 	bool _enableRefraction{};
