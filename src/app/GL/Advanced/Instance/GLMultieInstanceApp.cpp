@@ -36,7 +36,9 @@ static std::shared_ptr<rhi::IBuffer> createObjectPositions(rhi::IRenderer* rende
 	}
 
 	auto instanceVb = renderer->createBuffer();
-	instanceVb->init(translations.data(), translations.size() * sizeof(translations[0]), rhi::BufferType::Vertex);
+	std::vector<glm::vec2> padded(translations);
+	padded.resize((size_t)count * count);
+	instanceVb->init(padded.data(), padded.size() * sizeof(padded[0]), rhi::BufferType::Vertex);
 	return instanceVb;
 }
 
