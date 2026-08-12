@@ -1,131 +1,48 @@
 ﻿#include "GLDepthTestApp.hpp"
-#include "native/GL/GLProgram.hpp"
 #include "base/StaticCollector.hpp"
 #include "base/ErrorHandle.hpp"
-#include "glad/glad.h"
-#include "geometry/Cube.hpp"
-#include <geometry/Plane.hpp>
-#include "native/GL/GLImageTexture2D.hpp"
+#include "rhi/core/IShader.hpp"
+#include "rhi/core/IPipeline.hpp"
+#include "app/GL/RhiGeometry.hpp"
+#include "app/GL/RhiImage.hpp"
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include "base/Log.hpp"
 #include "imgui.h"
-#include "utils/FileUtils.hpp"
+#include "geometry/Cube.hpp"
+#include <geometry/Plane.hpp>
+#include <utils/FileUtils.hpp>
 using FileUtils::join;
-
 using namespace ErrorHandle;
 
-GLDepthTestApp::~GLDepthTestApp() {
-	if (_cubeVao != 0) {
-		glDeleteVertexArrays(1, &_cubeVao);
-		glDeleteBuffers(2, _cubeVbo);
-	}
-
-	_program.destroy();
-}
+GLDepthTestApp::~GLDepthTestApp() {}
 
 bool GLDepthTestApp::initApp() {
-	if (!GLApp::initApp()) {
-		return false;
-	}
-
-	const auto vfile = join(StaticCollector::getGLShaderPath(), "Advanced", "DepthTest", "Basic.vert");
-	const auto ffile = join(StaticCollector::getGLShaderPath(), "Advanced", "DepthTest", "Basic.frag");
-	auto ret = _program.init(vfile, ffile);
-	ErrorHandle::ExitIfFailed(ret, "Create OpenGL program failed!");
-	{
-		const auto imgFile = join(StaticCollector::getImagePath(), "marble.jpg");
-		_cubeTexture = std::make_shared<GLImageTexture2D>(imgFile);
-		const auto valid = _cubeTexture->load().texture()->valid();
-		ExitIfFailed(valid, "Failed to load texture from file {}", imgFile);
-	}
-	
-	{
-		const auto imgFile = join(StaticCollector::getImagePath(), "metal.jpg");
-		_planeTexture = std::make_shared<GLImageTexture2D>(imgFile);
-		const auto valid = _planeTexture->load().texture()->valid();
-		ExitIfFailed(valid, "Failed to load texture from file {}", imgFile);
-	}
-
-	createCubeBuffer();
-	createPlaneBuffer();
-	//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-	glEnable(GL_DEPTH_TEST);
-	//glDepthFunc(GL_LESS);
-	return true;
-}
-
-void GLDepthTestApp::createCubeBuffer() {
-	Cube shape{};
-	unsigned int vbo[2]{}, vao{}, ebo{};
-	glGenVertexArrays(1, &vao);
-	glGenBuffers(2, vbo);
-	glBindVertexArray(vao);
-	{
-		glBindBuffer(GL_ARRAY_BUFFER, vbo[0]);
-		glBufferData(GL_ARRAY_BUFFER, shape.byteSize(), shape.toGL().data(), GL_STATIC_DRAW);
-
-		glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex), nullptr);
-		glEnableVertexAttribArray(0);
-
-		glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)(sizeof(float) * 4));
-		glEnableVertexAttribArray(1);
-
-		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
-		glBufferData(GL_ELEMENT_ARRAY_BUFFER, shape.idxByteSize(), shape.idx(), GL_STATIC_DRAW);
-
-		glBindBuffer(GL_ARRAY_BUFFER, vbo[1]);
-		glBufferData(GL_ARRAY_BUFFER, shape.uvSize(), shape.uv(), GL_STATIC_DRAW);
-
-		glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), nullptr);
-		glEnableVertexAttribArray(2);
-	}
-	glBindVertexArray(0);
-	_cubeVao = vao;
-	_cubeVbo[0] = vbo[0], _cubeVbo[1] = vbo[1];
-}
-
-void GLDepthTestApp::createPlaneBuffer() {
-	Plane shape{};
-	unsigned int vbo[2]{}, vao{}, ebo{};
-	glGenVertexArrays(1, &vao);
-	glGenBuffers(2, vbo);
-	glBindVertexArray(vao);
-	{
-		glBindBuffer(GL_ARRAY_BUFFER, vbo[0]);
-		glBufferData(GL_ARRAY_BUFFER, shape.byteSize(), shape.toGL().data(), GL_STATIC_DRAW);
-
-		glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex), nullptr);
-		glEnableVertexAttribArray(0);
-
-		glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)(sizeof(float) * 4));
-		glEnableVertexAttribArray(1);
-
-		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
-		glBufferData(GL_ELEMENT_ARRAY_BUFFER, shape.idxByteSize(), shape.idx(), GL_STATIC_DRAW);
-
-		glBindBuffer(GL_ARRAY_BUFFER, vbo[1]);
-		glBufferData(GL_ARRAY_BUFFER, shape.uvSize(), shape.uv(), GL_STATIC_DRAW);
-
-		glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), nullptr);
-		glEnableVertexAttribArray(2);
-	}
-	glBindVertexArray(0);
-	_planeVao = vao;
-	_planeVbo[0] = vbo[0], _planeVbo[1] = vbo[1];
-}
-
-void GLDepthTestApp::beginDrawScene() {
-	_cubeTexture->texture()->bind(0);
-	_planeTexture->texture()->bind(1);
-	_program.use();
-	return GLApp::beginDrawScene();
+    if (!GLApp::initApp()) return false;
+    const auto vfile = join(StaticCollector::getGLShaderPath(), "Advanced", "DepthTest", "Basic.vert");
+    const auto ffile = join(StaticCollector::getGLShaderPath(), "Advanced", "DepthTest", "Basic.frag");
+    auto shader = renderer()->createShader();
+    auto ok = shader->compile({{rhi::ShaderStage::Vertex, vfile, "main", false},
+                               {rhi::ShaderStage::Fragment, ffile, "main", false}});
+    ExitIfFailed(ok, "Create RHI shader failed: {}", shader->getLog());
+    Cube cubeShape{};
+    auto cg = RhiGeometry::Create(renderer().get(), cubeShape, true, false, true);
+    _cubeVb = cg.vertexBuffer; _cubeUv = cg.uvBuffer; _cubeEbo = cg.indexBuffer;
+    _cubeIndexCount = cg.indexCount;
+    Plane plane{};
+    auto pg = RhiGeometry::Create(renderer().get(), plane, true, false, false);
+    _planeVb = pg.vertexBuffer; _planeUv = pg.uvBuffer; _planeVertexCount = pg.vertexCount;
+    _contentPipeline = renderer()->createPipeline(cg.layout, shader);
+    _contentPipeline->setDepthTest(true);
+    _cubeTexture = RhiImage::Load2D(renderer().get(), join(StaticCollector::getImagePath(), "marble.jpg"));
+    _planeTexture = RhiImage::Load2D(renderer().get(), join(StaticCollector::getImagePath(), "metal.jpg"));
+    return true;
 }
 
 static std::vector<glm::vec3> initializeCubePositions() {
 	std::vector<glm::vec3> positions;
-	float spacing = 1.1f; // ��������Ϊ 2.0f��ʹ�������������һ��
+	float spacing = 1.1f;
 
 	for (int x = -2; x < 2; ++x) {
 		for (int y = -2; y < 2; ++y) {
@@ -138,45 +55,31 @@ static std::vector<glm::vec3> initializeCubePositions() {
 }
 
 void GLDepthTestApp::drawScene(const float dt) {
-	ImGui::Begin("OpenGL");
-	ImGui::SetNextItemWidth(200);
-	//ImGui::SliderInt("Cube Count", &count, 1, 10);
-	ImGui::End();
-	
-	std::vector<glm::vec3> cubePositions = initializeCubePositions();
-	int count = cubePositions.size(); // ����������
-
-	// ����ͶӰ����
-	const auto projection = glm::perspective(glm::radians(_camera.zoom()), aspectRatio(), 0.1f, 100.0f);
-	_program.update("projection", projection);
-
-	// ��ȡ��ͼ����
-	const auto view = _camera.getViewMatrix();
-	_program.update("view", view);
-
-	static float curTime = 0; // ���ֵ�ǰʱ��
-	curTime += dt; // ���µ�ǰʱ��
-	glBindVertexArray(_cubeVao);
-	_program.update("textureSampler", 0);
-	for (int i = 0; i < count; i++) {
-		glm::mat4 model = glm::mat4(1.0f); // ��ʼ������Ϊ��λ����
-		model = glm::translate(model, cubePositions[i]); // ƽ����������λ��
-
-		// ʹ�õ�ǰʱ�������������������ת�Ƕ�
-		float angle = 0; // ÿ���������Բ�ͬ���ٶ���ת
-		model = glm::rotate(model, glm::radians(angle), glm::vec3(1.0f, 0.3f, 0.5f)); // ��ת
-
-		_program.update("model", model); // ����ģ�;���
-		glDrawArrays(GL_TRIANGLES, 0, 36); // ����������
-	}
-
-	glBindVertexArray(_planeVao);
-	glm::mat4 model = glm::mat4(1.0f); // ��ʼ������Ϊ��λ����
-	model = glm::translate(model, glm::vec3(-1.0,-4.50, -10)); // ƽ����������λ��
-	_program.update("model", model); // ����ģ�;���
-	_program.update("textureSampler", 1);
-	glDrawArrays(GL_TRIANGLES, 0, 6); // ����������
-
-	glBindVertexArray(0);
-	return GLApp::drawScene(dt);
+    ImGui::Begin("OpenGL"); ImGui::End();
+    std::vector<glm::vec3> cubePositions = initializeCubePositions();
+    int count = (int)cubePositions.size();
+    const auto projection = glm::perspective(glm::radians(_camera.zoom()), aspectRatio(), 0.1f, 100.0f);
+    const auto view = _camera.getViewMatrix();
+    renderer()->bindTexture(_cubeTexture, 0);
+    renderer()->setPipeline(_contentPipeline);
+    renderer()->setVertexBuffer(_cubeVb);
+    renderer()->setVertexBuffer(_cubeUv, 1);
+    renderer()->setIndexBuffer(_cubeEbo);
+    _contentPipeline->setUniform("projection", glm::value_ptr(projection), 1);
+    _contentPipeline->setUniform("view", glm::value_ptr(view), 1);
+    _contentPipeline->setUniform("textureSampler", 0);
+    for (int i = 0; i < count; i++) {
+        glm::mat4 model = glm::mat4(1.0f);
+        model = glm::translate(model, cubePositions[i]);
+        _contentPipeline->setUniform("model", glm::value_ptr(model), 1);
+        renderer()->drawIndexed(_cubeIndexCount, 0, 0);
+    }
+    renderer()->setVertexBuffer(_planeVb);
+    renderer()->setVertexBuffer(_planeUv, 1);
+    renderer()->bindTexture(_planeTexture, 1);
+    _contentPipeline->setUniform("textureSampler", 1);
+    glm::mat4 model = glm::translate(glm::mat4(1.0f), glm::vec3(-1.0f, -4.50f, -10));
+    _contentPipeline->setUniform("model", glm::value_ptr(model), 1);
+    renderer()->draw(_planeVertexCount, 0);
+    return GLApp::drawScene(dt);
 }
