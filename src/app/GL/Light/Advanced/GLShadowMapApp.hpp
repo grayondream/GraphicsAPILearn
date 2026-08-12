@@ -1,13 +1,14 @@
 #pragma once
 #include "app/GL/Base/GLCameraBaseApp.hpp"
-#include "native/GL/GLProgram.hpp"
+#include "rhi/core/IPipeline.hpp"
+#include "rhi/core/IRenderTarget.hpp"
+#include "rhi/core/ITexture2D.hpp"
 #include <memory>
 #include <array>
 #include "geometry/Camera.hpp"
 #include "geometry/Vertex.hpp"
-#include "geometry/Sphere.hpp"
+#include "app/GL/RhiGeometry.hpp"
 
-class GLImageTexture2D;
 class GLShadowMapApp : public GLCameraBaseApp {
 public:
 	virtual ~GLShadowMapApp();
@@ -18,28 +19,20 @@ protected:
 
 private:
 	void createShadowDepthBuffer();
-	void createVertexBuffer();
-	void createPlaneBuffer();
-	void createScreenBuffer();
-	void compileShader();
+	void initShapes();
+	void createTextures();
+	void compileShader(const rhi::VertexLayout& cubeLayout, const rhi::VertexLayout& screenLayout);
 	void reanderFraemBuffer();
 	void renderScene2FrameBuffer();
 
 private:
-	Sphere shape{};
-	GLProgram _shadowProgram{};
-	GLProgram _depthProgram{};
-	unsigned int _vbo[2]{};
-	unsigned int _vao{};
-	unsigned int _ebo{};
-	unsigned int _planeVbo[3]{};
-	unsigned int _planeVao{};
-	unsigned int _shadowDepthMapFbo{};
-	unsigned int _shadowDepthMap{};
-	unsigned int _screenVao{};
-	unsigned int _screenVbo[2];
-	unsigned int _screenEbo{};
-	float _curTime{};
-	glm::vec4 _lightColor{1.0, 1.0, 1.0, 1.0};
-	std::shared_ptr<GLImageTexture2D> _texture{};
+	std::shared_ptr<rhi::IPipeline> _shadowProgram{};
+	std::shared_ptr<rhi::IPipeline> _depthProgram{};
+	std::shared_ptr<rhi::IRenderTarget> _shadowDepthMapFbo{};
+	std::shared_ptr<rhi::IBuffer> _cubeVb{}, _cubeEbo{};
+	std::shared_ptr<rhi::IBuffer> _planeVb{}, _planeUv{}, _planeNormal{};
+	std::shared_ptr<rhi::IBuffer> _screenVb{}, _screenUv{}, _screenEbo{};
+	uint32_t _cubeIndexCount{0}, _planeVertexCount{0}, _screenIndexCount{0};
+	rhi::VertexLayout _cubeLayout{}, _screenLayout{};
+	std::shared_ptr<rhi::ITexture2D> _texture{};
 };
