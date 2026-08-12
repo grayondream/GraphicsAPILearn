@@ -54,6 +54,9 @@ public:
     // vertex input layout for this mesh
     const rhi::VertexLayout& layout() const { return _layout; }
 
+    const std::shared_ptr<rhi::IBuffer>& vertexBuffer() const { return _vb; }
+    const std::shared_ptr<rhi::IBuffer>& indexBuffer() const { return _ib; }
+
 public:
     // mesh Data
     vector<MeshVertex>       vertices;

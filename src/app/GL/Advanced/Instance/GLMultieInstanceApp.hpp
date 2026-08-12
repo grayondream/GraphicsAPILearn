@@ -1,6 +1,7 @@
 #pragma once
 #include "app/GL/Base/GLCameraBaseApp.hpp"
-#include "native/GL/GLProgram.hpp"
+#include "rhi/core/IPipeline.hpp"
+#include "app/GL/RhiGeometry.hpp"
 #include <memory>
 #include <array>
 #include "geometry/Camera.hpp"
@@ -8,7 +9,6 @@
 #include <vector>
 #include "geometry/Sphere.hpp"
 
-class GLImageTexture2D;
 class GLMultieInstanceApp : public GLCameraBaseApp {
 
 public:
@@ -17,17 +17,11 @@ public:
 protected:
 	virtual bool initApp() override;
 	virtual void drawScene(const float dt);
-	
-private:
-	void createVertexBuffer();
 
 private:
 	Sphere shape{};
-	GLProgram _program;
-	unsigned int _vbo[2]{};
-	unsigned int _vao{};
-	unsigned int _ebo{};
-	unsigned int _positionVbo{};
+	std::shared_ptr<rhi::IPipeline> _pipeline{};
+	std::shared_ptr<rhi::IBuffer> _vb{}, _normal{}, _ebo{}, _instanceVb{};
+	uint32_t _indexCount{0};
 	int _count = 10;
-	float _curTime{};
 };
