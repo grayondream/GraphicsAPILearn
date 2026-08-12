@@ -1,220 +1,129 @@
 #include "GLPointLightShadowApp.hpp"
-#include "native/GL/GLProgram.hpp"
 #include "base/StaticCollector.hpp"
 #include "base/ErrorHandle.hpp"
-#include "glad/glad.h"
-#include "native/GL/GLImageTexture2D.hpp"
+#include "rhi/core/IShader.hpp"
+#include "rhi/core/IPipeline.hpp"
+#include "rhi/core/IRenderTarget.hpp"
+#include "rhi/core/ITexture2D.hpp"
+#include "rhi/core/ITexture3D.hpp"
+#include "rhi/core/Common.hpp"
+#include "app/GL/RhiGeometry.hpp"
+#include "app/GL/RhiImage.hpp"
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
+#include <cmath>
 #include "base/Log.hpp"
 #include "imgui.h"
+#include "geometry/Cube.hpp"
 #include <utils/FileUtils.hpp>
-#include "geometry/Rect.hpp"
-#include "utils/GL/GLUtils.hpp"
-#include "base/Constexpr.hpp"
+#include <base/Constexpr.hpp>
 
 using namespace Constexpr;
 using FileUtils::join;
 using namespace ErrorHandle;
 
 GLPointLightShadowApp::~GLPointLightShadowApp() {
-	if (_cubeVao != 0) {
-		glDeleteVertexArrays(1, &_cubeVao);
-		glDeleteBuffers(3, _cubeVbo);
-		glDeleteBuffers(1, &_cubeEbo);
-	}
-
-	_depthProgram.destroy();
-	_shadowProgram.destroy();
 }
 
 bool GLPointLightShadowApp::initApp() {
 	if (!GLCameraBaseApp::initApp()) {
 		return false;
 	}
-	
-	_camera = Camera(glm::vec3(-1.f, 0.0f, 1.0f));
-	{
-		const auto imgFile = join(StaticCollector::getImagePath(), "wood.png");
-		_texture = std::make_shared<GLImageTexture2D>(imgFile);
-		const auto valid = _texture->load().texture()->valid();
-		ExitIfFailed(valid, "Failed to load texture from file {}", imgFile);
-	}
 
-	glEnable(GL_DEPTH_TEST);
-    glEnable(GL_CULL_FACE);
-	createCubeBuffer();
+	_camera = Camera(glm::vec3(-1.f, 0.0f, 1.0f));
+	_texture = RhiImage::Load2D(renderer().get(), join(StaticCollector::getImagePath(), "wood.png"));
+	initShapes();
 	createShadowDepthBuffer();
-	compileShader();
-	
-	//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+	compileShader(_cubeLayout);
 	return true;
 }
 
-void GLPointLightShadowApp::compileShader(){
-	const auto shaderDir = join(StaticCollector::getGLShaderPath(), "Light");
-	{
-		const auto vfile = join(shaderDir, "Advanced", "PointLightShadow", "ShadowMapping.vs");
-		const auto ffile = join(shaderDir, "Advanced", "PointLightShadow", "ShadowMapping.fs");
-		auto ret = _shadowProgram.init(vfile, ffile);
-		ErrorHandle::ExitIfFailed(ret, "Create OpenGL program failed!");
-	}
-
-	{
-		const auto vfile = join(shaderDir, "Advanced", "PointLightShadow", "ShadowMappingDepth.vs");
-		const auto ffile = join(shaderDir, "Advanced", "PointLightShadow", "ShadowMappingDepth.fs");
-		const auto gfile = join(shaderDir, "Advanced", "PointLightShadow", "ShadowMappingDepth.gs");
-		auto ret = _depthProgram.init(vfile, ffile, gfile);
-		ErrorHandle::ExitIfFailed(ret, "Create OpenGL program failed!");
-	}
+void GLPointLightShadowApp::initShapes() {
+    Cube cubeShape{};
+    auto cubeGeo = RhiGeometry::Create(renderer().get(), cubeShape, true, true, true);
+    _cubeVb = cubeGeo.vertexBuffer; _cubeUv = cubeGeo.uvBuffer;
+    _cubeNormal = cubeGeo.normalBuffer; _cubeEbo = cubeGeo.indexBuffer;
+    _cubeIndexCount = cubeGeo.indexCount; _cubeLayout = cubeGeo.layout;
 }
 
-void GLPointLightShadowApp::createShadowDepthBuffer(){
-	unsigned int depthMapFBO;
-	glGenFramebuffers(1, &depthMapFBO);
-	// create a texture to hold the depth map
-	unsigned int depthMap;
-	glGenTextures(1, &depthMap);
-	glBindTexture(GL_TEXTURE_CUBE_MAP, depthMap);
-	for (unsigned int i = 0; i < 6; ++i){
-		glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_DEPTH_COMPONENT, GetShadowMapWidth(), GetShadowMapHeight(), 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
-	}
+void GLPointLightShadowApp::createShadowDepthBuffer() {
+    rhi::TextureDesc cubemapDesc;
+    cubemapDesc.format = rhi::TextureFormat::Depth32F;
+    cubemapDesc.wrapS = cubemapDesc.wrapT = cubemapDesc.wrapR = rhi::TextureWrap::ClampToEdge;
+    cubemapDesc.minFilter = rhi::TextureFilter::Nearest;
+    cubemapDesc.magFilter = rhi::TextureFilter::Nearest;
+    cubemapDesc.generateMipmap = false;
+    _shadowDepthMap = renderer()->createTexture3D();
+    _shadowDepthMap->createEmpty(cubemapDesc, Constexpr::GetShadowMapWidth(), Constexpr::GetShadowMapHeight());
 
-	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
-    // attach depth texture as FBO's depth buffer
-    glBindFramebuffer(GL_FRAMEBUFFER, depthMapFBO);
-    glFramebufferTexture(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, depthMap, 0);
-    glDrawBuffer(GL_NONE);
-    glReadBuffer(GL_NONE);
-	if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
-        ErrorHandle::ExitIfFailed(false, "Shadow FBO is incomplete!");
+    _shadowDepthMapFbo = renderer()->createRenderTarget();
+    rhi::FramebufferDesc fbd;
+    fbd.width = Constexpr::GetShadowMapWidth();
+    fbd.height = Constexpr::GetShadowMapHeight();
+    if (!_shadowDepthMapFbo->create(fbd)) ExitIfFailed(false, "Failed to create depth cubemap framebuffer (color base)");
+    _shadowDepthMapFbo->attachDepthCube(_shadowDepthMap.get(), 0);
+}
+
+void GLPointLightShadowApp::compileShader(const rhi::VertexLayout& cubeLayout) {
+    const auto shaderDir = join(StaticCollector::getGLShaderPath(), "Light", "Advanced", "PointLightShadow");
+    {
+        auto shader = renderer()->createShader();
+        auto ok = shader->compile({ {rhi::ShaderStage::Vertex, join(shaderDir, "ShadowMapping.vs"), "main", false},
+                                    {rhi::ShaderStage::Fragment, join(shaderDir, "ShadowMapping.fs"), "main", false} });
+        ExitIfFailed(ok, "Create RHI shader failed: {}", shader->getLog());
+        _shadowProgram = renderer()->createPipeline(cubeLayout, shader);
+        _shadowProgram->setDepthTest(true);
+        _shadowProgram->setCullFaceEnable(true);
     }
-
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
-	_shadowDepthMapFbo = depthMapFBO;
-	_shadowDepthMap = depthMap;
+    {
+        auto shader = renderer()->createShader();
+        auto ok = shader->compile({ {rhi::ShaderStage::Vertex, join(shaderDir, "ShadowMappingDepth.vs"), "main", false},
+                                    {rhi::ShaderStage::Geometry, join(shaderDir, "ShadowMappingDepth.gs"), "main", false},
+                                    {rhi::ShaderStage::Fragment, join(shaderDir, "ShadowMappingDepth.fs"), "main", false} });
+        ExitIfFailed(ok, "Create RHI shader failed: {}", shader->getLog());
+        _depthProgram = renderer()->createPipeline(cubeLayout, shader);
+        _depthProgram->setDepthTest(true);
+        _depthProgram->setCullFaceEnable(true);
+    }
 }
 
-void GLPointLightShadowApp::createCubeBuffer() {
-	unsigned int vbo[3]{}, vao{}, ebo{};
-	glGenVertexArrays(1, &vao);
-	glGenBuffers(3, vbo);
-	glGenBuffers(1, &ebo);
-
-	glBindVertexArray(vao);
-	{
-		// �󶨵�һ�� VBO�����ö���λ��
-		glBindBuffer(GL_ARRAY_BUFFER, vbo[0]);
-		glBufferData(GL_ARRAY_BUFFER, cube.byteSize(), cube.toGL().data(), GL_STATIC_DRAW);
-		glEnableVertexAttribArray(0);
-		glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex), nullptr);
-		
-		glEnableVertexAttribArray(1);
-		glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)(sizeof(float) * 4));
-		
-
-		glBindBuffer(GL_ARRAY_BUFFER, vbo[1]);
-		glBufferData(GL_ARRAY_BUFFER, cube.uvSize(), cube.uv(), GL_STATIC_DRAW);
-
-		glEnableVertexAttribArray(2);
-		glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), nullptr);
-
-		glBindBuffer(GL_ARRAY_BUFFER, vbo[2]);
-		glBufferData(GL_ARRAY_BUFFER, cube.normalSize(), cube.normal(), GL_STATIC_DRAW);
-
-		glEnableVertexAttribArray(3);
-		glVertexAttribPointer(3, 4, GL_FLOAT, GL_FALSE, 4 * sizeof(float), nullptr);
-
-		// ������������
-		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
-		glBufferData(GL_ELEMENT_ARRAY_BUFFER, cube.idxByteSize(), cube.idx(), GL_STATIC_DRAW);
-	}
-	glBindVertexArray(0);
-
-	// ��¼ VBO �� EBO
-	_cubeVao = vao;
-	_cubeVbo[0] = vbo[0], _cubeVbo[1] = vbo[1], _cubeVbo[2] = vbo[2];
-	_cubeEbo = ebo;
+void GLPointLightShadowApp::renderCube(std::shared_ptr<rhi::IPipeline>& program, const glm::mat4& model, const int type) {
+    renderer()->setPipeline(program);
+    renderer()->setVertexBuffer(_cubeVb);
+    renderer()->setVertexBuffer(_cubeUv, 1);
+    renderer()->setVertexBuffer(_cubeNormal, 2);
+    renderer()->setIndexBuffer(_cubeEbo);
+    program->setUniform("model", glm::value_ptr(model), 1);
+    program->setUniform("type", type);
+    renderer()->drawIndexed(_cubeIndexCount, 0, 0);
+    program->setUniform("type", 0);   // 原生 renderCube 绘后归 0，防止后续世界盒被当灯位着色
 }
 
-void GLPointLightShadowApp::renderCube(GLProgram &program, const glm::mat4 &model, const int type){
-	program.use();
-	program.update("model", model);
-	program.update("type", type);
-	glBindVertexArray(_cubeVao);
-	glDrawElements(GL_TRIANGLES, cube.idxSize(), GL_UNSIGNED_INT, 0);
-	glBindVertexArray(0);
-	program.update("type", 0);
-}
-
-void GLPointLightShadowApp::renderScene(GLProgram &program, const glm::vec3 &lightPos){
-	program.use();
-	float scale = 0.25f;
-	std::vector<glm::mat4> models;
-	{
-		glm::mat4 model = glm::mat4(1.0f);
-    	model = glm::scale(model, glm::vec3(10.0f));
-		glDisable(GL_CULL_FACE);
-		program.update("reverse_normals", 1);
-		renderCube(program, model);
-		program.update("reverse_normals", 0);
-		glEnable(GL_CULL_FACE);
-	}
-
-	{
-		auto model = glm::mat4(1.0f);
-		model = glm::translate(model, glm::vec3(4.0f, -3.5f, 0.0));
-		model = glm::scale(model, glm::vec3(0.5f));
-		models.push_back(model);
-	}
-
-	{
-		auto model = glm::mat4(1.0f);
-    	model = glm::translate(model, glm::vec3(2.0f, 3.0f, 1.0));
-    	model = glm::scale(model, glm::vec3(0.75f));
-		models.push_back(model);
-	}
-
-	{
-		auto model = glm::mat4(1.0f);
-    	model = glm::translate(model, glm::vec3(-3.0f, -1.0f, 0.0));
-    	model = glm::scale(model, glm::vec3(0.5f));
-		models.push_back(model);
-	}
-
-	{
-		auto model = glm::mat4(1.0f);
-    	model = glm::translate(model, glm::vec3(-1.5f, 1.0f, 1.5));
-    	model = glm::scale(model, glm::vec3(0.5f));
-		models.push_back(model);
-	}
-
-	{
-		auto model = glm::mat4(1.0f);
-    	model = glm::translate(model, glm::vec3(-1.5f, 2.0f, -3.0));
-    	model = glm::rotate(model, glm::radians(60.0f), glm::normalize(glm::vec3(1.0, 0.0, 1.0)));
-    	model = glm::scale(model, glm::vec3(0.75f));
-		models.push_back(model);
-	}
-
-	{
-		auto model = glm::mat4(1.0f);
-		model = glm::scale(model, glm::vec3(0.1f));
-		model = glm::translate(model, lightPos);
-		program.update("light", 1);
-		renderCube(program, model);
-		program.update("light", 0);
-	}
-
-	for (auto i = 0; i < models.size(); i++) {
-		renderCube(program, models[i]);
-	}
+void GLPointLightShadowApp::renderScene(std::shared_ptr<rhi::IPipeline>& program, const glm::vec3& lightPos) {
+    float scale = 0.25f;
+    std::vector<glm::mat4> models;
+    {   // reversed normals 大世界盒（scale 10）
+        auto model = glm::scale(glm::mat4(1.0f), glm::vec3(10.0f));
+        program->setCullFaceEnable(false);            // 原生 glDisable(GL_CULL_FACE)
+        program->setUniform("reverse_normals", 1);
+        renderCube(program, model);
+        program->setUniform("reverse_normals", 0);
+        program->setCullFaceEnable(true);             // 原生 glEnable(GL_CULL_FACE)
+    }
+    { models.push_back(glm::scale(glm::translate(glm::mat4(1.0f), glm::vec3(4.0f, -3.5f, 0.0)), glm::vec3(0.5f))); }
+    { models.push_back(glm::scale(glm::translate(glm::mat4(1.0f), glm::vec3(2.0f, 3.0f, 1.0)), glm::vec3(0.75f))); }
+    { models.push_back(glm::scale(glm::translate(glm::mat4(1.0f), glm::vec3(-3.0f, -1.0f, 0.0)), glm::vec3(0.5f))); }
+    { models.push_back(glm::scale(glm::translate(glm::mat4(1.0f), glm::vec3(-1.5f, 1.0f, 1.5)), glm::vec3(0.5f))); }
+    { models.push_back(glm::scale(glm::rotate(glm::translate(glm::mat4(1.0f), glm::vec3(-1.5f, 2.0f, -3.0)),
+          glm::radians(60.0f), glm::normalize(glm::vec3(1.0, 0.0, 1.0))), glm::vec3(0.75f))); }
+    for (auto& m : models) renderCube(program, m);
+    {   // 灯位
+        auto model = glm::translate(glm::scale(glm::mat4(1.0f), glm::vec3(0.1f)), lightPos);   // 原生 scale(0.1) 再 translate → S*T
+        program->setUniform("light", 1);
+        renderCube(program, model);
+        program->setUniform("light", 0);
+    }
 }
 
 std::vector<glm::mat4> CreateTransformVector(const glm::vec3& lightPos, float aspectRatio, float far_plane, float near_plane){
@@ -229,48 +138,38 @@ std::vector<glm::mat4> CreateTransformVector(const glm::vec3& lightPos, float as
 	return shadowTransforms;
 }
 
-void GLPointLightShadowApp::renderScene2FrameBuffer(GLProgram& program, const glm::vec3 &lightPos){
-	auto shadowTransforms = CreateTransformVector(lightPos, GetShadowMapWidth() * 1.0 / GetShadowMapHeight(), _far, _near);
-	program.use();
-	glViewport(0, 0, GetShadowMapWidth(), GetShadowMapHeight());
-	glBindFramebuffer(GL_FRAMEBUFFER, _shadowDepthMapFbo);
-	glClear(GL_DEPTH_BUFFER_BIT);
-	{
-		for (unsigned int i = 0; i < 6; ++i){
-			program.update("shadowMatrices[" + std::to_string(i) + "]", shadowTransforms[i]);
-		}
-                
-		program.update("far_plane", _far);
-		program.update("lightPos", lightPos);
-		renderScene(program, lightPos);
-	}
-
-	glBindFramebuffer(GL_FRAMEBUFFER, 0);
-	auto attr = m_window->getProperties();
-	glViewport(0, 0, attr.width, attr.height);
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+void GLPointLightShadowApp::renderScene2FrameBuffer(std::shared_ptr<rhi::IPipeline>& program, const glm::vec3& lightPos) {
+    auto shadowTransforms = CreateTransformVector(lightPos, Constexpr::GetShadowMapWidth() * 1.0f / Constexpr::GetShadowMapHeight(), _far, _near);
+    renderer()->setPipeline(program);
+    renderer()->setViewport(rhi::Viewport{0, 0, Constexpr::GetShadowMapWidth(), Constexpr::GetShadowMapHeight()});
+    renderer()->setRenderTarget(_shadowDepthMapFbo);
+    renderer()->clearColor(0.0f, 0.0f, 0.0f, 1.0f);   // RHI clearColor 同时清 depth
+    for (unsigned int i = 0; i < 6; ++i)
+        program->setUniform("shadowMatrices[" + std::to_string(i) + "]", glm::value_ptr(shadowTransforms[i]), 1);
+    program->setUniform("far_plane", _far);
+    program->setUniform("lightPos", glm::value_ptr(lightPos), 1, 3);
+    renderScene(program, lightPos);
+    renderer()->setRenderTarget(nullptr);
+    const auto props = m_window->getProperties();
+    renderer()->setViewport(rhi::Viewport{0, 0, props.width, props.height});
+    renderer()->clearColor(0.0f, 0.0f, 0.0f, 1.0f);
 }
 
-void GLPointLightShadowApp::renderScene2Screen(GLProgram& program, const glm::vec3 &lightPos){
-	program.use();
-	program.update("diffuseTexture", 0);
-	program.update("depthMap", 1);
-	auto attr = _camera.getAttr();
-	glm::mat4 projection = glm::perspective(glm::radians(_camera.zoom()), aspectRatio(), 0.1f, 100.0f);
-	glm::mat4 view = _camera.getViewMatrix();
-	program.update("projection", projection);
-	program.update("view", view);
-	program.update("lightPos", lightPos);
-	program.update("viewPos", attr.pos);
-	program.update("shadows", _enableShadow); // enable/disable shadows by pressing 'SPACE'
-	program.update("far_plane", _far);
-
-	auto woodTexture = GLUtils::Ptr2GLTextureId(_texture->texture()->handle());
-	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(GL_TEXTURE_2D, woodTexture);
-	glActiveTexture(GL_TEXTURE1);
-	glBindTexture(GL_TEXTURE_CUBE_MAP, _shadowDepthMap);
-	renderScene(_shadowProgram, lightPos);
+void GLPointLightShadowApp::renderScene2Screen(std::shared_ptr<rhi::IPipeline>& program, const glm::vec3& lightPos) {
+    renderer()->setPipeline(program);
+    renderer()->bindTexture(_texture, 0);
+    program->setUniform("diffuseTexture", 0);
+    renderer()->bindTexture(_shadowDepthMap, 1);
+    program->setUniform("depthMap", 1);
+    const auto projection = glm::perspective(glm::radians(_camera.zoom()), aspectRatio(), 0.1f, 100.0f);
+    const auto view = _camera.getViewMatrix();
+    program->setUniform("projection", glm::value_ptr(projection), 1);
+    program->setUniform("view", glm::value_ptr(view), 1);
+    program->setUniform("lightPos", glm::value_ptr(lightPos), 1, 3);
+    program->setUniform("viewPos", glm::value_ptr(_camera.getAttr().pos), 1, 3);
+    program->setUniform("shadows", _enableShadow ? 1 : 0);
+    program->setUniform("far_plane", _far);
+    renderScene(program, lightPos);
 }
 
 void GLPointLightShadowApp::drawScene(const float dt) {
@@ -278,7 +177,7 @@ void GLPointLightShadowApp::drawScene(const float dt) {
 	curTime += dt;
 	glm::vec3 lightPos = glm::vec3(0.0f, 0.0f, 0.0f);
 	lightPos.z = static_cast<float>(sin(curTime) * 10.0);
-	GLApp::drawScene(dt);
+	GLCameraBaseApp::drawScene(dt);
 	auto pos = _camera.getAttr().pos;
 	ImGui::Begin("OpenGL");
 	ImGui::Checkbox("Enable PCF", &_enableSimplePCF);
@@ -287,10 +186,6 @@ void GLPointLightShadowApp::drawScene(const float dt) {
 	ImGui::Text("Light Pos: (%.2f, %.2f, %.2f)", lightPos.x, lightPos.y, lightPos.z);
 	ImGui::End();
 
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-	
-	
-	renderScene2FrameBuffer(_depthProgram,lightPos);
-	renderScene2Screen(_shadowProgram,lightPos);
-	return GLApp::drawScene(dt);
+	renderScene2FrameBuffer(_depthProgram, lightPos);
+	renderScene2Screen(_shadowProgram, lightPos);
 }
