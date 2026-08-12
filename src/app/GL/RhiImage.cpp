@@ -15,6 +15,10 @@ std::shared_ptr<rhi::ITexture2D> Load2D(rhi::IRenderer* renderer, const std::str
         return {};
     }
 
+    if (img.size().channel == 1) {
+        img.load(true, 4);
+    }
+
     auto tex = renderer->createTexture2D();
     rhi::TextureDesc desc;
     desc.format = rhi::TextureFormat::RGBA8;

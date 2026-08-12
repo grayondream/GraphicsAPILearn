@@ -25,7 +25,7 @@ public:
 	Image(const std::string& file = {}, const TextureOption& option = {});
 	~Image();
 
-	Image& load(bool flip = true);
+	Image& load(bool flip = true, int targetChannel = 0);
 
 	uint8_t* data();
 

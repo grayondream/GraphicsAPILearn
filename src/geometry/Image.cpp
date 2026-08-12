@@ -16,13 +16,13 @@ Image::~Image() {
 	stbi_image_free(m_pdata);
 }
 
-Image& Image::load(bool flip) {
+Image& Image::load(bool flip, int targetChannel) {
 	stbi_set_flip_vertically_on_load(flip);
 	if (m_option.IsHdr) {
 		float *ptr = stbi_loadf(m_file.c_str(), &m_size.width, &m_size.height, &m_size.channel, 0);
 		m_pdata = reinterpret_cast<uint8_t*>(ptr);
 	}else {
-		m_pdata = stbi_load(m_file.c_str(), &m_size.width, &m_size.height, &m_size.channel, 0);
+		m_pdata = stbi_load(m_file.c_str(), &m_size.width, &m_size.height, &m_size.channel, targetChannel);
 	}
 
 	m_format = GLUtils::PixelChannel2PixelFormat(m_size.channel, m_option.IsHdr);
