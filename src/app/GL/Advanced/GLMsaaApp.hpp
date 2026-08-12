@@ -20,8 +20,6 @@ protected:
 	virtual void drawScene(const float dt);
 	
 private:
-	void createVertexBuffer();
-	void createScreenBuffer();
 	void createFrameBuffer();
 	void createPostFrameBuffer();
 	void compileShader(const rhi::VertexLayout& layout);
