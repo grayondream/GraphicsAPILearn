@@ -1,6 +1,7 @@
 #pragma once
 #include "app/GL/Base/GLCameraBaseApp.hpp"
-#include "native/GL/GLProgram.hpp"
+#include "rhi/core/IPipeline.hpp"
+#include "app/GL/RhiGeometry.hpp"
 #include <memory>
 #include <array>
 #include "geometry/Camera.hpp"
@@ -8,7 +9,6 @@
 #include <vector>
 #include "geometry/Sphere.hpp"
 
-class GLImageTexture2D;
 class GLNormalLine : public GLCameraBaseApp {
 public:
 	virtual ~GLNormalLine();
@@ -18,14 +18,10 @@ protected:
 	virtual void drawScene(const float dt);
 	
 private:
-	void createVertexBuffer();
-
-private:
 	Sphere shape{};
-	GLProgram _program;
-	GLProgram _normalProgram;
-	unsigned int _vbo[2]{};
-	unsigned int _vao{};
-	unsigned int _ebo{};
+	std::shared_ptr<rhi::IPipeline> _pipeline{};
+	std::shared_ptr<rhi::IPipeline> _normalPipeline{};
+	std::shared_ptr<rhi::IBuffer> _vb{}, _normal{}, _ebo{};
+	uint32_t _indexCount{0};
 	float _curTime{};
 };
