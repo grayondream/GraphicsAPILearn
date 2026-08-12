@@ -1,12 +1,15 @@
 #pragma once
 #include "app/GL/Base/GLCameraBaseApp.hpp"
-#include "native/GL/GLProgram.hpp"
+#include "rhi/core/ITexture2D.hpp"
+#include "rhi/core/IBuffer.hpp"
+#include "rhi/core/IPipeline.hpp"
+#include "rhi/core/IRenderTarget.hpp"
+#include "app/GL/RhiGeometry.hpp"
 #include <memory>
 #include <array>
 #include "geometry/Camera.hpp"
 #include "geometry/Vertex.hpp"
 
-class GLImageTexture2D;
 class GLFrameBufferApp : public GLCameraBaseApp {
 public:
 	virtual ~GLFrameBufferApp();
@@ -16,32 +19,24 @@ protected:
 	virtual void drawScene(const float dt);
 	
 private:
-	void createCubeBuffer();
-	void createPlaneBuffer();
-	void createScreenBuffer();
 	void createFrameBuffer();
-	void compileShader();
+	void compileShader(const rhi::VertexLayout& layout);
 	void loadTexture();
 	void initGLEnv();
 	void drawPlane();
 	void drawCube();
-	GLProgram compileShader(const std::string& name);
+	std::shared_ptr<rhi::IPipeline> compileShader(const std::string& name, const rhi::VertexLayout& layout);
 
 private:
-	std::shared_ptr<GLImageTexture2D> _cubeTexture{};
-	std::shared_ptr<GLImageTexture2D> _planeTexture{};
-	GLProgram _contentProgram{};
-	GLProgram _screenProgram{};
-	unsigned int _cubeVbo[2]{};
-	unsigned int _cubeVao{};
-	unsigned int _planeVbo[2]{};
-	unsigned int _planeVao{};
-	unsigned int _screenVao{};
-	unsigned int _screenVbo[2];
-	unsigned int _screenEbo{};
-	unsigned int _screenFrameBuffer{};
-	unsigned int _screenTextureId{};
-	unsigned int _screenRbo{};
-	float _curTime{};
+	std::shared_ptr<rhi::ITexture2D> _cubeTexture{};
+	std::shared_ptr<rhi::ITexture2D> _planeTexture{};
+	std::shared_ptr<rhi::IPipeline> _contentPipeline{};
+	std::shared_ptr<rhi::IPipeline> _screenPipeline{};
+	std::shared_ptr<rhi::IBuffer> _cubeVb{}, _cubeUv{}, _cubeEbo{};
+	std::shared_ptr<rhi::IBuffer> _planeVb{}, _planeUv{};
+	std::shared_ptr<rhi::IBuffer> _screenVb{}, _screenUv{}, _screenEbo{};
+	std::shared_ptr<rhi::IRenderTarget> _screenFbo{};
+	uint32_t _cubeIndexCount{};
+	uint32_t _planeVertexCount{};
 	int _selectEffectType{ 0 };
 };
