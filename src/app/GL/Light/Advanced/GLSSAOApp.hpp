@@ -1,18 +1,13 @@
 #pragma once
 #include "app/GL/Base/GLCameraBaseApp.hpp"
-#include "native/GL/GLProgram.hpp"
 #include "rhi/core/IPipeline.hpp"
+#include "rhi/core/IRenderTarget.hpp"
+#include "rhi/core/ITexture2D.hpp"
 #include <memory>
-#include <array>
+
 #include "geometry/Camera.hpp"
-#include "geometry/Vertex.hpp"
-#include "geometry/Sphere.hpp"
-#include "geometry/Cube.hpp"
 #include "model/Model.hpp"
 
-class GLImageTexture2D;
-class GLPlane;
-class GLCube;
 class GLSSAOApp : public GLCameraBaseApp {
 public:
 	virtual ~GLSSAOApp();
@@ -22,10 +17,9 @@ protected:
 	virtual void drawScene(const float dt);
 
 private:
-	void compileShader();
+	void compileShader(const rhi::VertexLayout& cubeLayout, const rhi::VertexLayout& quadLayout);
 	void initShapes();
 	void createTextures();
-	void createCubeBuffer();
 	void createGBufferFbo();
 	void createFrameBuffers();
 	void createSSAOFbo();
@@ -34,48 +28,37 @@ private:
 	void initModelPipeline();
 
 	void renderOneCube();
-	void renderGBuffer(GLProgram& program, const glm::mat4& projection, const glm::mat4& view);
-	void renderSSAOTexture(GLProgram& program, const glm::mat4& projection);
-	void renderBlurSSAOTexture(GLProgram& program);
-	void renderLightPass(GLProgram& program);
+	void renderGBuffer(std::shared_ptr<rhi::IPipeline>& program, const glm::mat4& projection, const glm::mat4& view);
+	void renderSSAOTexture(std::shared_ptr<rhi::IPipeline>& program, const glm::mat4& projection);
+	void renderBlurSSAOTexture(std::shared_ptr<rhi::IPipeline>& program);
+	void renderLightPass(std::shared_ptr<rhi::IPipeline>& program);
 	void renderQuad();
 
 private:
 	struct GBuffer{
-		unsigned int gbuffer;
-		unsigned int gPosition;
-		unsigned int gNormal;
-		unsigned int gAlbedoSpec;
-		unsigned int rboDepth;
+		std::shared_ptr<rhi::IRenderTarget> gbuffer{};
+		rhi::ITexture2D* gPosition{};
+		rhi::ITexture2D* gNormal{};
+		rhi::ITexture2D* gAlbedoSpec{};
 	};
 
 	struct SSAOBuffer {
-		unsigned int ssaoColorBuffer;
-		unsigned int fbo;
-		unsigned int blurFbo;
-		unsigned int ssaoBlurBuffer;
-		unsigned int noiseTexture;
+		std::shared_ptr<rhi::IRenderTarget> fbo{}, blurFbo{};
+		rhi::ITexture2D* ssaoColorBuffer{};
+		rhi::ITexture2D* ssaoBlurBuffer{};
+		std::shared_ptr<rhi::ITexture2D> noiseTexture{};
 	};
 private:
 	GBuffer m_gBuffer;
 	SSAOBuffer m_ssaoBuffer;
-	GLProgram m_gBufferProgram;
-	GLProgram m_ssaoProgram;
-	GLProgram m_ssaoBlurProgram;
-	GLProgram m_lightProgram;
-
-	std::shared_ptr<rhi::IPipeline> m_modelPipeline{};
-
-	unsigned int m_quadVAO{};
-	unsigned int m_quadVBO{};
-	
-	unsigned int m_cubeVAO{};
-	unsigned int m_cubeVBO{};
-
+	std::shared_ptr<rhi::IPipeline> m_gBufferProgram{}, m_ssaoProgram{}, m_ssaoBlurProgram{}, m_lightProgram{};
+	// 几何
+	std::shared_ptr<rhi::IBuffer> m_cubeVb{};
+	std::shared_ptr<rhi::IBuffer> m_quadVb{};
+	uint32_t m_cubeVertexCount{0}, m_quadVertexCount{0};
+	rhi::VertexLayout m_cubeLayout{}, m_quadLayout{};
+	std::shared_ptr<rhi::IPipeline> m_modelPipeline{};  // 保留（已 RHI）
+	std::shared_ptr< Model> m_model{};
 	bool m_enableSSAO{};
-	float _curTime{};	
-	
-	std::shared_ptr<GLImageTexture2D> m_woodTexture{};
-	std::shared_ptr<GLImageTexture2D> m_brickTexture{};
-	std::shared_ptr< Model> m_model;
+	float _curTime{};
 };
