@@ -6,6 +6,7 @@
 #include "VKPipeline.hpp"
 #include "VKTexture2D.hpp"
 #include "VKTexture3D.hpp"
+#include "VKRenderTarget.hpp"
 #include <GLFW/glfw3.h>
 #include "rhi/core/ISurface.hpp"
 #include "base/Log.hpp"
@@ -49,15 +50,15 @@ public:
     void setVertexBuffer(const std::shared_ptr<IBuffer>& buffer) override;
     void setVertexBuffer(const std::shared_ptr<IBuffer>& buffer, uint32_t binding) override;
     void setIndexBuffer(const std::shared_ptr<IBuffer>& buffer) override;
-    void setRenderTarget(const std::shared_ptr<IRenderTarget>&) override {}
-    void bindTexture(const std::shared_ptr<ITexture2D>&, unsigned int) override {}
-    void bindTexture(const std::shared_ptr<ITexture3D>&, unsigned int) override {}
-    void bindTexture(rhi::ITexture2D*, unsigned int) override {}
+    void setRenderTarget(const std::shared_ptr<IRenderTarget>&) override;
+    void bindTexture(const std::shared_ptr<ITexture2D>&, unsigned int) override;
+    void bindTexture(const std::shared_ptr<ITexture3D>&, unsigned int) override;
+    void bindTexture(rhi::ITexture2D*, unsigned int) override;
     void draw(uint32_t vertexCount, uint32_t firstVertex) override;
     void drawIndexed(uint32_t indexCount, uint32_t indexOffset, uint32_t vertexOffset) override;
     void drawIndexedInstanced(uint32_t indexCount, uint32_t instanceCount, uint32_t indexOffset, uint32_t vertexOffset) override;
     void drawInstanced(uint32_t vertexCount, uint32_t instanceCount, uint32_t firstVertex) override;
-    void blitFramebuffer(const std::shared_ptr<IRenderTarget>&, const std::shared_ptr<IRenderTarget>&, BlitMask) override {}
+    void blitFramebuffer(const std::shared_ptr<IRenderTarget>&, const std::shared_ptr<IRenderTarget>&, BlitMask) override;
     BackendCapabilities backendCapabilities() override;
 
     void onUniformCreated(VKBuffer* buffer) override;
@@ -72,6 +73,7 @@ private:
     bool createRenderPassAndFramebuffers();
     bool createCommandResources();
     void updateUboDescriptor();
+    void updateSamplerDescriptor(uint32_t binding, vk::Sampler sampler, vk::ImageView view);
     bool ensureRenderPass();
     void applyViewport();
     bool bindPipelineAndState();
@@ -111,6 +113,8 @@ private:
     std::array<std::shared_ptr<IBuffer>, 16> _vertexBuffers{};
     std::shared_ptr<IBuffer> _indexBuffer{};
     VKBuffer* _uboBuffer{nullptr};
+    std::shared_ptr<IRenderTarget> _renderTarget{};
+    std::shared_ptr<VKRenderTarget> _vkRenderTarget{};
 };
 
 bool VKRenderer::init(const std::shared_ptr<ISurface>& surface) {
@@ -339,6 +343,8 @@ void VKRenderer::shutdown() {
     _pipeline.reset();
     _indexBuffer.reset();
     _vertexBuffers = {};
+    _renderTarget.reset();
+    _vkRenderTarget.reset();
     // _uboBuffer is a raw (non-owning) pointer to the App's UBO buffer. The App
     // must keep its _uboBuffer alive for as long as this renderer uses it; VK
     // only registers it (GL mode keeps its own buffer). Clear it here so we
@@ -368,9 +374,15 @@ std::shared_ptr<IBuffer> VKRenderer::createUniformBuffer() {
     return buf;
 }
 
-std::shared_ptr<ITexture2D> VKRenderer::createTexture2D() { return std::make_shared<VKTexture2D>(_device); }
-std::shared_ptr<ITexture3D> VKRenderer::createTexture3D() { return std::make_shared<VKTexture3D>(_device); }
-std::shared_ptr<IRenderTarget> VKRenderer::createRenderTarget() { return {}; }
+std::shared_ptr<ITexture2D> VKRenderer::createTexture2D() {
+    return std::make_shared<VKTexture2D>(_device, _phys, _graphicsQueue, _graphicsFamily);
+}
+std::shared_ptr<ITexture3D> VKRenderer::createTexture3D() {
+    return std::make_shared<VKTexture3D>(_device, _phys, _graphicsQueue, _graphicsFamily);
+}
+std::shared_ptr<IRenderTarget> VKRenderer::createRenderTarget() {
+    return std::make_shared<VKRenderTarget>(_device, _phys, _graphicsQueue, _graphicsFamily);
+}
 std::shared_ptr<ISwapchain> VKRenderer::getSwapchain() { return _swapchain; }
 
 void VKRenderer::beginFrame() {
@@ -457,6 +469,133 @@ void VKRenderer::setVertexBuffer(const std::shared_ptr<IBuffer>& buffer, uint32_
 }
 void VKRenderer::setIndexBuffer(const std::shared_ptr<IBuffer>& buffer) { _indexBuffer = buffer; }
 
+void VKRenderer::setRenderTarget(const std::shared_ptr<IRenderTarget>& target) {
+    if (_recording && _rpActive) {
+        _cmd.endRenderPass();
+        _rpActive = false;
+    }
+    _renderTarget = target;
+    _vkRenderTarget = target ? std::dynamic_pointer_cast<VKRenderTarget>(target) : nullptr;
+}
+
+void VKRenderer::bindTexture(const std::shared_ptr<ITexture2D>& texture, unsigned int unit) {
+    if (!texture || unit > 14) return;
+    auto vktex = std::dynamic_pointer_cast<VKTexture2D>(texture);
+    if (!vktex || !vktex->valid()) return;
+    updateSamplerDescriptor(unit + 1, vktex->sampler(), vktex->view());
+}
+
+void VKRenderer::bindTexture(const std::shared_ptr<ITexture3D>& texture, unsigned int unit) {
+    if (!texture || unit > 14) return;
+    auto vktex = std::dynamic_pointer_cast<VKTexture3D>(texture);
+    if (!vktex || !vktex->valid()) return;
+    updateSamplerDescriptor(unit + 1, vktex->sampler(),
+                            vktex->isDepth() ? vktex->depthCubeView() : vktex->cubeView());
+}
+
+void VKRenderer::bindTexture(rhi::ITexture2D* texture, unsigned int unit) {
+    if (!texture || unit > 14) return;
+    auto vktex = dynamic_cast<VKTexture2D*>(texture);
+    if (!vktex || !vktex->valid()) return;
+    updateSamplerDescriptor(unit + 1, vktex->sampler(), vktex->view());
+}
+
+void VKRenderer::updateSamplerDescriptor(uint32_t binding, vk::Sampler sampler, vk::ImageView view) {
+    if (_uboDs == nullptr || !sampler || !view) return;
+    vk::DescriptorImageInfo info(sampler, view, vk::ImageLayout::eShaderReadOnlyOptimal);
+    vk::WriteDescriptorSet wds{};
+    wds.dstSet = *_uboDs;
+    wds.dstBinding = binding;
+    wds.dstArrayElement = 0;
+    wds.descriptorCount = 1;
+    wds.descriptorType = vk::DescriptorType::eCombinedImageSampler;
+    wds.pImageInfo = &info;
+    _device.updateDescriptorSets({wds}, {});
+}
+
+void VKRenderer::blitFramebuffer(const std::shared_ptr<IRenderTarget>& src,
+                                 const std::shared_ptr<IRenderTarget>& dst, BlitMask mask) {
+    if (!_recording || !src || !dst) return;
+    auto s = std::dynamic_pointer_cast<VKRenderTarget>(src);
+    auto d = std::dynamic_pointer_cast<VKRenderTarget>(dst);
+    if (!s || !d || s->colorCount() == 0 || d->colorCount() == 0) return;
+    if (_rpActive) {
+        _cmd.endRenderPass();
+        _rpActive = false;
+    }
+
+    const bool doColor = (static_cast<uint8_t>(mask) & static_cast<uint8_t>(BlitMask::Color)) != 0;
+    const bool doDepth = (static_cast<uint8_t>(mask) & static_cast<uint8_t>(BlitMask::Depth)) != 0;
+
+    if (doColor) {
+        vk::Image srcImg = s->colorImage(0);
+        vk::Image dstImg = d->colorImage(0);
+        const vk::ImageAspectFlags aspect = vk::ImageAspectFlagBits::eColor;
+
+        vk::ImageMemoryBarrier toSrc{};
+        toSrc.oldLayout = vk::ImageLayout::eColorAttachmentOptimal;
+        toSrc.newLayout = vk::ImageLayout::eTransferSrcOptimal;
+        toSrc.srcQueueFamilyIndex = vk::QueueFamilyIgnored;
+        toSrc.dstQueueFamilyIndex = vk::QueueFamilyIgnored;
+        toSrc.image = srcImg;
+        toSrc.subresourceRange.aspectMask = aspect;
+        toSrc.subresourceRange.levelCount = 1;
+        toSrc.subresourceRange.layerCount = 1;
+        toSrc.srcAccessMask = vk::AccessFlagBits::eColorAttachmentWrite;
+        toSrc.dstAccessMask = vk::AccessFlagBits::eTransferRead;
+        vk::ImageMemoryBarrier toDst{};
+        toDst.oldLayout = vk::ImageLayout::eUndefined;
+        toDst.newLayout = vk::ImageLayout::eTransferDstOptimal;
+        toDst.srcQueueFamilyIndex = vk::QueueFamilyIgnored;
+        toDst.dstQueueFamilyIndex = vk::QueueFamilyIgnored;
+        toDst.image = dstImg;
+        toDst.subresourceRange.aspectMask = aspect;
+        toDst.subresourceRange.levelCount = 1;
+        toDst.subresourceRange.layerCount = 1;
+        toDst.dstAccessMask = vk::AccessFlagBits::eTransferWrite;
+        _cmd.pipelineBarrier(vk::PipelineStageFlagBits::eColorAttachmentOutput, vk::PipelineStageFlagBits::eTransfer,
+                             {}, {}, {}, {toSrc, toDst});
+
+        vk::ImageBlit region{};
+        region.srcSubresource.aspectMask = aspect;
+        region.srcSubresource.layerCount = 1;
+        region.srcOffsets[1] = vk::Offset3D(static_cast<int32_t>(s->extent2d().width),
+                                            static_cast<int32_t>(s->extent2d().height), 1);
+        region.dstSubresource.aspectMask = aspect;
+        region.dstSubresource.layerCount = 1;
+        region.dstOffsets[1] = vk::Offset3D(static_cast<int32_t>(d->extent2d().width),
+                                            static_cast<int32_t>(d->extent2d().height), 1);
+        _cmd.blitImage(srcImg, vk::ImageLayout::eTransferSrcOptimal,
+                       dstImg, vk::ImageLayout::eTransferDstOptimal, {region}, vk::Filter::eLinear);
+
+        vk::ImageMemoryBarrier backSrc{};
+        backSrc.oldLayout = vk::ImageLayout::eTransferSrcOptimal;
+        backSrc.newLayout = vk::ImageLayout::eColorAttachmentOptimal;
+        backSrc.srcQueueFamilyIndex = vk::QueueFamilyIgnored;
+        backSrc.dstQueueFamilyIndex = vk::QueueFamilyIgnored;
+        backSrc.image = srcImg;
+        backSrc.subresourceRange.aspectMask = aspect;
+        backSrc.subresourceRange.levelCount = 1;
+        backSrc.subresourceRange.layerCount = 1;
+        backSrc.srcAccessMask = vk::AccessFlagBits::eTransferRead;
+        backSrc.dstAccessMask = vk::AccessFlagBits::eColorAttachmentWrite;
+        vk::ImageMemoryBarrier backDst{};
+        backDst.oldLayout = vk::ImageLayout::eTransferDstOptimal;
+        backDst.newLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
+        backDst.srcQueueFamilyIndex = vk::QueueFamilyIgnored;
+        backDst.dstQueueFamilyIndex = vk::QueueFamilyIgnored;
+        backDst.image = dstImg;
+        backDst.subresourceRange.aspectMask = aspect;
+        backDst.subresourceRange.levelCount = 1;
+        backDst.subresourceRange.layerCount = 1;
+        backDst.srcAccessMask = vk::AccessFlagBits::eTransferWrite;
+        backDst.dstAccessMask = vk::AccessFlagBits::eShaderRead;
+        _cmd.pipelineBarrier(vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eFragmentShader,
+                             {}, {}, {}, {backSrc, backDst});
+    }
+    (void)doDepth;
+}
+
 void VKRenderer::draw(uint32_t vertexCount, uint32_t firstVertex) {
     if (!_recording || !_pipeline) return;
     if (!ensureRenderPass()) return;
@@ -497,12 +636,40 @@ void VKRenderer::drawInstanced(uint32_t vertexCount, uint32_t instanceCount, uin
 
 bool VKRenderer::ensureRenderPass() {
     if (_rpActive) return true;
-    const uint32_t idx = _swapchain->currentImage();
-    if (idx >= _framebuffers.size()) return false;
-    vk::ClearValue clear;
-    clear.color = vk::ClearColorValue(_clearColor[0], _clearColor[1], _clearColor[2], _clearColor[3]);
-    const vk::Rect2D area({0, 0}, extent());
-    vk::RenderPassBeginInfo rpbi(*_renderPass, *_framebuffers[idx], area, 1, &clear);
+    std::shared_ptr<VKRenderTarget> vkrt = _vkRenderTarget;
+    vk::RenderPass rp;
+    vk::Framebuffer fb;
+    vk::Extent2D ext;
+    uint32_t colorCount = 1;
+    uint32_t depthCount = 0;
+    if (vkrt && vkrt->valid()) {
+        rp = vkrt->renderPass();
+        fb = vkrt->framebuffer();
+        ext = vkrt->extent2d();
+        colorCount = vkrt->colorCount();
+        depthCount = vkrt->attachmentCount() - colorCount;
+    } else {
+        const uint32_t idx = _swapchain->currentImage();
+        if (idx >= _framebuffers.size()) return false;
+        rp = *_renderPass;
+        fb = *_framebuffers[idx];
+        ext = extent();
+    }
+
+    std::vector<vk::ClearValue> clears;
+    for (uint32_t i = 0; i < colorCount; i++) {
+        vk::ClearValue cv;
+        cv.color = vk::ClearColorValue(_clearColor[0], _clearColor[1], _clearColor[2], _clearColor[3]);
+        clears.push_back(cv);
+    }
+    for (uint32_t i = 0; i < depthCount; i++) {
+        vk::ClearValue cv;
+        cv.depthStencil = vk::ClearDepthStencilValue(1.0f, 0);
+        clears.push_back(cv);
+    }
+
+    const vk::Rect2D area({0, 0}, ext);
+    vk::RenderPassBeginInfo rpbi(rp, fb, area, static_cast<uint32_t>(clears.size()), clears.data());
     _cmd.beginRenderPass(rpbi, vk::SubpassContents::eInline);
     _rpActive = true;
     applyViewport();
@@ -660,8 +827,8 @@ bool VKRenderer::createDevice(const QueueFamilies& families) {
 
 BackendCapabilities VKRenderer::backendCapabilities() {
     BackendCapabilities caps;
-    caps.maxSamples = 1;
-    caps.maxUniformBlockSize = 16384;
+    caps.maxSamples = 8;
+    caps.maxUniformBlockSize = 65536;
     return caps;
 }
 
