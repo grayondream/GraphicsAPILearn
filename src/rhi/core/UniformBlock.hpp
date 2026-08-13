@@ -6,7 +6,7 @@
 namespace rhi {
 
 struct ULight {
-    glm::vec4 position;   // position(xyz) + 方向光标志(w=1)
+    glm::vec4 position;   // position(xyz) + 可选类型标志(w)
     glm::vec4 direction;  // direction(xyz) + spot outerCutOff(w)
     glm::vec4 ambient;
     glm::vec4 diffuse;
