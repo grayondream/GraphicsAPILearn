@@ -2,6 +2,7 @@
 #include "base/StaticCollector.hpp"
 #include "base/ErrorHandle.hpp"
 #include "rhi/core/IShader.hpp"
+#include "rhi/core/IBuffer.hpp"
 #include "rhi/core/IPipeline.hpp"
 #include "rhi/core/ITexture2D.hpp"
 #include "geometry/Cube.hpp"
@@ -42,6 +43,10 @@ bool GLCubeApp::initApp() {
 
 	_pipeline = renderer()->createPipeline(_layout, shader);
 	_pipeline->setDepthTest(true);
+
+	_uboBuffer = renderer()->createUniformBuffer();
+	_uboBuffer->init(nullptr, sizeof(rhi::UniformBlock), rhi::BufferType::Uniform);
+	_uboBuffer->bindRange(0, 0, sizeof(rhi::UniformBlock));
 	return true;
 }
 
@@ -81,9 +86,10 @@ void GLCubeApp::drawScene(const float dt) {
 		model = glm::rotate(model, glm::radians(angle), glm::vec3(1.0f, 0.3f, 0.5f));
 		view = glm::translate(view, glm::vec3(0.0f, 0.0f, -3.0f));
 		projection = glm::perspective(glm::radians(45.0f), aspectRatio(), 0.1f, 100.0f);
-		_pipeline->setUniform("model", glm::value_ptr(model), 1);
-		_pipeline->setUniform("view", glm::value_ptr(view), 1);
-		_pipeline->setUniform("projection", glm::value_ptr(projection), 1);
+		rhi::SetUniform(_ubo, "model", model);
+		rhi::SetUniform(_ubo, "view", view);
+		rhi::SetUniform(_ubo, "projection", projection);
+		_uboBuffer->update(&_ubo, sizeof(rhi::UniformBlock), 0);
 		renderer()->draw(_vertexCount, 0);
 	}
 

@@ -2,6 +2,7 @@
 #include "base/StaticCollector.hpp"
 #include "base/ErrorHandle.hpp"
 #include "rhi/core/IShader.hpp"
+#include "rhi/core/IBuffer.hpp"
 #include "rhi/core/ITexture2D.hpp"
 #include "geometry/Rect.hpp"
 #include "app/GL/RhiGeometry.hpp"
@@ -35,6 +36,10 @@ bool GLSimpleTextureApp::initApp() {
 	_indexCount = geo.indexCount;
 
 	_pipeline = renderer()->createPipeline(_layout, shader);
+
+	_uboBuffer = renderer()->createUniformBuffer();
+	_uboBuffer->init(nullptr, sizeof(rhi::UniformBlock), rhi::BufferType::Uniform);
+	_uboBuffer->bindRange(0, 0, sizeof(rhi::UniformBlock));
 	return true;
 }
 
@@ -44,6 +49,7 @@ void GLSimpleTextureApp::drawScene(const float dt) {
 	renderer()->setVertexBuffer(_vb);
 	renderer()->setVertexBuffer(_uv, 1);
 	renderer()->setIndexBuffer(_ib);
+	_uboBuffer->update(&_ubo, sizeof(rhi::UniformBlock), 0);
 	renderer()->drawIndexed(_indexCount, 0);
 	return GLApp::drawScene(dt);
 }

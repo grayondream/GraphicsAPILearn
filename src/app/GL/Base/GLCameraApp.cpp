@@ -3,6 +3,7 @@
 #include "base/ErrorHandle.hpp"
 #include "base/Log.hpp"
 #include "rhi/core/IShader.hpp"
+#include "rhi/core/IBuffer.hpp"
 #include "rhi/core/IPipeline.hpp"
 #include "rhi/core/ITexture2D.hpp"
 #include "geometry/Cube.hpp"
@@ -45,6 +46,10 @@ bool GLCameraApp::initApp() {
 
 	_pipeline = renderer()->createPipeline(_layout, shader);
 	_pipeline->setDepthTest(true);
+
+	_uboBuffer = renderer()->createUniformBuffer();
+	_uboBuffer->init(nullptr, sizeof(rhi::UniformBlock), rhi::BufferType::Uniform);
+	_uboBuffer->bindRange(0, 0, sizeof(rhi::UniformBlock));
 	return true;
 }
 
@@ -76,16 +81,16 @@ void GLCameraApp::drawScene(const float dt) {
 	static float curTime = 0;
 	curTime += dt;
 	const auto projection = glm::perspective(glm::radians(_camera.zoom()), aspectRatio(), 0.1f, 100.0f);
-	_pipeline->setUniform("projection", glm::value_ptr(projection), 1);
+	rhi::SetUniform(_ubo, "projection", projection);
 	const auto view = _camera.getViewMatrix();
-	_pipeline->setUniform("view", glm::value_ptr(view), 1);
+	rhi::SetUniform(_ubo, "view", view);
 	for (int i = 0; i < count; i++) {
 		glm::mat4 model = glm::mat4(1.0f); // make sure to initialize matrix to identity matrix first
 		model = glm::translate(model, cubePositions[i]);
 		float angle = 20.0f * (i + 1) * curTime;
 		model = glm::rotate(model, glm::radians(angle), glm::vec3(1.0f, 0.3f, 0.5f));
-		_pipeline->setUniform("model", glm::value_ptr(model), 1);
-
+		rhi::SetUniform(_ubo, "model", model);
+		_uboBuffer->update(&_ubo, sizeof(rhi::UniformBlock), 0);
 		renderer()->draw(_vertexCount, 0);
 	}
 

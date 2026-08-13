@@ -2,6 +2,7 @@
 #include "base/StaticCollector.hpp"
 #include "base/ErrorHandle.hpp"
 #include "rhi/core/IShader.hpp"
+#include "rhi/core/IBuffer.hpp"
 #include "geometry/Triangle.hpp"
 #include "app/GL/RhiGeometry.hpp"
 #include <utils/FileUtils.hpp>
@@ -27,12 +28,17 @@ bool GLTriangleApp::initApp() {
 	_vertexCount = geo.vertexCount;
 
 	_pipeline = renderer()->createPipeline(_layout, shader);
+
+	_uboBuffer = renderer()->createUniformBuffer();
+	_uboBuffer->init(nullptr, sizeof(rhi::UniformBlock), rhi::BufferType::Uniform);
+	_uboBuffer->bindRange(0, 0, sizeof(rhi::UniformBlock));
 	return true;
 }
 
 void GLTriangleApp::drawScene(const float dt) {
 	renderer()->setPipeline(_pipeline);
 	renderer()->setVertexBuffer(_vb);
+	_uboBuffer->update(&_ubo, sizeof(rhi::UniformBlock), 0);
 	renderer()->draw(_vertexCount, 0);
 	return GLApp::drawScene(dt);
 }

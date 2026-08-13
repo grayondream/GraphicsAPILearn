@@ -1,6 +1,7 @@
 #pragma once
 #include "app/App.hpp"
 #include "rhi/core/IRenderer.hpp"
+#include "rhi/core/UniformBlock.hpp"
 #include <memory>
 
 class GLTriangleApp : public App {
@@ -14,4 +15,6 @@ private:
 	std::shared_ptr<rhi::IBuffer> _vb{};
 	rhi::VertexLayout _layout{};
 	uint32_t _vertexCount{0};
+	rhi::UniformBlock _ubo{};
+	std::shared_ptr<rhi::IBuffer> _uboBuffer{};
 };
