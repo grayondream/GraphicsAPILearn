@@ -1,10 +1,16 @@
 #include "VKBackend.hpp"
 #include "VKHeader.hpp"
 #include "VKSwapchain.hpp"
+#include "VKBuffer.hpp"
+#include "VKShader.hpp"
+#include "VKPipeline.hpp"
+#include "VKTexture2D.hpp"
+#include "VKTexture3D.hpp"
 #include <GLFW/glfw3.h>
 #include "rhi/core/ISurface.hpp"
 #include "base/Log.hpp"
 #include <cstring>
+#include <array>
 #include <vector>
 #include <memory>
 
@@ -16,7 +22,7 @@ struct QueueFamilies {
     bool found{false};
 };
 
-class VKRenderer final : public IRenderer {
+class VKRenderer final : public IRenderer, public VKBuffer::Notifier {
 public:
     VKRenderer() = default;
     ~VKRenderer() override { shutdown(); }
@@ -24,46 +30,53 @@ public:
     bool init(const std::shared_ptr<ISurface>& surface) override;
     void shutdown() override;
 
-    void beginFrame() override { if (_swapchain) _swapchain->acquire(); }
-    void endFrame() override {}
-    bool present() override { return _swapchain ? _swapchain->present() : false; }
+    void beginFrame() override;
+    void endFrame() override;
+    bool present() override;
 
-    std::shared_ptr<IShader> createShader() override { return {}; }
-    std::shared_ptr<IPipeline> createPipeline(const VertexLayout&, const std::shared_ptr<IShader>&) override { return {}; }
-    std::shared_ptr<IBuffer> createBuffer() override { return {}; }
-    std::shared_ptr<IBuffer> createUniformBuffer() override { return {}; }
-    std::shared_ptr<ITexture2D> createTexture2D() override { return {}; }
-    std::shared_ptr<ITexture3D> createTexture3D() override { return {}; }
-    std::shared_ptr<IRenderTarget> createRenderTarget() override { return {}; }
-    std::shared_ptr<ISwapchain> getSwapchain() override { return _swapchain; }
+    std::shared_ptr<IShader> createShader() override;
+    std::shared_ptr<IPipeline> createPipeline(const VertexLayout& layout, const std::shared_ptr<IShader>& shader) override;
+    std::shared_ptr<IBuffer> createBuffer() override;
+    std::shared_ptr<IBuffer> createUniformBuffer() override;
+    std::shared_ptr<ITexture2D> createTexture2D() override;
+    std::shared_ptr<ITexture3D> createTexture3D() override;
+    std::shared_ptr<IRenderTarget> createRenderTarget() override;
+    std::shared_ptr<ISwapchain> getSwapchain() override;
 
-    void clearColor(float, float, float, float) override {}
-    void setViewport(const Viewport&) override {}
-    void setPipeline(const std::shared_ptr<IPipeline>&) override {}
-    void setVertexBuffer(const std::shared_ptr<IBuffer>&) override {}
-    void setVertexBuffer(const std::shared_ptr<IBuffer>&, uint32_t) override {}
-    void setIndexBuffer(const std::shared_ptr<IBuffer>&) override {}
+    void clearColor(float r, float g, float b, float a) override;
+    void setViewport(const Viewport& vp) override;
+    void setPipeline(const std::shared_ptr<IPipeline>& pipeline) override;
+    void setVertexBuffer(const std::shared_ptr<IBuffer>& buffer) override;
+    void setVertexBuffer(const std::shared_ptr<IBuffer>& buffer, uint32_t binding) override;
+    void setIndexBuffer(const std::shared_ptr<IBuffer>& buffer) override;
     void setRenderTarget(const std::shared_ptr<IRenderTarget>&) override {}
     void bindTexture(const std::shared_ptr<ITexture2D>&, unsigned int) override {}
     void bindTexture(const std::shared_ptr<ITexture3D>&, unsigned int) override {}
     void bindTexture(rhi::ITexture2D*, unsigned int) override {}
-    void draw(uint32_t, uint32_t) override {}
-    void drawIndexed(uint32_t, uint32_t, uint32_t) override {}
-    void drawIndexedInstanced(uint32_t, uint32_t, uint32_t, uint32_t) override {}
-    void drawInstanced(uint32_t, uint32_t, uint32_t) override {}
+    void draw(uint32_t vertexCount, uint32_t firstVertex) override;
+    void drawIndexed(uint32_t indexCount, uint32_t indexOffset, uint32_t vertexOffset) override;
+    void drawIndexedInstanced(uint32_t indexCount, uint32_t instanceCount, uint32_t indexOffset, uint32_t vertexOffset) override;
+    void drawInstanced(uint32_t vertexCount, uint32_t instanceCount, uint32_t firstVertex) override;
     void blitFramebuffer(const std::shared_ptr<IRenderTarget>&, const std::shared_ptr<IRenderTarget>&, BlitMask) override {}
-    BackendCapabilities backendCapabilities() override {
-        BackendCapabilities caps;
-        caps.maxSamples = 8;
-        caps.maxUniformBlockSize = 16384;
-        return caps;
-    }
+    BackendCapabilities backendCapabilities() override;
+
+    void onUniformCreated(VKBuffer* buffer) override;
+    void onUniformUpdated(VKBuffer* buffer) override;
 
 private:
     bool pickPhysicalDevice();
     bool isDeviceSuitable(vk::raii::PhysicalDevice& pd);
     QueueFamilies findQueueFamilies(vk::raii::PhysicalDevice& pd);
     bool createDevice(const QueueFamilies& families);
+    bool createDescriptors();
+    bool createRenderPassAndFramebuffers();
+    bool createCommandResources();
+    void updateUboDescriptor();
+    bool ensureRenderPass();
+    void applyViewport();
+    bool bindPipelineAndState();
+    bool bindVertexBuffers();
+    vk::Extent2D extent() const { return _swapchain ? _swapchain->extent() : vk::Extent2D{}; }
 
     std::shared_ptr<ISurface> _surface{};
     std::shared_ptr<VKSwapchain> _swapchain{};
@@ -76,6 +89,28 @@ private:
     vk::raii::Queue _presentQueue{nullptr};
     uint32_t _graphicsFamily{0};
     uint32_t _presentFamily{0};
+
+    vk::raii::DescriptorSetLayout _dsLayout{nullptr};
+    vk::raii::DescriptorPool _dsPool{nullptr};
+    vk::raii::DescriptorSet _uboDs{nullptr};
+    vk::raii::PipelineLayout _pipelineLayout{nullptr};
+    vk::raii::RenderPass _renderPass{nullptr};
+    std::vector<vk::raii::Framebuffer> _framebuffers{};
+    vk::raii::CommandPool _cmdPool{nullptr};
+    vk::raii::CommandBuffer _cmd{nullptr};
+    vk::raii::Semaphore _imageReady{nullptr};
+    vk::raii::Semaphore _rendered{nullptr};
+    vk::raii::Fence _frameFence{nullptr};
+
+    bool _recording{false};
+    bool _rpActive{false};
+    bool _viewportSet{false};
+    Viewport _viewport{};
+    float _clearColor[4]{0.0f, 0.0f, 0.0f, 1.0f};
+    std::shared_ptr<IPipeline> _pipeline{};
+    std::array<std::shared_ptr<IBuffer>, 16> _vertexBuffers{};
+    std::shared_ptr<IBuffer> _indexBuffer{};
+    VKBuffer* _uboBuffer{nullptr};
 };
 
 bool VKRenderer::init(const std::shared_ptr<ISurface>& surface) {
@@ -134,15 +169,166 @@ bool VKRenderer::init(const std::shared_ptr<ISurface>& surface) {
         LOGE("VKRenderer: swapchain init failed");
         return false;
     }
+    if (!createDescriptors()) return false;
+    if (!createRenderPassAndFramebuffers()) return false;
+    if (!createCommandResources()) return false;
+    return true;
+}
+
+bool VKRenderer::createDescriptors() {
+    std::vector<vk::DescriptorSetLayoutBinding> dsb;
+    dsb.push_back(vk::DescriptorSetLayoutBinding(0, vk::DescriptorType::eUniformBuffer, 1,
+        vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment));
+    for (int i = 1; i <= 15; i++) {
+        dsb.push_back(vk::DescriptorSetLayoutBinding(static_cast<uint32_t>(i),
+            vk::DescriptorType::eCombinedImageSampler, 1, vk::ShaderStageFlagBits::eFragment));
+    }
+    vk::DescriptorSetLayoutCreateInfo dslci{};
+    dslci.bindingCount = static_cast<uint32_t>(dsb.size());
+    dslci.pBindings = dsb.data();
+    auto dlr = _device.createDescriptorSetLayout(dslci);
+    if (dlr.result != vk::Result::eSuccess) {
+        LOGE("VKRenderer: createDescriptorSetLayout failed");
+        return false;
+    }
+    _dsLayout = std::move(dlr.value);
+
+    vk::DescriptorPoolSize sizes[] = {
+        vk::DescriptorPoolSize(vk::DescriptorType::eUniformBuffer, 16),
+        vk::DescriptorPoolSize(vk::DescriptorType::eCombinedImageSampler, 16 * 15),
+    };
+    vk::DescriptorPoolCreateInfo dpci{};
+    dpci.maxSets = 16;
+    dpci.poolSizeCount = 2;
+    dpci.pPoolSizes = sizes;
+    auto dpr = _device.createDescriptorPool(dpci);
+    if (dpr.result != vk::Result::eSuccess) {
+        LOGE("VKRenderer: createDescriptorPool failed");
+        return false;
+    }
+    _dsPool = std::move(dpr.value);
+
+    vk::DescriptorSetAllocateInfo dsai(*_dsPool, 1, &*_dsLayout);
+    auto dar = _device.allocateDescriptorSets(dsai);
+    if (dar.result != vk::Result::eSuccess) {
+        LOGE("VKRenderer: allocateDescriptorSets failed");
+        return false;
+    }
+    _uboDs = std::move(dar.value[0]);
+
+    vk::PipelineLayoutCreateInfo plci{};
+    plci.setLayoutCount = 1;
+    plci.pSetLayouts = &*_dsLayout;
+    auto plr = _device.createPipelineLayout(plci);
+    if (plr.result != vk::Result::eSuccess) {
+        LOGE("VKRenderer: createPipelineLayout failed");
+        return false;
+    }
+    _pipelineLayout = std::move(plr.value);
+    return true;
+}
+
+bool VKRenderer::createRenderPassAndFramebuffers() {
+    const vk::Format fmt = _swapchain->format();
+    vk::AttachmentDescription color{};
+    color.format = fmt;
+    color.samples = vk::SampleCountFlagBits::e1;
+    color.loadOp = vk::AttachmentLoadOp::eClear;
+    color.storeOp = vk::AttachmentStoreOp::eStore;
+    color.stencilLoadOp = vk::AttachmentLoadOp::eDontCare;
+    color.stencilStoreOp = vk::AttachmentStoreOp::eDontCare;
+    color.initialLayout = vk::ImageLayout::eUndefined;
+    color.finalLayout = vk::ImageLayout::ePresentSrcKHR;
+    vk::AttachmentReference colorRef(0, vk::ImageLayout::eColorAttachmentOptimal);
+    vk::SubpassDescription subpass{};
+    subpass.pipelineBindPoint = vk::PipelineBindPoint::eGraphics;
+    subpass.colorAttachmentCount = 1;
+    subpass.pColorAttachments = &colorRef;
+    vk::RenderPassCreateInfo rpci{};
+    rpci.attachmentCount = 1;
+    rpci.pAttachments = &color;
+    rpci.subpassCount = 1;
+    rpci.pSubpasses = &subpass;
+    auto rpr = _device.createRenderPass(rpci);
+    if (rpr.result != vk::Result::eSuccess) {
+        LOGE("VKRenderer: createRenderPass failed");
+        return false;
+    }
+    _renderPass = std::move(rpr.value);
+
+    _framebuffers.clear();
+    const vk::Extent2D ext = _swapchain->extent();
+    for (uint32_t i = 0; i < _swapchain->imageCount(); i++) {
+        vk::ImageView view = _swapchain->imageView(i);
+        vk::FramebufferCreateInfo fci{};
+        fci.renderPass = *_renderPass;
+        fci.attachmentCount = 1;
+        fci.pAttachments = &view;
+        fci.width = ext.width;
+        fci.height = ext.height;
+        fci.layers = 1;
+        auto fr = _device.createFramebuffer(fci);
+        if (fr.result != vk::Result::eSuccess) {
+            LOGE("VKRenderer: createFramebuffer failed");
+            return false;
+        }
+        _framebuffers.push_back(std::move(fr.value));
+    }
+    return true;
+}
+
+bool VKRenderer::createCommandResources() {
+    vk::CommandPoolCreateInfo cpci{};
+    cpci.flags = vk::CommandPoolCreateFlagBits::eResetCommandBuffer;
+    cpci.queueFamilyIndex = _graphicsFamily;
+    auto cpr = _device.createCommandPool(cpci);
+    if (cpr.result != vk::Result::eSuccess) {
+        LOGE("VKRenderer: createCommandPool failed");
+        return false;
+    }
+    _cmdPool = std::move(cpr.value);
+
+    vk::CommandBufferAllocateInfo cba(*_cmdPool, vk::CommandBufferLevel::ePrimary, 1);
+    auto cbr = _device.allocateCommandBuffers(cba);
+    if (cbr.result != vk::Result::eSuccess) {
+        LOGE("VKRenderer: allocateCommandBuffers failed");
+        return false;
+    }
+    _cmd = std::move(cbr.value[0]);
+
+    auto sr = _device.createSemaphore(vk::SemaphoreCreateInfo{});
+    if (sr.result != vk::Result::eSuccess) return false;
+    _imageReady = std::move(sr.value);
+    sr = _device.createSemaphore(vk::SemaphoreCreateInfo{});
+    if (sr.result != vk::Result::eSuccess) return false;
+    _rendered = std::move(sr.value);
+
+    vk::FenceCreateInfo fci(vk::FenceCreateFlagBits::eSignaled);
+    auto fr = _device.createFence(fci);
+    if (fr.result != vk::Result::eSuccess) {
+        LOGE("VKRenderer: createFence failed");
+        return false;
+    }
+    _frameFence = std::move(fr.value);
     return true;
 }
 
 void VKRenderer::shutdown() {
     if (_device != nullptr) {
-        auto w = _device.waitIdle();
-        (void)w;
+        _device.waitIdle();
     }
     _swapchain.reset();
+    _framebuffers.clear();
+    _renderPass = vk::raii::RenderPass{nullptr};
+    _pipelineLayout = vk::raii::PipelineLayout{nullptr};
+    _uboDs = vk::raii::DescriptorSet{nullptr};
+    _dsPool = vk::raii::DescriptorPool{nullptr};
+    _dsLayout = vk::raii::DescriptorSetLayout{nullptr};
+    _cmd = vk::raii::CommandBuffer{nullptr};
+    _cmdPool = vk::raii::CommandPool{nullptr};
+    _frameFence = vk::raii::Fence{nullptr};
+    _rendered = vk::raii::Semaphore{nullptr};
+    _imageReady = vk::raii::Semaphore{nullptr};
     _presentQueue = vk::raii::Queue{nullptr};
     _graphicsQueue = vk::raii::Queue{nullptr};
     _device = vk::raii::Device{nullptr};
@@ -150,6 +336,212 @@ void VKRenderer::shutdown() {
     _phys = vk::raii::PhysicalDevice{nullptr};
     _instance = vk::raii::Instance{nullptr};
     _surface.reset();
+    _pipeline.reset();
+    _indexBuffer.reset();
+    _vertexBuffers = {};
+    _uboBuffer = nullptr;
+    _recording = false;
+    _rpActive = false;
+}
+
+std::shared_ptr<IShader> VKRenderer::createShader() {
+    return std::make_shared<VKShader>(_device);
+}
+
+std::shared_ptr<IPipeline> VKRenderer::createPipeline(const VertexLayout& layout, const std::shared_ptr<IShader>& shader) {
+    auto vks = std::dynamic_pointer_cast<VKShader>(shader);
+    return std::make_shared<VKPipeline>(_device, *_pipelineLayout, *_renderPass,
+                                        _swapchain->format(), layout, vks);
+}
+
+std::shared_ptr<IBuffer> VKRenderer::createBuffer() {
+    return std::make_shared<VKBuffer>(_device, _phys, _graphicsQueue, _graphicsFamily);
+}
+
+std::shared_ptr<IBuffer> VKRenderer::createUniformBuffer() {
+    auto buf = std::make_shared<VKBuffer>(_device, _phys, _graphicsQueue, _graphicsFamily);
+    buf->setNotifier(this);
+    return buf;
+}
+
+std::shared_ptr<ITexture2D> VKRenderer::createTexture2D() { return std::make_shared<VKTexture2D>(_device); }
+std::shared_ptr<ITexture3D> VKRenderer::createTexture3D() { return std::make_shared<VKTexture3D>(_device); }
+std::shared_ptr<IRenderTarget> VKRenderer::createRenderTarget() { return {}; }
+std::shared_ptr<ISwapchain> VKRenderer::getSwapchain() { return _swapchain; }
+
+void VKRenderer::beginFrame() {
+    if (_recording || !_swapchain) return;
+    (void)_device.waitForFences({*_frameFence}, vk::True, UINT64_MAX);
+    _device.resetFences({*_frameFence});
+    if (!_swapchain->acquire(static_cast<vk::Semaphore>(*_imageReady))) return;
+
+    vk::CommandBufferBeginInfo cbbi(vk::CommandBufferUsageFlagBits::eOneTimeSubmit);
+    vk::Result br = _cmd.begin(cbbi);
+    if (br != vk::Result::eSuccess) return;
+    _recording = true;
+    _rpActive = false;
+    _cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *_pipelineLayout, 0, {*_uboDs}, {});
+}
+
+void VKRenderer::endFrame() {
+    if (!_recording) return;
+    if (_rpActive) _cmd.endRenderPass();
+    vk::Result er = _cmd.end();
+    _recording = false;
+    if (er != vk::Result::eSuccess) return;
+
+    vk::Semaphore waitSem = *_imageReady;
+    vk::Semaphore signalSem = *_rendered;
+    vk::PipelineStageFlags waitStage = vk::PipelineStageFlagBits::eColorAttachmentOutput;
+    vk::CommandBuffer cb = *_cmd;
+    vk::SubmitInfo si{};
+    si.waitSemaphoreCount = 1;
+    si.pWaitSemaphores = &waitSem;
+    si.pWaitDstStageMask = &waitStage;
+    si.commandBufferCount = 1;
+    si.pCommandBuffers = &cb;
+    si.signalSemaphoreCount = 1;
+    si.pSignalSemaphores = &signalSem;
+    _graphicsQueue.submit({si}, *_frameFence);
+}
+
+bool VKRenderer::present() {
+    if (!_swapchain) return false;
+    _swapchain->setPresentSemaphore(static_cast<vk::Semaphore>(*_rendered));
+    return _swapchain->present();
+}
+
+void VKRenderer::onUniformCreated(VKBuffer* buffer) {
+    _uboBuffer = buffer;
+    updateUboDescriptor();
+}
+
+void VKRenderer::onUniformUpdated(VKBuffer* buffer) {
+    if (_uboBuffer == buffer) updateUboDescriptor();
+}
+
+void VKRenderer::updateUboDescriptor() {
+    if (_uboDs == nullptr || _uboBuffer == nullptr) return;
+    vk::DescriptorBufferInfo info(_uboBuffer->raw(), 0, _uboBuffer->size());
+    vk::WriteDescriptorSet wds{};
+    wds.dstSet = *_uboDs;
+    wds.dstBinding = 0;
+    wds.dstArrayElement = 0;
+    wds.descriptorCount = 1;
+    wds.descriptorType = vk::DescriptorType::eUniformBuffer;
+    wds.pBufferInfo = &info;
+    _device.updateDescriptorSets({wds}, {});
+}
+
+void VKRenderer::clearColor(float r, float g, float b, float a) {
+    _clearColor[0] = r;
+    _clearColor[1] = g;
+    _clearColor[2] = b;
+    _clearColor[3] = a;
+}
+
+void VKRenderer::setViewport(const Viewport& vp) {
+    _viewport = vp;
+    _viewportSet = true;
+    if (_recording && _rpActive) applyViewport();
+}
+
+void VKRenderer::setPipeline(const std::shared_ptr<IPipeline>& pipeline) { _pipeline = pipeline; }
+void VKRenderer::setVertexBuffer(const std::shared_ptr<IBuffer>& buffer) { _vertexBuffers[0] = buffer; }
+void VKRenderer::setVertexBuffer(const std::shared_ptr<IBuffer>& buffer, uint32_t binding) {
+    if (binding < _vertexBuffers.size()) _vertexBuffers[binding] = buffer;
+}
+void VKRenderer::setIndexBuffer(const std::shared_ptr<IBuffer>& buffer) { _indexBuffer = buffer; }
+
+void VKRenderer::draw(uint32_t vertexCount, uint32_t firstVertex) {
+    if (!_recording || !_pipeline) return;
+    if (!ensureRenderPass()) return;
+    if (!bindPipelineAndState()) return;
+    bindVertexBuffers();
+    _cmd.draw(vertexCount, 1, firstVertex, 0);
+}
+
+void VKRenderer::drawIndexed(uint32_t indexCount, uint32_t indexOffset, uint32_t vertexOffset) {
+    if (!_recording || !_pipeline) return;
+    if (!ensureRenderPass()) return;
+    if (!bindPipelineAndState()) return;
+    auto ib = std::dynamic_pointer_cast<VKBuffer>(_indexBuffer);
+    if (!ib || !ib->raw()) return;
+    bindVertexBuffers();
+    _cmd.bindIndexBuffer(ib->raw(), 0, vk::IndexType::eUint32);
+    _cmd.drawIndexed(indexCount, 1, indexOffset, static_cast<int32_t>(vertexOffset), 0);
+}
+
+void VKRenderer::drawIndexedInstanced(uint32_t indexCount, uint32_t instanceCount, uint32_t indexOffset, uint32_t vertexOffset) {
+    if (!_recording || !_pipeline) return;
+    if (!ensureRenderPass()) return;
+    if (!bindPipelineAndState()) return;
+    auto ib = std::dynamic_pointer_cast<VKBuffer>(_indexBuffer);
+    if (!ib || !ib->raw()) return;
+    bindVertexBuffers();
+    _cmd.bindIndexBuffer(ib->raw(), 0, vk::IndexType::eUint32);
+    _cmd.drawIndexed(indexCount, instanceCount, indexOffset, static_cast<int32_t>(vertexOffset), 0);
+}
+
+void VKRenderer::drawInstanced(uint32_t vertexCount, uint32_t instanceCount, uint32_t firstVertex) {
+    if (!_recording || !_pipeline) return;
+    if (!ensureRenderPass()) return;
+    if (!bindPipelineAndState()) return;
+    bindVertexBuffers();
+    _cmd.draw(vertexCount, instanceCount, firstVertex, 0);
+}
+
+bool VKRenderer::ensureRenderPass() {
+    if (_rpActive) return true;
+    const uint32_t idx = _swapchain->currentImage();
+    if (idx >= _framebuffers.size()) return false;
+    vk::ClearValue clear;
+    clear.color = vk::ClearColorValue(_clearColor[0], _clearColor[1], _clearColor[2], _clearColor[3]);
+    const vk::Rect2D area({0, 0}, extent());
+    vk::RenderPassBeginInfo rpbi(*_renderPass, *_framebuffers[idx], area, 1, &clear);
+    _cmd.beginRenderPass(rpbi, vk::SubpassContents::eInline);
+    _rpActive = true;
+    applyViewport();
+    return true;
+}
+
+void VKRenderer::applyViewport() {
+    const vk::Extent2D ext = extent();
+    float x = _viewportSet ? static_cast<float>(_viewport.x) : 0.0f;
+    float y = _viewportSet ? static_cast<float>(_viewport.y) : 0.0f;
+    float w = _viewportSet ? static_cast<float>(_viewport.width) : static_cast<float>(ext.width);
+    float h = _viewportSet ? static_cast<float>(_viewport.height) : static_cast<float>(ext.height);
+    vk::Viewport vp(x, y, w, h, 0.0f, 1.0f);
+    vk::Rect2D sc({static_cast<int32_t>(x), static_cast<int32_t>(y)},
+                  {static_cast<uint32_t>(w), static_cast<uint32_t>(h)});
+    _cmd.setViewport(0, {vp});
+    _cmd.setScissor(0, {sc});
+}
+
+bool VKRenderer::bindPipelineAndState() {
+    auto vkp = std::dynamic_pointer_cast<VKPipeline>(_pipeline);
+    if (!vkp) return false;
+    if (!vkp->ensureCreated()) return false;
+    _cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, vkp->pipeline());
+    vkp->applyDynamicState(_cmd);
+    return true;
+}
+
+bool VKRenderer::bindVertexBuffers() {
+    uint32_t maxBinding = 0;
+    bool any = false;
+    for (uint32_t i = 0; i < _vertexBuffers.size(); i++) {
+        if (_vertexBuffers[i]) { maxBinding = i; any = true; }
+    }
+    if (!any) return true;
+    std::vector<vk::Buffer> bufs(maxBinding + 1);
+    std::vector<vk::DeviceSize> offs(maxBinding + 1, 0);
+    for (uint32_t i = 0; i <= maxBinding; i++) {
+        auto vb = std::dynamic_pointer_cast<VKBuffer>(_vertexBuffers[i]);
+        if (vb && vb->raw()) bufs[i] = vb->raw();
+    }
+    _cmd.bindVertexBuffers(0, bufs, offs);
+    return true;
 }
 
 bool VKRenderer::isDeviceSuitable(vk::raii::PhysicalDevice& pd) {
@@ -251,6 +643,13 @@ bool VKRenderer::createDevice(const QueueFamilies& families) {
     _graphicsQueue = _device.getQueue(families.graphics, 0);
     _presentQueue = _device.getQueue(families.present, 0);
     return true;
+}
+
+BackendCapabilities VKRenderer::backendCapabilities() {
+    BackendCapabilities caps;
+    caps.maxSamples = 1;
+    caps.maxUniformBlockSize = 16384;
+    return caps;
 }
 
 std::shared_ptr<IRenderer> createVKRenderer() {

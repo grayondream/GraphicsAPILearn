@@ -136,8 +136,8 @@ bool VKSwapchain::createImageViews() {
     return true;
 }
 
-bool VKSwapchain::acquire() {
-    auto r = _swapchain.acquireNextImage(std::numeric_limits<uint64_t>::max());
+bool VKSwapchain::acquire(vk::Semaphore imageReady) {
+    auto r = _swapchain.acquireNextImage(std::numeric_limits<uint64_t>::max(), imageReady, nullptr);
     if (r.result == vk::Result::eSuccess || r.result == vk::Result::eSuboptimalKHR) {
         _imageIndex = r.value;
         return true;
@@ -148,7 +148,10 @@ bool VKSwapchain::acquire() {
 bool VKSwapchain::present() {
     vk::SwapchainKHR sc = static_cast<vk::SwapchainKHR>(*_swapchain);
     vk::PresentInfoKHR info{};
-    info.waitSemaphoreCount = 0;
+    if (_presentSemaphore) {
+        info.waitSemaphoreCount = 1;
+        info.pWaitSemaphores = &_presentSemaphore;
+    }
     info.swapchainCount = 1;
     info.pSwapchains = &sc;
     info.pImageIndices = &_imageIndex;
