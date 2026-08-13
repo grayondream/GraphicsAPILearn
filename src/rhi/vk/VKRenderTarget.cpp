@@ -136,7 +136,10 @@ bool VKRenderTarget::createRenderPass() {
         ad.stencilLoadOp = vk::AttachmentLoadOp::eDontCare;
         ad.stencilStoreOp = vk::AttachmentStoreOp::eDontCare;
         ad.initialLayout = vk::ImageLayout::eUndefined;
-        ad.finalLayout = vk::ImageLayout::eColorAttachmentOptimal;
+        // Non-MSAA color attachments must be left in a samplerable layout so the
+        // adopted colorTexture2D(i) can be sampled (e.g. post-processing).
+        ad.finalLayout = msaa ? vk::ImageLayout::eColorAttachmentOptimal
+                              : vk::ImageLayout::eShaderReadOnlyOptimal;
         uint32_t idx = static_cast<uint32_t>(attachments.size());
         attachments.push_back(ad);
         colorRefs.push_back(vk::AttachmentReference(idx, vk::ImageLayout::eColorAttachmentOptimal));
@@ -161,16 +164,20 @@ bool VKRenderTarget::createRenderPass() {
 
     vk::AttachmentReference depthRef{};
     bool hasDepthRef = false;
-    if (_depthAttachment) {
+    if (_depthAttachment || _cubeDepth) {
         vk::AttachmentDescription ad{};
-        ad.format = ToVkTextureFormat(_depth.format);
-        ad.samples = msaa ? ToVkSamples(static_cast<int>(_samples)) : vk::SampleCountFlagBits::e1;
+        ad.format = _cubeDepth ? _cubeDepthFormat : ToVkTextureFormat(_depth.format);
+        // An attached depth cubemap is single-sampled; only the RT's own MSAA
+        // depth can be multisampled.
+        ad.samples = _cubeDepth ? vk::SampleCountFlagBits::e1
+                                : (msaa ? ToVkSamples(static_cast<int>(_samples)) : vk::SampleCountFlagBits::e1);
         ad.loadOp = vk::AttachmentLoadOp::eClear;
         ad.storeOp = vk::AttachmentStoreOp::eStore;
         ad.stencilLoadOp = vk::AttachmentLoadOp::eDontCare;
         ad.stencilStoreOp = vk::AttachmentStoreOp::eDontCare;
         ad.initialLayout = vk::ImageLayout::eUndefined;
-        ad.finalLayout = vk::ImageLayout::eDepthStencilAttachmentOptimal;
+        // Leave depth in a samplerable layout so depthTexture2D() can be sampled.
+        ad.finalLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
         depthRef = vk::AttachmentReference(static_cast<uint32_t>(attachments.size()),
                                            vk::ImageLayout::eDepthStencilAttachmentOptimal);
         hasDepthRef = true;
@@ -202,7 +209,7 @@ bool VKRenderTarget::createFramebuffer() {
     std::vector<vk::ImageView> views;
     for (auto& c : _colors) views.push_back(*c.view);
     if (this->msaa()) for (auto& r : _resolved) views.push_back(*r.view);
-    if (_depthAttachment) views.push_back(*_depth.view);
+    if (_depthAttachment || _cubeDepth) views.push_back(_cubeDepth ? _cubeDepthView : *_depth.view);
 
     vk::FramebufferCreateInfo fci{};
     fci.renderPass = *_renderPass;
@@ -210,7 +217,10 @@ bool VKRenderTarget::createFramebuffer() {
     fci.pAttachments = views.data();
     fci.width = _extent.width;
     fci.height = _extent.height;
-    fci.layers = 1;
+    // A depth-only cubemap attachment (6 layers) is written to all faces via
+    // the geometry shader (gl_Layer). Mixed color+cube combos keep 1 layer to
+    // stay valid against single-layer color attachments.
+    fci.layers = (_colorCount == 0 && _cubeDepth) ? 6u : 1u;
     auto fr = _dev.createFramebuffer(fci);
     if (fr.result != vk::Result::eSuccess) {
         LOGE("VKRenderTarget: createFramebuffer failed");
@@ -260,27 +270,21 @@ bool VKRenderTarget::attachDepthCube(ITexture3D* cube, int mip) {
     (void)mip;
     auto vkCube = static_cast<VKTexture3D*>(cube);
     if (!vkCube || !vkCube->valid()) return false;
-    if (_framebuffer != nullptr) _framebuffer = vk::raii::Framebuffer{nullptr};
+    vk::ImageView view = vkCube->depthCubeView();
+    if (!view) return false;
 
-    std::vector<vk::ImageView> views;
-    for (auto& c : _colors) views.push_back(*c.view);
-    if (!_depthAttachment && _colorCount == 0) {
-        views.push_back(vkCube->depthCubeView());
-    } else if (_depthAttachment) {
-        views.push_back(*_depth.view);
-    }
+    // Wire the cube's layered depth view in as this render pass's depth
+    // attachment, then rebuild render pass + framebuffer so their attachment
+    // sets match (cube depth is added regardless of whether the RT owns color
+    // and/or a depth attachment).
+    _cubeDepthView = view;
+    _cubeDepthFormat = vkCube->format();
+    _cubeDepth = true;
 
-    vk::FramebufferCreateInfo fci{};
-    fci.renderPass = *_renderPass;
-    fci.attachmentCount = static_cast<uint32_t>(views.size());
-    fci.pAttachments = views.data();
-    fci.width = _extent.width;
-    fci.height = _extent.height;
-    fci.layers = 1;
-    auto fr = _dev.createFramebuffer(fci);
-    if (fr.result != vk::Result::eSuccess) return false;
-    _framebuffer = std::move(fr.value);
-    return true;
+    _framebuffer = vk::raii::Framebuffer{nullptr};
+    _renderPass = vk::raii::RenderPass{nullptr};
+    if (!createRenderPass()) return false;
+    return createFramebuffer();
 }
 
 bool VKRenderTarget::bind() { return true; }
@@ -333,6 +337,9 @@ void VKRenderTarget::clearImages() {
     _colors.clear();
     _depth = Image{};
     _depthAttachment = false;
+    _cubeDepth = false;
+    _cubeDepthView = vk::ImageView{};
+    _cubeDepthFormat = vk::Format{};
     _colorCount = 0;
 }
 

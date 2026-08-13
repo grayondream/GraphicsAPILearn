@@ -1,5 +1,6 @@
 #include "VKBackend.hpp"
 #include "VKHeader.hpp"
+#include "VKFormat.hpp"
 #include "VKSwapchain.hpp"
 #include "VKBuffer.hpp"
 #include "VKShader.hpp"
@@ -360,8 +361,7 @@ std::shared_ptr<IShader> VKRenderer::createShader() {
 
 std::shared_ptr<IPipeline> VKRenderer::createPipeline(const VertexLayout& layout, const std::shared_ptr<IShader>& shader) {
     auto vks = std::dynamic_pointer_cast<VKShader>(shader);
-    return std::make_shared<VKPipeline>(_device, *_pipelineLayout, *_renderPass,
-                                        _swapchain->format(), layout, vks);
+    return std::make_shared<VKPipeline>(_device, *_pipelineLayout, layout, vks);
 }
 
 std::shared_ptr<IBuffer> VKRenderer::createBuffer() {
@@ -532,8 +532,11 @@ void VKRenderer::blitFramebuffer(const std::shared_ptr<IRenderTarget>& src,
         vk::Image dstImg = d->colorImage(0);
         const vk::ImageAspectFlags aspect = vk::ImageAspectFlagBits::eColor;
 
+        // colorImage(0) returns the samplerable attachment (the resolve image
+        // for MSAA, the color image otherwise), whose layout after the render
+        // pass is eShaderReadOnlyOptimal.
         vk::ImageMemoryBarrier toSrc{};
-        toSrc.oldLayout = vk::ImageLayout::eColorAttachmentOptimal;
+        toSrc.oldLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
         toSrc.newLayout = vk::ImageLayout::eTransferSrcOptimal;
         toSrc.srcQueueFamilyIndex = vk::QueueFamilyIgnored;
         toSrc.dstQueueFamilyIndex = vk::QueueFamilyIgnored;
@@ -570,7 +573,7 @@ void VKRenderer::blitFramebuffer(const std::shared_ptr<IRenderTarget>& src,
 
         vk::ImageMemoryBarrier backSrc{};
         backSrc.oldLayout = vk::ImageLayout::eTransferSrcOptimal;
-        backSrc.newLayout = vk::ImageLayout::eColorAttachmentOptimal;
+        backSrc.newLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
         backSrc.srcQueueFamilyIndex = vk::QueueFamilyIgnored;
         backSrc.dstQueueFamilyIndex = vk::QueueFamilyIgnored;
         backSrc.image = srcImg;
@@ -578,7 +581,7 @@ void VKRenderer::blitFramebuffer(const std::shared_ptr<IRenderTarget>& src,
         backSrc.subresourceRange.levelCount = 1;
         backSrc.subresourceRange.layerCount = 1;
         backSrc.srcAccessMask = vk::AccessFlagBits::eTransferRead;
-        backSrc.dstAccessMask = vk::AccessFlagBits::eColorAttachmentWrite;
+        backSrc.dstAccessMask = vk::AccessFlagBits::eShaderRead;
         vk::ImageMemoryBarrier backDst{};
         backDst.oldLayout = vk::ImageLayout::eTransferDstOptimal;
         backDst.newLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
@@ -641,13 +644,11 @@ bool VKRenderer::ensureRenderPass() {
     vk::Framebuffer fb;
     vk::Extent2D ext;
     uint32_t colorCount = 1;
-    uint32_t depthCount = 0;
     if (vkrt && vkrt->valid()) {
         rp = vkrt->renderPass();
         fb = vkrt->framebuffer();
         ext = vkrt->extent2d();
         colorCount = vkrt->colorCount();
-        depthCount = vkrt->attachmentCount() - colorCount;
     } else {
         const uint32_t idx = _swapchain->currentImage();
         if (idx >= _framebuffers.size()) return false;
@@ -656,13 +657,26 @@ bool VKRenderer::ensureRenderPass() {
         ext = extent();
     }
 
+    // Build clear values in the render pass's attachment order:
+    // [color] x N, [resolve] x N (when MSAA), [depth] (optional). The resolve
+    // attachments use loadOp DontCare so their clear value is ignored, but a
+    // VkClearValue must still be supplied for every attachment.
+    const bool msaa = vkrt && vkrt->valid() && vkrt->msaa();
+    const bool hasDepth = vkrt && vkrt->valid() && vkrt->hasDepthAttachment();
     std::vector<vk::ClearValue> clears;
     for (uint32_t i = 0; i < colorCount; i++) {
         vk::ClearValue cv;
         cv.color = vk::ClearColorValue(_clearColor[0], _clearColor[1], _clearColor[2], _clearColor[3]);
         clears.push_back(cv);
     }
-    for (uint32_t i = 0; i < depthCount; i++) {
+    if (msaa) {
+        for (uint32_t i = 0; i < colorCount; i++) {
+            vk::ClearValue cv;
+            cv.color = vk::ClearColorValue(0.0f, 0.0f, 0.0f, 0.0f);
+            clears.push_back(cv);
+        }
+    }
+    if (hasDepth) {
         vk::ClearValue cv;
         cv.depthStencil = vk::ClearDepthStencilValue(1.0f, 0);
         clears.push_back(cv);
@@ -692,8 +706,21 @@ void VKRenderer::applyViewport() {
 bool VKRenderer::bindPipelineAndState() {
     auto vkp = std::dynamic_pointer_cast<VKPipeline>(_pipeline);
     if (!vkp) return false;
-    if (!vkp->ensureCreated()) return false;
-    _cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, vkp->pipeline());
+    // Build/bind a pipeline matching the currently active render pass (either an
+    // offscreen RT or the swapchain), with the correct attachment sample count.
+    vk::RenderPass rp;
+    vk::SampleCountFlagBits samples = vk::SampleCountFlagBits::e1;
+    if (_vkRenderTarget && _vkRenderTarget->valid()) {
+        rp = _vkRenderTarget->renderPass();
+        samples = _vkRenderTarget->msaa()
+            ? ToVkSamples(static_cast<int>(_vkRenderTarget->samples()))
+            : vk::SampleCountFlagBits::e1;
+    } else {
+        rp = *_renderPass;
+    }
+    vk::Pipeline p = vkp->pipelineFor(rp, samples);
+    if (!p) return false;
+    _cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, p);
     vkp->applyDynamicState(_cmd);
     return true;
 }

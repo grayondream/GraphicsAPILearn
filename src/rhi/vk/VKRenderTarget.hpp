@@ -29,9 +29,18 @@ public:
     vk::RenderPass renderPass() const { return _renderPass != nullptr ? *_renderPass : vk::RenderPass{nullptr}; }
     vk::Framebuffer framebuffer() const { return _framebuffer != nullptr ? *_framebuffer : vk::Framebuffer{nullptr}; }
     vk::Extent2D extent2d() const { return _extent; }
-    uint32_t attachmentCount() const { return _colorCount + (_depthAttachment ? 1u : 0u); }
+    // True attachment count of the render pass, in attachment order:
+    // [color msaa] x N, [resolve] x N (when MSAA), [depth] (optional).
+    uint32_t attachmentCount() const {
+        uint32_t n = _colorCount;
+        if (this->msaa()) n += _colorCount;
+        if (_depthAttachment || _cubeDepth) n += 1;
+        return n;
+    }
     uint32_t colorCount() const { return _colorCount; }
     bool msaa() const { return _samples > 1; }
+    uint32_t samples() const { return _samples; }
+    bool hasDepthAttachment() const { return _depthAttachment || _cubeDepth; }
     bool valid() const { return _valid; }
     vk::Image colorImage(uint32_t i) const;
     vk::Format colorFormat(uint32_t i) const;
@@ -65,6 +74,10 @@ private:
     std::vector<Image> _resolved{};
     Image _depth;
     bool _depthAttachment{false};
+    // Attached depth cubemap (point-light shadow): view + format, active after attachDepthCube.
+    bool _cubeDepth{false};
+    vk::ImageView _cubeDepthView{};
+    vk::Format _cubeDepthFormat{};
 
     vk::raii::RenderPass _renderPass{nullptr};
     vk::raii::Framebuffer _framebuffer{nullptr};

@@ -82,15 +82,17 @@ static vk::CullModeFlags ToVkCullMode(bool enable, CullFace face) {
     return vk::CullModeFlagBits::eNone;
 }
 
-VKPipeline::VKPipeline(vk::raii::Device& device, vk::PipelineLayout layout, vk::RenderPass renderPass,
-                       vk::Format swapchainFormat, VertexLayout layoutIn, std::shared_ptr<VKShader> shader)
-    : _dev(device), _pipelineLayout(layout), _renderPass(renderPass), _swapchainFormat(swapchainFormat),
-      _layout(std::move(layoutIn)), _shader(std::move(shader)) {}
+VKPipeline::VKPipeline(vk::raii::Device& device, vk::PipelineLayout layout, VertexLayout layoutIn,
+                       std::shared_ptr<VKShader> shader)
+    : _dev(device), _pipelineLayout(layout), _layout(std::move(layoutIn)), _shader(std::move(shader)) {}
 
 void VKPipeline::use() {}
 
 void* VKPipeline::handle() {
-    return reinterpret_cast<void*>(static_cast<VkPipeline>(*_pipeline));
+    // Pipelines are created per render pass and cached; there is no single
+    // handle. Return the most recently built one for introspection use.
+    if (!_cache.empty()) return reinterpret_cast<void*>(static_cast<VkPipeline>(*_cache.rbegin()->second));
+    return nullptr;
 }
 
 void VKPipeline::setDepthTest(bool enable) { _depthTest = enable; }
@@ -118,23 +120,24 @@ void VKPipeline::setPrimitiveType(PrimitiveType type) {
     if (_primitive != type) { _primitive = type; _needsRecreate = true; }
 }
 
-bool VKPipeline::ensureCreated() {
-    if (_created && !_needsRecreate) return true;
-    if (_created) {
-        _retired.push_back(std::move(_pipeline));
-        _pipeline = vk::raii::Pipeline{nullptr};
-        _created = false;
+vk::Pipeline VKPipeline::pipelineFor(vk::RenderPass rp, vk::SampleCountFlagBits samples) {
+    if (_needsRecreate) {
+        _cache.clear();
+        _needsRecreate = false;
     }
-    _needsRecreate = false;
-    if (!createGraphicsPipeline()) {
-        LOGE("VKPipeline: createGraphicsPipeline failed");
-        return false;
+    auto it = _cache.find(rp);
+    if (it == _cache.end()) {
+        vk::raii::Pipeline pipe{nullptr};
+        if (!createGraphicsPipeline(rp, samples, pipe)) {
+            LOGE("VKPipeline: createGraphicsPipeline failed");
+            return vk::Pipeline{};
+        }
+        it = _cache.emplace(rp, std::move(pipe)).first;
     }
-    _created = true;
-    return true;
+    return *it->second;
 }
 
-bool VKPipeline::createGraphicsPipeline() {
+bool VKPipeline::createGraphicsPipeline(vk::RenderPass rp, vk::SampleCountFlagBits samples, vk::raii::Pipeline& out) {
     const std::vector<vk::PipelineShaderStageCreateInfo> stages = _shader ? _shader->stageInfos() : std::vector<vk::PipelineShaderStageCreateInfo>{};
     if (stages.empty()) {
         LOGE("VKPipeline: no shader stages");
@@ -178,7 +181,7 @@ bool VKPipeline::createGraphicsPipeline() {
     rasterizer.lineWidth = 1.0f;
 
     vk::PipelineMultisampleStateCreateInfo multisample{};
-    multisample.rasterizationSamples = vk::SampleCountFlagBits::e1;
+    multisample.rasterizationSamples = samples;
     multisample.sampleShadingEnable = vk::False;
 
     vk::PipelineDepthStencilStateCreateInfo depthStencil{};
@@ -230,7 +233,7 @@ bool VKPipeline::createGraphicsPipeline() {
     gpi.pColorBlendState = &colorBlend;
     gpi.pDynamicState = &dynamicState;
     gpi.layout = _pipelineLayout;
-    gpi.renderPass = _renderPass;
+    gpi.renderPass = rp;
     gpi.subpass = 0;
 
     auto pr = _dev.createGraphicsPipeline(nullptr, gpi);
@@ -238,7 +241,7 @@ bool VKPipeline::createGraphicsPipeline() {
         LOGE("VKPipeline: createGraphicsPipeline result {}", static_cast<int>(pr.result));
         return false;
     }
-    _pipeline = std::move(pr.value);
+    out = std::move(pr.value);
     return true;
 }
 

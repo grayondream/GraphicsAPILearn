@@ -2,6 +2,7 @@
 #include "VKHeader.hpp"
 #include "rhi/core/IPipeline.hpp"
 #include "VKShader.hpp"
+#include <map>
 
 namespace rhi {
 
@@ -9,8 +10,11 @@ class VKShader;
 
 class VKPipeline : public IPipeline {
 public:
-    VKPipeline(vk::raii::Device& device, vk::PipelineLayout layout, vk::RenderPass renderPass,
-               vk::Format swapchainFormat, VertexLayout layoutIn, std::shared_ptr<VKShader> shader);
+    // A VK pipeline is bound against whatever render pass is active at draw
+    // time (swapchain or an offscreen render target), so it is created lazily
+    // and cached per render pass handle via pipelineFor().
+    VKPipeline(vk::raii::Device& device, vk::PipelineLayout layout, VertexLayout layoutIn,
+               std::shared_ptr<VKShader> shader);
     ~VKPipeline() override = default;
 
     void use() override;
@@ -45,23 +49,20 @@ public:
     void setVertexBuffer(const std::shared_ptr<IBuffer>&, uint32_t) override {}
     void setIndexBuffer(const std::shared_ptr<IBuffer>&) override {}
 
-    bool ensureCreated();
+    // Build (if not cached) and return the VkPipeline bound for the given
+    // render pass. samples must match the render pass attachment sample count.
+    vk::Pipeline pipelineFor(vk::RenderPass rp, vk::SampleCountFlagBits samples);
     void applyDynamicState(vk::raii::CommandBuffer& cmd) const;
-    vk::Pipeline pipeline() const { return *_pipeline; }
     vk::PipelineLayout layout() const { return _pipelineLayout; }
 
 private:
-    bool createGraphicsPipeline();
+    bool createGraphicsPipeline(vk::RenderPass rp, vk::SampleCountFlagBits samples, vk::raii::Pipeline& out);
 
     vk::raii::Device& _dev;
     vk::PipelineLayout _pipelineLayout{};
-    vk::RenderPass _renderPass{};
-    vk::Format _swapchainFormat{};
     VertexLayout _layout{};
     std::shared_ptr<VKShader> _shader{};
-    vk::raii::Pipeline _pipeline{nullptr};
-    std::vector<vk::raii::Pipeline> _retired{};
-    bool _created{false};
+    std::map<vk::RenderPass, vk::raii::Pipeline> _cache{};
     bool _needsRecreate{false};
 
     bool _depthTest{false};
