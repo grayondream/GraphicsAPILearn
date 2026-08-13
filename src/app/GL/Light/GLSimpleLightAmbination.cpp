@@ -48,6 +48,10 @@ bool GLSimpleLightAmbination::initApp() {
 		_targetPipeline = renderer()->createPipeline(geo.layout, shader);
 		_targetPipeline->setDepthTest(true);
 	}
+
+	_uboBuffer = renderer()->createUniformBuffer();
+	_uboBuffer->init(nullptr, sizeof(rhi::UniformBlock), rhi::BufferType::Uniform);
+	_uboBuffer->bindRange(0, 0, sizeof(rhi::UniformBlock));
 	return true;
 }
 
@@ -72,11 +76,12 @@ void GLSimpleLightAmbination::drawScene(const float dt) {
 		model = glm::translate(model, glm::vec3(0.0f, 0.0f, 0.0f));
 		model = glm::rotate(model, glm::radians(0.0f), glm::vec3(1.0f, 0.3f, 0.5f));
 		glm::vec4 objectColor(1.0f, 0.5f, 0.31f, 1.0f);
-		_targetPipeline->setUniform("projection", glm::value_ptr(projection), 1);
-		_targetPipeline->setUniform("view", glm::value_ptr(view), 1);
-		_targetPipeline->setUniform("model", glm::value_ptr(model), 1);
-		_targetPipeline->setUniform("lightColor", glm::value_ptr(_lightColor), 1, 4);
-		_targetPipeline->setUniform("objectColor", glm::value_ptr(objectColor), 1, 4);
+		rhi::SetUniform(_ubo, "projection", projection);
+		rhi::SetUniform(_ubo, "view", view);
+		rhi::SetUniform(_ubo, "model", model);
+		rhi::SetUniform(_ubo, "lightColor", _lightColor);
+		rhi::SetUniform(_ubo, "objectColor", objectColor);
+		_uboBuffer->update(&_ubo, sizeof(rhi::UniformBlock), 0);
 		renderer()->setIndexBuffer(_ebo);
 		renderer()->drawIndexed(_indexCount, 0, 0);
 	}
@@ -89,10 +94,11 @@ void GLSimpleLightAmbination::drawScene(const float dt) {
 		model = glm::translate(model, glm::vec3(1.0f, 1.0f, 1.0f));
 		model = glm::rotate(model, glm::radians(0.0f), glm::vec3(1.0f, 0.3f, 0.5f));
 		model = glm::scale(model, glm::vec3(0.2, 0.2, 0.2));
-		_lightPipeline->setUniform("projection", glm::value_ptr(projection), 1);
-		_lightPipeline->setUniform("view", glm::value_ptr(view), 1);
-		_lightPipeline->setUniform("lightColor", glm::value_ptr(_lightColor), 1, 4);
-		_lightPipeline->setUniform("model", glm::value_ptr(model), 1);
+		rhi::SetUniform(_ubo, "projection", projection);
+		rhi::SetUniform(_ubo, "view", view);
+		rhi::SetUniform(_ubo, "lightColor", _lightColor);
+		rhi::SetUniform(_ubo, "model", model);
+		_uboBuffer->update(&_ubo, sizeof(rhi::UniformBlock), 0);
 		renderer()->setIndexBuffer(_ebo);
 		renderer()->drawIndexed(_indexCount, 0, 0);
 	}

@@ -2,6 +2,8 @@
 #include "app/GL/Base/GLCameraBaseApp.hpp"
 #include "rhi/core/IPipeline.hpp"
 #include "rhi/core/IBuffer.hpp"
+#include "rhi/core/IRenderer.hpp"
+#include "rhi/core/UniformBlock.hpp"
 #include <memory>
 #include <array>
 #include "geometry/Camera.hpp"
@@ -31,4 +33,7 @@ private:
 	float _specularStrength{0.0};
 	float _diffuseStrength{0.0};
 	int _powTimes{1};
+
+	rhi::UniformBlock _ubo{};
+	std::shared_ptr<rhi::IBuffer> _uboBuffer{};
 };

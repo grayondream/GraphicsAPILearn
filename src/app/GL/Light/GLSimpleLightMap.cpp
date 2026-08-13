@@ -63,6 +63,10 @@ bool GLSimpleLightMap::initApp() {
 		ExitIfFailed(_specularTex != nullptr, "Failed to load texture from file {}", objImg);
 	}
 
+	_uboBuffer = renderer()->createUniformBuffer();
+	_uboBuffer->init(nullptr, sizeof(rhi::UniformBlock), rhi::BufferType::Uniform);
+	_uboBuffer->bindRange(0, 0, sizeof(rhi::UniformBlock));
+
 	return true;
 }
 
@@ -94,10 +98,11 @@ void GLSimpleLightMap::drawScene(const float dt) {
 		model = glm::rotate(model, 0.f, glm::vec3(1.0f, 0.f, 0.f));
 		model = glm::scale(model, glm::vec3(0.2, 0.2, 0.2));
 
-		_lightPipeline->setUniform("projection", glm::value_ptr(projection), 1);
-		_lightPipeline->setUniform("view", glm::value_ptr(view), 1);
-		_lightPipeline->setUniform("lightColor", glm::value_ptr(_lightColor), 1, 4);
-		_lightPipeline->setUniform("model", glm::value_ptr(model), 1);
+		rhi::SetUniform(_ubo, "projection", projection);
+		rhi::SetUniform(_ubo, "view", view);
+		rhi::SetUniform(_ubo, "lightColor", _lightColor);
+		rhi::SetUniform(_ubo, "model", model);
+		_uboBuffer->update(&_ubo, sizeof(rhi::UniformBlock), 0);
 		renderer()->setIndexBuffer(_ebo);
 		renderer()->drawIndexed(_indexCount, 0, 0);
 	}
@@ -113,36 +118,34 @@ void GLSimpleLightMap::drawScene(const float dt) {
 		model = glm::translate(model, glm::vec3(1, 0.0, 0.0f));
 		model = glm::rotate(model, glm::radians(0.0f), glm::vec3(1.0f, 0.3f, 0.5f));
 
-		_targetPipeline->setUniform("projection", glm::value_ptr(projection), 1);
-		_targetPipeline->setUniform("view", glm::value_ptr(view), 1);
-		_targetPipeline->setUniform("model", glm::value_ptr(model), 1);
-		_targetPipeline->setUniform("lightColor", glm::value_ptr(_lightColor), 1, 4);
+		rhi::SetUniform(_ubo, "projection", projection);
+		rhi::SetUniform(_ubo, "view", view);
+		rhi::SetUniform(_ubo, "model", model);
+		rhi::SetUniform(_ubo, "lightColor", _lightColor);
 
 		glm::vec4 objectColor(1.0f, 0.5f, 0.31f, 1.0f);
-		_targetPipeline->setUniform("objectColor", glm::value_ptr(objectColor), 1, 4);
+		rhi::SetUniform(_ubo, "objectColor", objectColor);
 
-		glm::vec4 lightPosition(lightPos.x, lightPos.y, lightPos.z, 1.0f);
-		_targetPipeline->setUniform("light.position", glm::value_ptr(lightPosition), 1, 4);
+		rhi::SetLight(_ubo, 0, "position", lightPos);
 
 		const auto camPos = _camera.getAttr().pos;
 		glm::vec4 viewPos(camPos.x, camPos.y, camPos.z, 1.0f);
-		_targetPipeline->setUniform("viewPos", glm::value_ptr(viewPos), 1, 4);
+		rhi::SetUniform(_ubo, "viewPos", viewPos);
 
-		_targetPipeline->setUniform("material.shininess", 1);
+		rhi::SetUniform(_ubo, "material.shininess", 1);
 
 		renderer()->bindTexture(_diffuseTex, 0);
-		_targetPipeline->setUniform("material.diffuse", 0);
 		renderer()->bindTexture(_specularTex, 1);
-		_targetPipeline->setUniform("material.specular", 1);
 
 		float v = 0.2f;
 		glm::vec4 diffuseColor = _lightColor * glm::vec4(v * 3);
 		glm::vec4 ambientColor = diffuseColor * glm::vec4(v);
 		glm::vec4 specularColor(v * 3);
-		_targetPipeline->setUniform("light.ambient", glm::value_ptr(ambientColor), 1, 4);
-		_targetPipeline->setUniform("light.diffuse", glm::value_ptr(diffuseColor), 1, 4);
-		_targetPipeline->setUniform("light.specular", glm::value_ptr(specularColor), 1, 4);
+		rhi::SetLight(_ubo, 0, "ambient", glm::vec3(ambientColor));
+		rhi::SetLight(_ubo, 0, "diffuse", glm::vec3(diffuseColor));
+		rhi::SetLight(_ubo, 0, "specular", glm::vec3(specularColor));
 
+		_uboBuffer->update(&_ubo, sizeof(rhi::UniformBlock), 0);
 		renderer()->setIndexBuffer(_ebo);
 		renderer()->drawIndexed(_indexCount, 0, 0);
 	}

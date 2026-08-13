@@ -64,4 +64,6 @@ Light/Advanced/Shadow/DebugQuand.frag	depthMap	1
 Light/Advanced/Shadow/ShadowMapping.frag	diffuseTexture	1
 Light/Advanced/Shadow/ShadowMapping.frag	shadowMap	2
 Light/Advanced/ShadowMap/Depth.frag	textureSampler	1
+Light/LightMap/Object.frag	diffuseMap	1
+Light/LightMap/Object.frag	specularMap	2
 Model/model.frag	texture_diffuse1	1
