@@ -1,10 +1,23 @@
 #version 450 core
 
-out vec4 color;
+struct ULight { vec4 position; vec4 direction; vec4 ambient; vec4 diffuse; vec4 specular; vec4 params; };
 
-uniform vec4 lightColor;
+layout(set=0, binding=0) uniform UniformBlock {
+    mat4 projection;
+    mat4 view;
+    mat4 model;
+    mat4 normalMatrix;
+    mat4 viewModel;
+    mat4 extraMat4[14];
+    vec4 vec4Pool[64];
+    vec4 vec3Pool[64];
+    float floatPool[64];
+    ULight lights[6];
+};
+
+out vec4 color;
 
 void main(){
     //color = fragColor;
-    color = lightColor;
+    color = vec4Pool[3];
 }

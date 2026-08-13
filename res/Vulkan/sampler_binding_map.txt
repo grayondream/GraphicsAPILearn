@@ -66,4 +66,12 @@ Light/Advanced/Shadow/ShadowMapping.frag	shadowMap	2
 Light/Advanced/ShadowMap/Depth.frag	textureSampler	1
 Light/LightMap/Object.frag	diffuseMap	1
 Light/LightMap/Object.frag	specularMap	2
+Light/LightSource/Direction/Object.frag	diffuseMap	1
+Light/LightSource/Direction/Object.frag	specularMap	2
+Light/LightSource/Mult/Object.frag	diffuseMap	1
+Light/LightSource/Mult/Object.frag	specularMap	2
+Light/LightSource/Point/Object.frag	diffuseMap	1
+Light/LightSource/Point/Object.frag	specularMap	2
+Light/LightSource/Spot/Object.frag	diffuseMap	1
+Light/LightSource/Spot/Object.frag	specularMap	2
 Model/model.frag	texture_diffuse1	1

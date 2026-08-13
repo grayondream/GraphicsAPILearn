@@ -63,6 +63,10 @@ bool GLLightSourcePoint::initApp() {
 		ExitIfFailed(_specularTex != nullptr, "Failed to load texture from file {}", objImg);
 	}
 
+	_uboBuffer = renderer()->createUniformBuffer();
+	_uboBuffer->init(nullptr, sizeof(rhi::UniformBlock), rhi::BufferType::Uniform);
+	_uboBuffer->bindRange(0, 0, sizeof(rhi::UniformBlock));
+
 	return true;
 }
 
@@ -97,10 +101,11 @@ void GLLightSourcePoint::drawScene(const float dt) {
 		model = glm::translate(model, lightPos);
 		model = glm::rotate(model, 0.f, glm::vec3(1.0f, 0.f, 0.f));
 		model = glm::scale(model, glm::vec3(0.2, 0.2, 0.2));
-		_lightPipeline->setUniform("projection", glm::value_ptr(projection), 1);
-		_lightPipeline->setUniform("view", glm::value_ptr(view), 1);
-		_lightPipeline->setUniform("lightColor", glm::value_ptr(_lightColor), 1, 4);
-		_lightPipeline->setUniform("model", glm::value_ptr(model), 1);
+		rhi::SetUniform(_ubo, "projection", projection);
+		rhi::SetUniform(_ubo, "view", view);
+		rhi::SetUniform(_ubo, "lightColor", _lightColor);
+		rhi::SetUniform(_ubo, "model", model);
+		_uboBuffer->update(&_ubo, sizeof(rhi::UniformBlock), 0);
 		renderer()->setIndexBuffer(_ebo);
 		renderer()->drawIndexed(_indexCount, 0, 0);
 	}
@@ -112,37 +117,34 @@ void GLLightSourcePoint::drawScene(const float dt) {
 		renderer()->setVertexBuffer(_uv, 1);
 		renderer()->setVertexBuffer(_normal, 2);
 
-		_targetPipeline->setUniform("projection", glm::value_ptr(projection), 1);
-		_targetPipeline->setUniform("view", glm::value_ptr(view), 1);
-		_targetPipeline->setUniform("lightColor", glm::value_ptr(_lightColor), 1, 4);
+		rhi::SetUniform(_ubo, "projection", projection);
+		rhi::SetUniform(_ubo, "view", view);
+		rhi::SetUniform(_ubo, "lightColor", _lightColor);
 
 		glm::vec4 objectColor(1.0f, 0.5f, 0.31f, 1.0f);
-		_targetPipeline->setUniform("objectColor", glm::value_ptr(objectColor), 1, 4);
+		rhi::SetUniform(_ubo, "objectColor", objectColor);
 
-		glm::vec4 lightPosition(lightPos.x, lightPos.y, lightPos.z, 1.0f);
-		_targetPipeline->setUniform("light.position", glm::value_ptr(lightPosition), 1, 4);
+		rhi::SetLight(_ubo, 0, "position", lightPos);
 
 		const auto camPos = _camera.getAttr().pos;
 		glm::vec4 viewPos(camPos.x, camPos.y, camPos.z, 1.0f);
-		_targetPipeline->setUniform("viewPos", glm::value_ptr(viewPos), 1, 4);
+		rhi::SetUniform(_ubo, "viewPos", viewPos);
 
-		_targetPipeline->setUniform("material.shininess", 1);
+		rhi::SetUniform(_ubo, "material.shininess", 1);
 
 		renderer()->bindTexture(_diffuseTex, 0);
-		_targetPipeline->setUniform("material.diffuse", 0);
 		renderer()->bindTexture(_specularTex, 1);
-		_targetPipeline->setUniform("material.specular", 1);
 
-		glm::vec4 ambientColor(0.2f);
-		glm::vec4 diffuseColor(0.5f);
-		glm::vec4 specularColor(1.0f);
-		_targetPipeline->setUniform("light.ambient", glm::value_ptr(ambientColor), 1, 4);
-		_targetPipeline->setUniform("light.diffuse", glm::value_ptr(diffuseColor), 1, 4);
-		_targetPipeline->setUniform("light.specular", glm::value_ptr(specularColor), 1, 4);
+		glm::vec3 ambientColor(0.2f);
+		glm::vec3 diffuseColor(0.5f);
+		glm::vec3 specularColor(1.0f);
+		rhi::SetLight(_ubo, 0, "ambient", ambientColor);
+		rhi::SetLight(_ubo, 0, "diffuse", diffuseColor);
+		rhi::SetLight(_ubo, 0, "specular", specularColor);
 
-		_targetPipeline->setUniform("light.constant", 1.0f);
-		_targetPipeline->setUniform("light.linear", 0.09f);
-		_targetPipeline->setUniform("light.quadratic", 0.032f);
+		rhi::SetLightParam(_ubo, 0, "constant", 1.0f);
+		rhi::SetLightParam(_ubo, 0, "linear", 0.09f);
+		rhi::SetLightParam(_ubo, 0, "quadratic", 0.032f);
 
 		std::vector<glm::vec3> cubePositions;
 		cubePositions.reserve(cnt);
@@ -168,7 +170,8 @@ void GLLightSourcePoint::drawScene(const float dt) {
 			model = glm::translate(model, cubePositions[i]);
 			float angle = 20.0f * curTime;
 			model = glm::rotate(model, glm::radians(angle), glm::vec3(1.0f, 0.3f, 0.5f));
-			_targetPipeline->setUniform("model", glm::value_ptr(model), 1);
+			rhi::SetUniform(_ubo, "model", model);
+			_uboBuffer->update(&_ubo, sizeof(rhi::UniformBlock), 0);
 			renderer()->drawIndexed(_indexCount, 0, 0);
 		}
 	}

@@ -28,6 +28,11 @@ bool GLLightSourceMult::initApp() {
 	initProgram("Object", _targetPipeline);
 	_diffuseTex = initTexture("container2.jpg");
 	_specularTex = initTexture("container2_specular.jpg");
+
+	_uboBuffer = renderer()->createUniformBuffer();
+	_uboBuffer->init(nullptr, sizeof(rhi::UniformBlock), rhi::BufferType::Uniform);
+	_uboBuffer->bindRange(0, 0, sizeof(rhi::UniformBlock));
+
 	return true;
 }
 
@@ -119,57 +124,58 @@ void GLLightSourceMult::drawLight(const glm::mat4& proj, const glm::vec3& pos) {
 
 	renderer()->setPipeline(_lightPipeline);
 	renderer()->setVertexBuffer(_vb);
-	_lightPipeline->setUniform("projection", glm::value_ptr(proj), 1);
-	_lightPipeline->setUniform("view", glm::value_ptr(view), 1);
-	_lightPipeline->setUniform("lightColor", glm::value_ptr(_lightColor), 1, 4);
-	_lightPipeline->setUniform("model", glm::value_ptr(model), 1);
+	rhi::SetUniform(_ubo, "projection", proj);
+	rhi::SetUniform(_ubo, "view", view);
+	rhi::SetUniform(_ubo, "lightColor", _lightColor);
+	rhi::SetUniform(_ubo, "model", model);
+	_uboBuffer->update(&_ubo, sizeof(rhi::UniformBlock), 0);
 	renderer()->setIndexBuffer(_ebo);
 	renderer()->drawIndexed(_indexCount, 0, 0);
 }
 
 // 设置方向光参数（简化版）
-static void SetDirectionalLight(rhi::IPipeline& program) {
+static void SetDirectionalLight(rhi::UniformBlock& ubo) {
 	glm::vec3 direction(-0.2f, -1.0f, -0.3f);
-	program.setUniform("dirLight.direction", glm::value_ptr(direction), 1, 3);
+	rhi::SetLight(ubo, 0, "direction", direction);
+	rhi::SetLightParam(ubo, 0, "type", 1);
 	glm::vec3 ambient(0.05f, 0.05f, 0.05f);
-	program.setUniform("dirLight.ambient", glm::value_ptr(ambient), 1, 3);
+	rhi::SetLight(ubo, 0, "ambient", ambient);
 	glm::vec3 diffuse(0.4f, 0.4f, 0.4f);
-	program.setUniform("dirLight.diffuse", glm::value_ptr(diffuse), 1, 3);
+	rhi::SetLight(ubo, 0, "diffuse", diffuse);
 	glm::vec3 specular(0.5f, 0.5f, 0.5f);
-	program.setUniform("dirLight.specular", glm::value_ptr(specular), 1, 3);
+	rhi::SetLight(ubo, 0, "specular", specular);
 }
 
 // 设置点光源参数（简化版）
-static void SetPointLight(rhi::IPipeline& program, int index, const glm::vec3& position) {
-	std::string prefix = "pointLights[" + std::to_string(index) + "]";
-	program.setUniform(prefix + ".position", glm::value_ptr(position), 1, 3);
+static void SetPointLight(rhi::UniformBlock& ubo, int index, const glm::vec3& position) {
+	rhi::SetLight(ubo, index + 1, "position", position);
 	glm::vec3 ambient(0.05f, 0.05f, 0.05f);
-	program.setUniform(prefix + ".ambient", glm::value_ptr(ambient), 1, 3);
+	rhi::SetLight(ubo, index + 1, "ambient", ambient);
 	glm::vec3 diffuse(0.8f, 0.8f, 0.8f);
-	program.setUniform(prefix + ".diffuse", glm::value_ptr(diffuse), 1, 3);
+	rhi::SetLight(ubo, index + 1, "diffuse", diffuse);
 	glm::vec3 specular(1.0f, 1.0f, 1.0f);
-	program.setUniform(prefix + ".specular", glm::value_ptr(specular), 1, 3);
-	program.setUniform(prefix + ".constant", 1.0f);
-	program.setUniform(prefix + ".linear", 0.09f);
-	program.setUniform(prefix + ".quadratic", 0.032f);
+	rhi::SetLight(ubo, index + 1, "specular", specular);
+	rhi::SetLightParam(ubo, index + 1, "constant", 1.0f);
+	rhi::SetLightParam(ubo, index + 1, "linear", 0.09f);
+	rhi::SetLightParam(ubo, index + 1, "quadratic", 0.032f);
 }
 
 // 设置聚光灯参数（简化版）
-static void SetSpotLight(rhi::IPipeline& program, const glm::vec3& position) {
-	program.setUniform("spotLight.position", glm::value_ptr(position), 1, 3);
+static void SetSpotLight(rhi::UniformBlock& ubo, const glm::vec3& position) {
+	rhi::SetLight(ubo, 5, "position", position);
 	glm::vec3 direction(0.0f, 0.0f, -1.0f);
-	program.setUniform("spotLight.direction", glm::value_ptr(direction), 1, 3);
+	rhi::SetLight(ubo, 5, "direction", direction);
 	glm::vec3 ambient(0.0f, 0.0f, 0.0f);
-	program.setUniform("spotLight.ambient", glm::value_ptr(ambient), 1, 3);
+	rhi::SetLight(ubo, 5, "ambient", ambient);
 	glm::vec3 diffuse(1.0f, 1.0f, 1.0f);
-	program.setUniform("spotLight.diffuse", glm::value_ptr(diffuse), 1, 3);
+	rhi::SetLight(ubo, 5, "diffuse", diffuse);
 	glm::vec3 specular(1.0f, 1.0f, 1.0f);
-	program.setUniform("spotLight.specular", glm::value_ptr(specular), 1, 3);
-	program.setUniform("spotLight.constant", 1.0f);
-	program.setUniform("spotLight.linear", 0.09f);
-	program.setUniform("spotLight.quadratic", 0.032f);
-	program.setUniform("spotLight.cutOff", glm::cos(glm::radians(12.5f)));
-	program.setUniform("spotLight.outerCutOff", glm::cos(glm::radians(15.0f)));
+	rhi::SetLight(ubo, 5, "specular", specular);
+	rhi::SetLightParam(ubo, 5, "constant", 1.0f);
+	rhi::SetLightParam(ubo, 5, "linear", 0.09f);
+	rhi::SetLightParam(ubo, 5, "quadratic", 0.032f);
+	rhi::SetLightParam(ubo, 5, "cutOff", glm::cos(glm::radians(12.5f)));
+	rhi::SetLightParam(ubo, 5, "outerCutOff", glm::cos(glm::radians(15.0f)));
 }
 
 void GLLightSourceMult::drawObjects(const glm::mat4& proj, const float curTime, const std::vector<glm::vec3>& lightPoses) {
@@ -184,23 +190,21 @@ void GLLightSourceMult::drawObjects(const glm::mat4& proj, const float curTime, 
 	renderer()->setVertexBuffer(_uv, 1);
 	renderer()->setVertexBuffer(_normal, 2);
 
-	_targetPipeline->setUniform("projection", glm::value_ptr(proj), 1);
-	_targetPipeline->setUniform("view", glm::value_ptr(view), 1);
+	rhi::SetUniform(_ubo, "projection", proj);
+	rhi::SetUniform(_ubo, "view", view);
 	const auto camPos = _camera.getAttr().pos;
 	glm::vec4 viewPos(camPos.x, camPos.y, camPos.z, 1.0f);
-	_targetPipeline->setUniform("viewPos", glm::value_ptr(viewPos), 1, 4);
-	_targetPipeline->setUniform("material.shininess", 1);
+	rhi::SetUniform(_ubo, "viewPos", viewPos);
+	rhi::SetUniform(_ubo, "material.shininess", 1);
 
 	renderer()->bindTexture(_diffuseTex, 0);
-	_targetPipeline->setUniform("material.diffuse", 0);
 	renderer()->bindTexture(_specularTex, 1);
-	_targetPipeline->setUniform("material.specular", 1);
 
-	SetDirectionalLight(*_targetPipeline);
+	SetDirectionalLight(_ubo);
 	for (auto i = 0; i < lightPoses.size() - 1; i++) {
-		SetPointLight(*_targetPipeline, i, lightPoses[i]);
+		SetPointLight(_ubo, i, lightPoses[i]);
 	}
-	SetSpotLight(*_targetPipeline, lightPoses[lightPoses.size() - 1]);
+	SetSpotLight(_ubo, lightPoses[lightPoses.size() - 1]);
 
 	renderer()->setIndexBuffer(_ebo);
 	for (int i = 0; i < count; i++) {
@@ -208,7 +212,8 @@ void GLLightSourceMult::drawObjects(const glm::mat4& proj, const float curTime, 
 		model = glm::translate(model, cubePositions[i]);
 		float angle = 20.0f * curTime;
 		model = glm::rotate(model, glm::radians(angle), glm::vec3(1.0f, 0.3f, 0.5f));
-		_targetPipeline->setUniform("model", glm::value_ptr(model), 1);
+		rhi::SetUniform(_ubo, "model", model);
+		_uboBuffer->update(&_ubo, sizeof(rhi::UniformBlock), 0);
 		renderer()->drawIndexed(_indexCount, 0, 0);
 	}
 }
