@@ -170,8 +170,8 @@ void SetLight(UniformBlock& ubo, uint32_t index, const char* field, const glm::v
     else if (strcmp(field, "ambient") == 0)  { L.ambient = glm::vec4(v, 0.f); }
     else if (strcmp(field, "diffuse") == 0)  { L.diffuse = glm::vec4(v, 0.f); }
     else if (strcmp(field, "specular") == 0) { L.specular = glm::vec4(v, 0.f); }
-    // "direction" 落 position.w（类型标志 1=方向光），xyz 存方向
-    else if (strcmp(field, "direction") == 0){ L.position = glm::vec4(v, 1.f); }
+    // "direction" 存 direction.xyz（w 留给 spot outerCutOff），不碰 position
+    else if (strcmp(field, "direction") == 0){ L.direction.x = v.x; L.direction.y = v.y; L.direction.z = v.z; }
     else if (strcmp(field, "Position") == 0) { L.position = glm::vec4(v, 0.f); }
     else if (strcmp(field, "Color") == 0)    { L.diffuse = glm::vec4(v, 0.f); }
     // 参数类由 SetLightParam 写（constant→params.x, linear→params.y, quadratic→params.z,
@@ -187,6 +187,7 @@ void SetLightParam(UniformBlock& ubo, uint32_t index, const char* field, float v
     else if (strcmp(field, "cutOff") == 0)   L.params.w = v;
     else if (strcmp(field, "outerCutOff") == 0) L.direction.w = v;
     else if (strcmp(field, "Radius") == 0)   L.params.z = v;  // Defer/Hdr/Bloom 光度半径
+    else if (strcmp(field, "type") == 0)     L.position.w = v; // 0=点/聚光, 1=方向光
 }
 
 } // namespace rhi
