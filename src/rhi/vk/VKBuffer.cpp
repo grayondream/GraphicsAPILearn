@@ -123,10 +123,15 @@ bool VKBuffer::uploadStaging(const void* data, size_t size, size_t offset) {
     std::memcpy(mp.value, data, size);
     stagingMem.unmapMemory();
 
-    vk::CommandPoolCreateInfo cpci(vk::CommandPoolCreateFlagBits::eTransient, _graphicsFamily);
-    auto cpr = _dev.createCommandPool(cpci);
-    if (cpr.result != vk::Result::eSuccess) return false;
-    _stagingPool = std::move(cpr.value);
+    // Reuse a single transient command pool across uploads (lazily created once
+    // instead of per-upload). Each upload allocates a fresh command buffer that
+    // is submitted, waited on, then destroyed here, so no reset is needed.
+    if (_stagingPool == nullptr) {
+        vk::CommandPoolCreateInfo cpci(vk::CommandPoolCreateFlagBits::eTransient, _graphicsFamily);
+        auto cpr = _dev.createCommandPool(cpci);
+        if (cpr.result != vk::Result::eSuccess) return false;
+        _stagingPool = std::move(cpr.value);
+    }
     vk::CommandBufferAllocateInfo cba(*_stagingPool, vk::CommandBufferLevel::ePrimary, 1);
     auto cbr = _dev.allocateCommandBuffers(cba);
     if (cbr.result != vk::Result::eSuccess) return false;

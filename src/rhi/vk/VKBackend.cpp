@@ -339,6 +339,10 @@ void VKRenderer::shutdown() {
     _pipeline.reset();
     _indexBuffer.reset();
     _vertexBuffers = {};
+    // _uboBuffer is a raw (non-owning) pointer to the App's UBO buffer. The App
+    // must keep its _uboBuffer alive for as long as this renderer uses it; VK
+    // only registers it (GL mode keeps its own buffer). Clear it here so we
+    // never dereference a dangling pointer if the App outlives shutdown.
     _uboBuffer = nullptr;
     _recording = false;
     _rpActive = false;
@@ -528,19 +532,28 @@ bool VKRenderer::bindPipelineAndState() {
 }
 
 bool VKRenderer::bindVertexBuffers() {
-    uint32_t maxBinding = 0;
-    bool any = false;
+    // Vulkan binds a contiguous range [firstBinding, firstBinding+count) in one
+    // call, and binding a null VkBuffer for an empty slot is illegal. An App's
+    // VertexLayout may leave gaps (e.g. only bindings 0 and 2 present, binding 1
+    // unused), so emit one vkCmdBindVertexBuffers per contiguous run of present
+    // bindings, each starting at its real binding index.
+    uint32_t first = UINT32_MAX;
+    std::vector<vk::Buffer> bufs;
+    std::vector<vk::DeviceSize> offs;
     for (uint32_t i = 0; i < _vertexBuffers.size(); i++) {
-        if (_vertexBuffers[i]) { maxBinding = i; any = true; }
-    }
-    if (!any) return true;
-    std::vector<vk::Buffer> bufs(maxBinding + 1);
-    std::vector<vk::DeviceSize> offs(maxBinding + 1, 0);
-    for (uint32_t i = 0; i <= maxBinding; i++) {
+        if (!_vertexBuffers[i]) continue;
         auto vb = std::dynamic_pointer_cast<VKBuffer>(_vertexBuffers[i]);
-        if (vb && vb->raw()) bufs[i] = vb->raw();
+        if (!vb) continue;
+        if (first == UINT32_MAX || i != first + bufs.size()) {
+            if (first != UINT32_MAX) _cmd.bindVertexBuffers(first, bufs, offs);
+            first = i;
+            bufs.clear();
+            offs.clear();
+        }
+        bufs.push_back(vb->raw());
+        offs.push_back(0);
     }
-    _cmd.bindVertexBuffers(0, bufs, offs);
+    if (first != UINT32_MAX) _cmd.bindVertexBuffers(first, bufs, offs);
     return true;
 }
 
