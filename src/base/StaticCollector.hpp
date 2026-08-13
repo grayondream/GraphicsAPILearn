@@ -6,6 +6,8 @@ namespace StaticCollector{
 
 	std::string getGLShaderPath();
 
+	std::string getVulkanShaderPath();
+
 	std::string getDX11ShaderPath();
 
 	std::string getDX12ShaderPath();

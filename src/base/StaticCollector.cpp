@@ -16,6 +16,10 @@ namespace StaticCollector {
         return FileUtils::join(getResPath(), "GL");
 	}
 
+	std::string getVulkanShaderPath() {
+		return FileUtils::join(getResPath(), "Vulkan");
+	}
+
 	std::string getDX11ShaderPath() {
 		return FileUtils::join(getResPath(), "DX11");
 	}

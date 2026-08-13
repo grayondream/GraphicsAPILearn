@@ -14,7 +14,7 @@ MODE="${1:-all}"
 configure() {
     echo "==> cmake configure ..."
     cmake -S "$GIT_ROOT" -B "$BUILD_DIR" \
-        -DENABLE_OPENGL=ON \
+        -DENABLE_OPENGL=ON -DENABLE_VULKAN=ON \
         -DCMAKE_TOOLCHAIN_FILE="$VCPKG_TOOLCHAIN" \
         -DVCPKG_TARGET_TRIPLET="$VCPKG_TRIPLET"
 }

@@ -18,6 +18,13 @@ if(ENABLE_DX11)
     set(ALL_HPP_FILES ${ALL_HPP_FILES} ${APP_DX11_HPP_FILES} CACHE STRING "all header files" FORCE)
 endif()
 
+if(ENABLE_VULKAN)
+    file(GLOB_RECURSE APP_VULKAN_CPP_FILES "Vulkan/*.cpp")
+    file(GLOB_RECURSE APP_VULKAN_HPP_FILES "Vulkan/*.hpp")
+    set(ALL_CPP_FILES ${ALL_CPP_FILES} ${APP_VULKAN_CPP_FILES} CACHE STRING "all source files" FORCE)
+    set(ALL_HPP_FILES ${ALL_HPP_FILES} ${APP_VULKAN_HPP_FILES} CACHE STRING "all header files" FORCE)
+endif()
+
 
 
 
