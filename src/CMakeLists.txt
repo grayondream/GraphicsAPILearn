@@ -50,11 +50,17 @@ if(${ENABLE_VULKAN})
         file(RELATIVE_PATH rel "${VK_SHADER_SOURCE}" "${src}")
         get_filename_component(rel_dir "${rel}" DIRECTORY)
         get_filename_component(name "${rel}" NAME)
-        string(REGEX REPLACE "\\.[^.]+$" "" nospv "${name}")
-        set(out "${VK_SHADER_OUTPUT}/${rel_dir}/${nospv}.spv")
+        file(READ "${src}" _vk_glsl_content)
+        # 跳过含裸非不透明 uniform（如 uniform mat4 model;）的 shader：
+        # Vulkan 要求非不透明 uniform 放 block 内，GL 老式裸 uniform 需 Task 9 包进 UniformBlock 后才能编译。
+        if(_vk_glsl_content MATCHES "uniform[ \t]+(mat[234]|vec[234]|float|int|uint|bool)[ \t]+[A-Za-z0-9_]+")
+            message(STATUS "Skip VK shader (bare uniform, needs UniformBlock): ${rel}")
+            continue()
+        endif()
+        set(out "${VK_SHADER_OUTPUT}/${rel_dir}/${name}.spv")
         add_custom_command(OUTPUT "${out}"
             COMMAND ${CMAKE_COMMAND} -E make_directory "${VK_SHADER_OUTPUT}/${rel_dir}"
-            COMMAND "${GLSLANG_VALIDATOR}" -V --target-env vulkan1.3 -o "${out}" "${src}"
+            COMMAND "${GLSLANG_VALIDATOR}" -V --auto-map-locations --target-env vulkan1.3 -o "${out}" "${src}"
             DEPENDS "${src}"
             COMMENT "Compiling Vulkan shader ${rel}" VERBATIM)
         list(APPEND VK_SPV_OUTPUTS "${out}")

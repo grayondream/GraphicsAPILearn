@@ -1,0 +1,10 @@
+#version 450 core
+in vec4 fragColor;
+in vec2 textureCoord;
+
+out vec4 color;
+uniform vec4 cubeColor;
+void main(){
+    color = cubeColor * fragColor;
+    //color = texture(textureSampler, textureCoord);
+}
