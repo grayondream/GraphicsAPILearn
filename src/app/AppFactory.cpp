@@ -5,6 +5,9 @@
 #if ENABLE_DX11
 #include "app/DX11/DX11AppFactory.hpp"
 #endif
+#if ENABLE_VULKAN
+#include "app/Vulkan/VKAppFactory.hpp"
+#endif
 #include "IApplication.hpp"
 
 std::shared_ptr<IApplication> AppFactory::create(const GraphicsType gtype, const AppType type) {
@@ -17,6 +20,11 @@ std::shared_ptr<IApplication> AppFactory::create(const GraphicsType gtype, const
         case GraphicsType::DX11:
         #if ENABLE_DX11
             return DX11AppFactory::create(type);
+        #endif
+            return nullptr;
+        case GraphicsType::Vulkan:
+        #if ENABLE_VULKAN
+            return VKAppFactory::create(type);
         #endif
             return nullptr;
         default:

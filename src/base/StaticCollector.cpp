@@ -1,5 +1,6 @@
 #include "StaticCollector.hpp"
 #include "utils/FileUtils.hpp"
+#include "rhi/core/Common.hpp"
 #include <filesystem>
 #ifndef RESOURCE_DIR
 constexpr const char * kResourceRoot = "Res";
@@ -13,6 +14,9 @@ namespace StaticCollector {
     }
 
     std::string getGLShaderPath() {
+        if (rhi::backendKind() == rhi::BackendKind::Vulkan) {
+            return getVulkanShaderPath();
+        }
         return FileUtils::join(getResPath(), "GL");
 	}
 

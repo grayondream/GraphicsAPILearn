@@ -141,13 +141,17 @@ void Application::exit() {
 
 void Application::render() {
     beginDrawScene();
-    m_imguiWindow->newFrame();
+    if (m_imguiWindow) {
+        m_imguiWindow->newFrame();
+    }
     static auto lastTime = std::chrono::high_resolution_clock::now();
     auto currentTime = std::chrono::high_resolution_clock::now();
     std::chrono::duration<float> elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(currentTime - lastTime);
     drawScene(elapsed.count());
     lastTime = currentTime;
-    m_imguiWindow->render();
+    if (m_imguiWindow) {
+        m_imguiWindow->render();
+    }
     endDrawScene();
 }
 

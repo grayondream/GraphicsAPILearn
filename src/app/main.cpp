@@ -24,6 +24,9 @@ static std::vector<std::pair<std::string, GraphicsType>> AvailableBackends() {
 #if ENABLE_DX11
     v.emplace_back("dx11", GraphicsType::DX11);
 #endif
+#if ENABLE_VULKAN
+    v.emplace_back("vulkan", GraphicsType::Vulkan);
+#endif
     return v;
 }
 
@@ -114,6 +117,10 @@ int main(int argc, char **argv) {
         200, 200 );
     props.title = "Hello Graphics!";
     props.vsync = false;
-    app->init(props);
+    props.vulkan = (*gtype == GraphicsType::Vulkan);
+    if (!app->init(props)) {
+        LOGE("App init failed for app '{}' with backend '{}'", appName, backendName);
+        return 1;
+    }
     return app->run();
 }

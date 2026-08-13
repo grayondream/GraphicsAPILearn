@@ -6,6 +6,12 @@
 
 namespace rhi {
 
+enum class BackendKind : uint8_t { GL, Vulkan };
+
+inline BackendKind& CurrentBackendKind() { static BackendKind kind = BackendKind::GL; return kind; }
+inline void setBackendKind(BackendKind kind) { CurrentBackendKind() = kind; }
+inline BackendKind backendKind() { return CurrentBackendKind(); }
+
 enum class PrimitiveType : uint8_t { TriangleList, TriangleStrip, Lines, Points };
 
 struct Viewport {

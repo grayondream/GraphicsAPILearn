@@ -103,6 +103,9 @@ bool GLFWWindow::initialize() {
     glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
     glfwWindowHint(GLFW_VISIBLE, GLFW_TRUE);
     glfwWindowHint(GLFW_DECORATED, GLFW_TRUE);
+    if (m_properties.vulkan) {
+        glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
+    }
     if (m_properties.samples > 0) {
         glfwWindowHint(GLFW_SAMPLES, m_properties.samples);
     }

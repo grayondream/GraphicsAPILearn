@@ -4,6 +4,9 @@
 #include "ImGuiOpenglWindow.hpp"
 #include "rhi/gl/GLBackend.hpp"
 #include "rhi/gl/GLFWSurface.hpp"
+#if ENABLE_VULKAN
+#include "rhi/vk/VKBackend.hpp"
+#endif
 #include <imgui.h>
 
 using namespace ErrorHandle;
@@ -17,12 +20,31 @@ GLApp::~GLApp() {
 }
 
 bool GLApp::initGraphics() {
+    const auto props = m_window->getProperties();
+
+#if ENABLE_VULKAN
+    if (props.vulkan) {
+        rhi::setBackendKind(rhi::BackendKind::Vulkan);
+        auto surface = std::make_shared<rhi::GLFWSurface>(
+            m_window->getNativeGLFWWindow(), props.width, props.height);
+        _renderer = rhi::createVKRenderer();
+        if (!_renderer->init(surface)) {
+            LOGE("Failed to init Vulkan renderer");
+            return false;
+        }
+        _renderer->setViewport(rhi::Viewport{0, 0, static_cast<int>(props.width), static_cast<int>(props.height)});
+        _renderer->setPipeline(nullptr);
+        return true;
+    }
+#else
+    (void)props;
+#endif
+
     if (!m_window->initGLContext()) {
         LOGE("Failed to initialize GL Context");
         return false;
     }
 
-    auto props = m_window->getProperties();
     auto surface = std::make_shared<rhi::GLFWSurface>(
         m_window->getNativeGLFWWindow(), props.width, props.height);
     _renderer = rhi::createGLRenderer();
@@ -47,10 +69,12 @@ void GLApp::beginDrawScene() {
 }
 
 void GLApp::drawScene(const float dt) {
-    ImGui::Begin("OpenGL");
-    ImGuiIO& io = ImGui::GetIO();
-    ImGui::Text("Hello Graphic! %.1f FPS", io.Framerate);  // Display current FPS
-    ImGui::End();
+    if (m_imguiWindow) {
+        ImGui::Begin("OpenGL");
+        ImGuiIO& io = ImGui::GetIO();
+        ImGui::Text("Hello Graphic! %.1f FPS", io.Framerate);  // Display current FPS
+        ImGui::End();
+    }
 
     return Application::drawScene(dt);
 }
