@@ -37,7 +37,7 @@ void main()
     vec3 ambient = 0.0 * color;
     // lighting
     vec3 lighting = vec3(0.0);
-    for(int i = 0; i < 16; i++)
+    for(int i = 0; i < 4; i++)
     {
         Light light;
         light.Position = lights[i].position.xyz;

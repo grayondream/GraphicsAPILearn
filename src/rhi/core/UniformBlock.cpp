@@ -196,6 +196,9 @@ void SetLightParam(UniformBlock& ubo, uint32_t index, const char* field, float v
     if (strcmp(field, "constant") == 0)      L.params.x = v;
     else if (strcmp(field, "linear") == 0)   L.params.y = v;
     else if (strcmp(field, "quadratic") == 0)L.params.z = v;
+    // 大写别名（沿用老 GL uniform 名的 Defer/SSAO App）：与 SetLight 的 "Position"/"Color" 惯例一致
+    else if (strcmp(field, "Linear") == 0)   L.params.y = v;
+    else if (strcmp(field, "Quadratic") == 0)L.params.z = v;
     else if (strcmp(field, "cutOff") == 0)   L.params.w = v;
     else if (strcmp(field, "outerCutOff") == 0) L.direction.w = v;
     else if (strcmp(field, "Radius") == 0)   L.direction.w = v;  // Defer 光度体积半径（避免与 quadratic/params.z 冲突）
