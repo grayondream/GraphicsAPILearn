@@ -1,5 +1,20 @@
-#version 330 core
+#version 430 core
 out vec4 FragColor;
+
+struct ULight { vec4 position; vec4 direction; vec4 ambient; vec4 diffuse; vec4 specular; vec4 params; };
+
+layout(binding = 0) uniform UniformBlock {
+    mat4 projection;
+    mat4 view;
+    mat4 model;
+    mat4 normalMatrix;
+    mat4 viewModel;
+    mat4 extraMat4[14];
+    vec4 vec4Pool[64];
+    vec4 vec3Pool[64];
+    float floatPool[64];
+    ULight lights[2];
+};
 
 in VS_OUT {
     vec3 FragPos;
@@ -8,15 +23,8 @@ in VS_OUT {
     vec4 FragPosLightSpace;
 } fs_in;
 
-uniform sampler2D diffuseTexture;
-uniform sampler2D shadowMap;
-
-uniform vec3 lightPos;
-uniform vec3 viewPos;
-uniform int type;
-uniform int debug;
-uniform int enableBias;
-uniform int enableSimplePCF;
+layout(binding = 0) uniform sampler2D diffuseTexture;
+layout(binding = 1) uniform sampler2D shadowMap;
 
 float ShadowCalculation(vec4 fragPosLightSpace)
 {
@@ -31,9 +39,9 @@ float ShadowCalculation(vec4 fragPosLightSpace)
     // check whether current frag pos is in shadow
     float shadow = 0.0;
     float bias = 0.0;
-    if(enableBias == 1){
+    if(floatPool[25] > 0.5){
         vec3 normal = normalize(fs_in.Normal);
-        vec3 lightDir = normalize(lightPos - fs_in.FragPos);
+        vec3 lightDir = normalize(vec4Pool[2].xyz - fs_in.FragPos);
         bias = max(0.05 * (1.0 - dot(normal, lightDir)), 0.005);
         shadow = currentDepth - bias > closestDepth  ? 1.0 : 0.0;
     }else{
@@ -43,7 +51,7 @@ float ShadowCalculation(vec4 fragPosLightSpace)
     if(projCoords.z > 1.0)
         shadow = 0.0;
 
-    if(enableSimplePCF == 1){
+    if(floatPool[40] > 0.5){
         vec2 texelSize = 1.0 / textureSize(shadowMap, 0);
         for(int x = -1; x <= 1; ++x)
         {
@@ -68,11 +76,11 @@ void main()
     // ambient
     vec3 ambient = 0.3 * lightColor;
     // diffuse
-    vec3 lightDir = normalize(lightPos - fs_in.FragPos);
+    vec3 lightDir = normalize(vec4Pool[2].xyz - fs_in.FragPos);
     float diff = max(dot(lightDir, normal), 0.0);
     vec3 diffuse = diff * lightColor;
     // specular
-    vec3 viewDir = normalize(viewPos - fs_in.FragPos);
+    vec3 viewDir = normalize(vec4Pool[0].xyz - fs_in.FragPos);
     vec3 reflectDir = reflect(-lightDir, normal);
     float spec = 0.0;
     vec3 halfwayDir = normalize(lightDir + viewDir);  
@@ -83,14 +91,14 @@ void main()
     vec3 lighting = (ambient + (1.0 - shadow) * (diffuse + specular)) * color;    
     
     FragColor = vec4(lighting, 1.0);
-    if(type == 2){
+    if(floatPool[15] > 1.5){
         FragColor = vec4(lightColor, 1.0);
     }
     
-    if(debug == 1){
-        if(type == 1){
-        FragColor = vec4(1.0, 0.0, 0.0, 1.0);
-        }else if(type == 2){
+    if(floatPool[18] > 0.5){
+        if(floatPool[15] > 0.5 && floatPool[15] <= 1.5){
+            FragColor = vec4(1.0, 0.0, 0.0, 1.0);
+        }else if(floatPool[15] > 1.5){
             FragColor = vec4(1.0, 1.0, 1.0, 1.0);
         }else{
             FragColor = vec4(0.0, 1.0, 0.0, 1.0);

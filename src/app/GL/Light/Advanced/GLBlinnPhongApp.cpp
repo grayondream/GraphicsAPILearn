@@ -64,6 +64,10 @@ bool GLBlinnPhongApp::initApp() {
 		_texture = RhiImage::Load2D(renderer().get(), imgFile);
 		ExitIfFailed(_texture != nullptr, "Failed to load texture from file {}", imgFile);
 	}
+
+	_uboBuffer = renderer()->createUniformBuffer();
+	_uboBuffer->init(nullptr, sizeof(rhi::UniformBlock), rhi::BufferType::Uniform);
+	_uboBuffer->bindRange(0, 0, sizeof(rhi::UniformBlock));
 	return true;
 }
 
@@ -91,14 +95,14 @@ void GLBlinnPhongApp::drawScene(const float dt) {
 		renderer()->setVertexBuffer(_planeVb);
 		renderer()->setVertexBuffer(_planeUv, 1);
 		renderer()->setVertexBuffer(_planeNormal, 2);
-		_targetPipeline->setUniform("projection", glm::value_ptr(projection), 1);
-		_targetPipeline->setUniform("view", glm::value_ptr(view), 1);
-		_targetPipeline->setUniform("model", glm::value_ptr(model), 1);
-		_targetPipeline->setUniform("textureSampler", 0);
-		_targetPipeline->setUniform("lightColor", glm::value_ptr(_lightColor), 1, 4);
-		_targetPipeline->setUniform("lightPos", glm::value_ptr(lightPos), 1, 3);
-		_targetPipeline->setUniform("viewPos", glm::value_ptr(_camera.getAttr().pos), 1, 3);
-		_targetPipeline->setUniform("enableBlinnPhong", _enableBlinnPhong);
+		rhi::SetUniform(_ubo, "projection", projection);
+		rhi::SetUniform(_ubo, "view", view);
+		rhi::SetUniform(_ubo, "model", model);
+		rhi::SetLight(_ubo, 0, "position", lightPos);
+		rhi::SetLight(_ubo, 0, "diffuse", glm::vec3(_lightColor));
+		rhi::SetUniform(_ubo, "viewPos", _camera.getAttr().pos);
+		rhi::SetUniform(_ubo, "enableBlinnPhong", _enableBlinnPhong);
+		_uboBuffer->update(&_ubo, sizeof(rhi::UniformBlock), 0);
 		renderer()->draw(_planeVertexCount, 0);
 	}
 
@@ -110,10 +114,11 @@ void GLBlinnPhongApp::drawScene(const float dt) {
 
 		renderer()->setPipeline(_lightPipeline);
 		renderer()->setVertexBuffer(_vb);
-		_lightPipeline->setUniform("projection", glm::value_ptr(projection), 1);
-		_lightPipeline->setUniform("view", glm::value_ptr(view), 1);
-		_lightPipeline->setUniform("model", glm::value_ptr(model), 1);
-		_lightPipeline->setUniform("lightColor", glm::value_ptr(_lightColor), 1, 4);
+		rhi::SetUniform(_ubo, "projection", projection);
+		rhi::SetUniform(_ubo, "view", view);
+		rhi::SetUniform(_ubo, "model", model);
+		rhi::SetLight(_ubo, 0, "diffuse", glm::vec3(_lightColor));
+		_uboBuffer->update(&_ubo, sizeof(rhi::UniformBlock), 0);
 		renderer()->setIndexBuffer(_ebo);
 		renderer()->drawIndexed(_indexCount, 0, 0);
 	}

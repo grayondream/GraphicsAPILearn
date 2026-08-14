@@ -4,6 +4,7 @@
 #include "rhi/core/IBuffer.hpp"
 #include "rhi/core/ITexture2D.hpp"
 #include "rhi/core/IShader.hpp"
+#include "rhi/core/UniformBlock.hpp"
 #include <memory>
 #include <array>
 #include "geometry/Camera.hpp"
@@ -31,4 +32,6 @@ private:
 	bool _enableNormalMap{};
 	std::shared_ptr<rhi::ITexture2D> _brick{};
 	std::shared_ptr<rhi::ITexture2D> _brickNormal{};
+	rhi::UniformBlock _ubo{};
+	std::shared_ptr<rhi::IBuffer> _uboBuffer{};
 };

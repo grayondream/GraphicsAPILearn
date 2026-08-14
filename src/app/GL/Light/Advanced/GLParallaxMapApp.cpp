@@ -98,6 +98,10 @@ bool GLParallaxMapApp::initApp() {
 	_vertexCount = geo.vertexCount;
 	_pipeline = renderer()->createPipeline(geo.layout, _shader);
 	_pipeline->setDepthTest(true);
+
+	_uboBuffer = renderer()->createUniformBuffer();
+	_uboBuffer->init(nullptr, sizeof(rhi::UniformBlock), rhi::BufferType::Uniform);
+	_uboBuffer->bindRange(0, 0, sizeof(rhi::UniformBlock));
 	return true;
 }
 
@@ -140,28 +144,27 @@ void GLParallaxMapApp::drawScene(const float dt) {
 	glm::mat4 view = _camera.getViewMatrix();
 	renderer()->setPipeline(_pipeline);
 	renderer()->setVertexBuffer(_vb);
-	_pipeline->setUniform("diffuseMap", 0);
-	_pipeline->setUniform("normalMap", 1);
-	_pipeline->setUniform("depthMap", 2);
-	_pipeline->setUniform("projection", glm::value_ptr(projection), 1);
-	_pipeline->setUniform("view", glm::value_ptr(view), 1);
+	rhi::SetUniform(_ubo, "projection", projection);
+	rhi::SetUniform(_ubo, "view", view);
 	glm::mat4 model = glm::mat4(1.0f);
-	_pipeline->setUniform("model", glm::value_ptr(model), 1);
-	_pipeline->setUniform("viewPos", glm::value_ptr(attr.pos), 1, 3);
-	_pipeline->setUniform("lightPos", glm::value_ptr(lightPos), 1, 3);
-	_pipeline->setUniform("heightScale", _heightScale);
-	_pipeline->setUniform("enableDisp", _enableDisp);
-	_pipeline->setUniform("enableSteep", _enableSteep);
-	_pipeline->setUniform("enableOcclusion", _enableOcclusion);
+	rhi::SetUniform(_ubo, "model", model);
+	rhi::SetUniform(_ubo, "viewPos", attr.pos);
+	rhi::SetUniform(_ubo, "lightPos", lightPos);
+	rhi::SetUniform(_ubo, "heightScale", _heightScale);
+	rhi::SetUniform(_ubo, "enableDisp", _enableDisp);
+	rhi::SetUniform(_ubo, "enableSteep", _enableSteep);
+	rhi::SetUniform(_ubo, "enableOcclusion", _enableOcclusion);
 	renderer()->bindTexture(_brick, 0);
 	renderer()->bindTexture(_brickNormal, 1);
 	renderer()->bindTexture(_brickDisp, 2);
+	_uboBuffer->update(&_ubo, sizeof(rhi::UniformBlock), 0);
 	renderer()->draw(_vertexCount, 0);
 
 	model = glm::mat4(1.0f);
 	model = glm::translate(model, lightPos);
 	model = glm::scale(model, glm::vec3(0.1f));
-	_pipeline->setUniform("model", glm::value_ptr(model), 1);
+	rhi::SetUniform(_ubo, "model", model);
+	_uboBuffer->update(&_ubo, sizeof(rhi::UniformBlock), 0);
 	renderer()->draw(_vertexCount, 0);
 
 	return GLApp::drawScene(dt);

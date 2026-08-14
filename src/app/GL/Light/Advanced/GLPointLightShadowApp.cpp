@@ -66,6 +66,9 @@ void GLPointLightShadowApp::createShadowDepthBuffer() {
 }
 
 void GLPointLightShadowApp::compileShader(const rhi::VertexLayout& cubeLayout) {
+    _uboBuffer = renderer()->createUniformBuffer();
+    _uboBuffer->init(nullptr, sizeof(rhi::UniformBlock), rhi::BufferType::Uniform);
+    _uboBuffer->bindRange(0, 0, sizeof(rhi::UniformBlock));
     const auto shaderDir = join(StaticCollector::getGLShaderPath(), "Light", "Advanced", "PointLightShadow");
     {
         auto shader = renderer()->createShader();
@@ -94,10 +97,11 @@ void GLPointLightShadowApp::renderCube(std::shared_ptr<rhi::IPipeline>& program,
     renderer()->setVertexBuffer(_cubeUv, 1);
     renderer()->setVertexBuffer(_cubeNormal, 2);
     renderer()->setIndexBuffer(_cubeEbo);
-    program->setUniform("model", glm::value_ptr(model), 1);
-    program->setUniform("type", type);
+    rhi::SetUniform(_ubo, "model", model);
+    rhi::SetUniform(_ubo, "type", type);
+    _uboBuffer->update(&_ubo, sizeof(rhi::UniformBlock), 0);
     renderer()->drawIndexed(_cubeIndexCount, 0, 0);
-    program->setUniform("type", 0);   // 原生 renderCube 绘后归 0，防止后续世界盒被当灯位着色
+    rhi::SetUniform(_ubo, "type", 0);   // 原生 renderCube 绘后归 0，防止后续世界盒被当灯位着色
 }
 
 void GLPointLightShadowApp::renderScene(std::shared_ptr<rhi::IPipeline>& program, const glm::vec3& lightPos) {
@@ -106,9 +110,9 @@ void GLPointLightShadowApp::renderScene(std::shared_ptr<rhi::IPipeline>& program
     {   // reversed normals 大世界盒（scale 10）
         auto model = glm::scale(glm::mat4(1.0f), glm::vec3(10.0f));
         program->setCullFaceEnable(false);            // 原生 glDisable(GL_CULL_FACE)
-        program->setUniform("reverse_normals", 1);
+        rhi::SetUniform(_ubo, "reverse_normals", 1);
         renderCube(program, model);
-        program->setUniform("reverse_normals", 0);
+        rhi::SetUniform(_ubo, "reverse_normals", 0);
         program->setCullFaceEnable(true);             // 原生 glEnable(GL_CULL_FACE)
     }
     { models.push_back(glm::scale(glm::translate(glm::mat4(1.0f), glm::vec3(4.0f, -3.5f, 0.0)), glm::vec3(0.5f))); }
@@ -120,9 +124,9 @@ void GLPointLightShadowApp::renderScene(std::shared_ptr<rhi::IPipeline>& program
     for (auto& m : models) renderCube(program, m);
     {   // 灯位
         auto model = glm::translate(glm::scale(glm::mat4(1.0f), glm::vec3(0.1f)), lightPos);   // 原生 scale(0.1) 再 translate → S*T
-        program->setUniform("light", 1);
+        rhi::SetUniform(_ubo, "light", 1);
         renderCube(program, model);
-        program->setUniform("light", 0);
+        rhi::SetUniform(_ubo, "light", 0);
     }
 }
 
@@ -145,9 +149,9 @@ void GLPointLightShadowApp::renderScene2FrameBuffer(std::shared_ptr<rhi::IPipeli
     renderer()->setRenderTarget(_shadowDepthMapFbo);
     renderer()->clearColor(0.0f, 0.0f, 0.0f, 1.0f);   // RHI clearColor 同时清 depth
     for (unsigned int i = 0; i < 6; ++i)
-        program->setUniform("shadowMatrices[" + std::to_string(i) + "]", glm::value_ptr(shadowTransforms[i]), 1);
-    program->setUniform("far_plane", _far);
-    program->setUniform("lightPos", glm::value_ptr(lightPos), 1, 3);
+        rhi::SetUniform(_ubo, "shadowMatrices", i, shadowTransforms[i]);
+    rhi::SetUniform(_ubo, "far_plane", _far);
+    rhi::SetUniform(_ubo, "lightPos", lightPos);
     renderScene(program, lightPos);
     renderer()->setRenderTarget(nullptr);
     const auto props = m_window->getProperties();
@@ -158,17 +162,15 @@ void GLPointLightShadowApp::renderScene2FrameBuffer(std::shared_ptr<rhi::IPipeli
 void GLPointLightShadowApp::renderScene2Screen(std::shared_ptr<rhi::IPipeline>& program, const glm::vec3& lightPos) {
     renderer()->setPipeline(program);
     renderer()->bindTexture(_texture, 0);
-    program->setUniform("diffuseTexture", 0);
     renderer()->bindTexture(_shadowDepthMap, 1);
-    program->setUniform("depthMap", 1);
     const auto projection = glm::perspective(glm::radians(_camera.zoom()), aspectRatio(), 0.1f, 100.0f);
     const auto view = _camera.getViewMatrix();
-    program->setUniform("projection", glm::value_ptr(projection), 1);
-    program->setUniform("view", glm::value_ptr(view), 1);
-    program->setUniform("lightPos", glm::value_ptr(lightPos), 1, 3);
-    program->setUniform("viewPos", glm::value_ptr(_camera.getAttr().pos), 1, 3);
-    program->setUniform("shadows", _enableShadow ? 1 : 0);
-    program->setUniform("far_plane", _far);
+    rhi::SetUniform(_ubo, "projection", projection);
+    rhi::SetUniform(_ubo, "view", view);
+    rhi::SetUniform(_ubo, "lightPos", lightPos);
+    rhi::SetUniform(_ubo, "viewPos", _camera.getAttr().pos);
+    rhi::SetUniform(_ubo, "shadows", _enableShadow ? 1 : 0);
+    rhi::SetUniform(_ubo, "far_plane", _far);
     renderScene(program, lightPos);
 }
 

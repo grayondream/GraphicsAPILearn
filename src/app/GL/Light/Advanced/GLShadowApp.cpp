@@ -90,6 +90,9 @@ void GLShadowApp::createShadowDepthBuffer() {
 }
 
 void GLShadowApp::compileShader(const rhi::VertexLayout& cubeLayout, const rhi::VertexLayout& quadLayout) {
+    _uboBuffer = renderer()->createUniformBuffer();
+    _uboBuffer->init(nullptr, sizeof(rhi::UniformBlock), rhi::BufferType::Uniform);
+    _uboBuffer->bindRange(0, 0, sizeof(rhi::UniformBlock));
     const auto shaderDir = join(StaticCollector::getGLShaderPath(), "Light", "Advanced", "Shadow");
     auto build = [&](const std::string& vs, const std::string& fs, const rhi::VertexLayout& layout) {
         auto shader = renderer()->createShader();
@@ -112,10 +115,11 @@ void GLShadowApp::renderCube(std::shared_ptr<rhi::IPipeline>& program, const glm
     renderer()->setVertexBuffer(_cubeUv, 1);
     renderer()->setVertexBuffer(_cubeNormal, 2);
     renderer()->setIndexBuffer(_cubeEbo);
-    program->setUniform("model", glm::value_ptr(model), 1);
-    program->setUniform("type", type);
+    rhi::SetUniform(_ubo, "model", model);
+    rhi::SetUniform(_ubo, "type", type);
+    _uboBuffer->update(&_ubo, sizeof(rhi::UniformBlock), 0);
     renderer()->drawIndexed(_cubeIndexCount, 0, 0);
-    program->setUniform("type", 0);   // 原生 renderCube 绘后必归 0（GLShadowApp.cpp:245）
+    rhi::SetUniform(_ubo, "type", 0);   // 原生 renderCube 绘后必归 0（GLShadowApp.cpp:245）
 }
 
 void GLShadowApp::renderPlane(std::shared_ptr<rhi::IPipeline>& program, const glm::mat4& model) {
@@ -123,14 +127,15 @@ void GLShadowApp::renderPlane(std::shared_ptr<rhi::IPipeline>& program, const gl
     renderer()->setVertexBuffer(_planeVb);
     renderer()->setVertexBuffer(_planeUv, 1);
     renderer()->setVertexBuffer(_planeNormal, 2);
-    program->setUniform("model", glm::value_ptr(model), 1);
+    rhi::SetUniform(_ubo, "model", model);
+    _uboBuffer->update(&_ubo, sizeof(rhi::UniformBlock), 0);
     renderer()->draw(_planeVertexCount, 0);
 }
 
 void GLShadowApp::renderScene(std::shared_ptr<rhi::IPipeline>& program, const glm::vec3& lightPos) {
-    program->setUniform("debug", _enableDebug ? 1 : 0);
-    program->setUniform("enableBias", _enableShadowBias ? 1 : 0);
-    program->setUniform("enableSimplePCF", _enableSimplePCF ? 1 : 0);
+    rhi::SetUniform(_ubo, "debug", _enableDebug ? 1 : 0);
+    rhi::SetUniform(_ubo, "enableBias", _enableShadowBias ? 1 : 0);
+    rhi::SetUniform(_ubo, "enableSimplePCF", _enableSimplePCF ? 1 : 0);
     auto model = glm::scale(glm::mat4(1.0f), glm::vec3(0.5f));
     renderPlane(program, model);
     float scale = 0.25f;
@@ -145,12 +150,11 @@ void GLShadowApp::renderScene(std::shared_ptr<rhi::IPipeline>& program, const gl
 
 void GLShadowApp::renderScene2FrameBuffer(const glm::mat4& lightSpaceMatrix, const glm::vec3& lightPos) {
     renderer()->setPipeline(_depthProgram);
-    _depthProgram->setUniform("lightSpaceMatrix", glm::value_ptr(lightSpaceMatrix), 1);
+    rhi::SetUniform(_ubo, "lightSpaceMatrix", lightSpaceMatrix);
     renderer()->setViewport(rhi::Viewport{0, 0, Constexpr::GetShadowMapWidth(), Constexpr::GetShadowMapHeight()});
     renderer()->setRenderTarget(_shadowDepthMapFbo);
     renderer()->clearColor(1.0f, 1.0f, 1.0f, 1.0f);   // RHI clearColor 同时清 depth
     renderer()->bindTexture(_texture, 0);
-    _depthProgram->setUniform("diffuseTexture", 0);
     if (_enableCullFace) {
         _depthProgram->setCullFaceEnable(true);
         _depthProgram->setCullFace(rhi::CullFace::Front);
@@ -168,16 +172,14 @@ void GLShadowApp::renderScene2FrameBuffer(const glm::mat4& lightSpaceMatrix, con
 void GLShadowApp::renderScene2Screen(const glm::mat4& lightSpaceMatrix, const glm::vec3& lightPos) {
     renderer()->setPipeline(_shadowProgram);
     renderer()->bindTexture(_texture, 0);
-    _shadowProgram->setUniform("diffuseTexture", 0);
     renderer()->bindTexture(_shadowDepthMapFbo->depthTexture2D(), 1);
-    _shadowProgram->setUniform("shadowMap", 1);
     const auto projection = glm::perspective(glm::radians(_camera.zoom()), aspectRatio(), 0.1f, 100.0f);
     const auto view = _camera.getViewMatrix();
-    _shadowProgram->setUniform("projection", glm::value_ptr(projection), 1);
-    _shadowProgram->setUniform("view", glm::value_ptr(view), 1);
-    _shadowProgram->setUniform("viewPos", glm::value_ptr(_camera.getAttr().pos), 1, 3);
-    _shadowProgram->setUniform("lightPos", glm::value_ptr(lightPos), 1, 3);
-    _shadowProgram->setUniform("lightSpaceMatrix", glm::value_ptr(lightSpaceMatrix), 1);
+    rhi::SetUniform(_ubo, "projection", projection);
+    rhi::SetUniform(_ubo, "view", view);
+    rhi::SetUniform(_ubo, "viewPos", _camera.getAttr().pos);
+    rhi::SetUniform(_ubo, "lightPos", lightPos);
+    rhi::SetUniform(_ubo, "lightSpaceMatrix", lightSpaceMatrix);
     renderScene(_shadowProgram, lightPos);
 }
 
@@ -185,11 +187,11 @@ void GLShadowApp::renderDepthDebug() {
     const float near_plane = 1.0f, far_plane = 7.5f;
     renderer()->clearColor(1.0f, 1.0f, 1.0f, 1.0f);
     renderer()->setPipeline(_debugProgram);
-    _debugProgram->setUniform("near_plane", near_plane);
-    _debugProgram->setUniform("far_plane", far_plane);
+    rhi::SetUniform(_ubo, "near_plane", near_plane);
+    rhi::SetUniform(_ubo, "far_plane", far_plane);
     renderer()->bindTexture(_shadowDepthMapFbo->depthTexture2D(), 0);
-    _debugProgram->setUniform("depthMap", 0);
     renderer()->setVertexBuffer(_quadVb);
+    _uboBuffer->update(&_ubo, sizeof(rhi::UniformBlock), 0);
     renderer()->draw(_quadVertexCount, 0);
 }
 

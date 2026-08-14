@@ -81,6 +81,9 @@ void GLShadowMapApp::createShadowDepthBuffer() {
 }
 
 void GLShadowMapApp::compileShader(const rhi::VertexLayout& cubeLayout, const rhi::VertexLayout& screenLayout) {
+    _uboBuffer = renderer()->createUniformBuffer();
+    _uboBuffer->init(nullptr, sizeof(rhi::UniformBlock), rhi::BufferType::Uniform);
+    _uboBuffer->bindRange(0, 0, sizeof(rhi::UniformBlock));
     const auto shaderDir = join(StaticCollector::getGLShaderPath(), "Light", "Advanced", "ShadowMap");
     {
         auto shader = renderer()->createShader();
@@ -107,7 +110,7 @@ void GLShadowMapApp::renderScene2FrameBuffer() {
     glm::mat4 lightView = glm::lookAt(lightPos, glm::vec3(0.0f), glm::vec3(0.0, 1.0, 0.0));
     glm::mat4 lightSpaceMatrix = lightProjection * lightView;
     renderer()->setPipeline(_shadowProgram);
-    _shadowProgram->setUniform("lightSpaceMatrix", glm::value_ptr(lightSpaceMatrix), 1);
+    rhi::SetUniform(_ubo, "lightSpaceMatrix", lightSpaceMatrix);
     renderer()->setViewport(rhi::Viewport{0, 0, Constexpr::GetShadowMapWidth(), Constexpr::GetShadowMapHeight()});
     renderer()->setRenderTarget(_shadowDepthMapFbo);
     renderer()->clearColor(1.0f, 1.0f, 1.0f, 1.0f);   // RHI clearColor 同时清 depth（GLBackend: glClear(COLOR|DEPTH|STENCIL)）
@@ -116,14 +119,16 @@ void GLShadowMapApp::renderScene2FrameBuffer() {
         renderer()->setVertexBuffer(_planeUv, 1);
         renderer()->setVertexBuffer(_planeNormal, 2);
         const glm::mat4 identity{1.0f};
-        _shadowProgram->setUniform("model", glm::value_ptr(identity), 1);
+        rhi::SetUniform(_ubo, "model", identity);
+        _uboBuffer->update(&_ubo, sizeof(rhi::UniformBlock), 0);
         renderer()->draw(_planeVertexCount, 0);
     }
     {
         renderer()->setVertexBuffer(_cubeVb);
         renderer()->setIndexBuffer(_cubeEbo);
         auto model = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 1.5f, 0.0));
-        _shadowProgram->setUniform("model", glm::value_ptr(model), 1);
+        rhi::SetUniform(_ubo, "model", model);
+        _uboBuffer->update(&_ubo, sizeof(rhi::UniformBlock), 0);
         renderer()->drawIndexed(_cubeIndexCount, 0, 0);
     }
     renderer()->setRenderTarget(nullptr);
@@ -136,10 +141,10 @@ void GLShadowMapApp::reanderFraemBuffer() {
     renderer()->setRenderTarget(nullptr);
     renderer()->clearColor(0.5f, 0.0f, 0.5f, 1.0f);
     renderer()->bindTexture(_shadowDepthMapFbo->depthTexture2D(), 0);
-    _depthProgram->setUniform("textureSampler", 0);
     renderer()->setVertexBuffer(_screenVb);
     renderer()->setVertexBuffer(_screenUv, 1);
     renderer()->setIndexBuffer(_screenEbo);
+    _uboBuffer->update(&_ubo, sizeof(rhi::UniformBlock), 0);
     renderer()->drawIndexed(_screenIndexCount, 0, 0);
 }
 

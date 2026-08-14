@@ -3,6 +3,7 @@
 #include "rhi/core/IPipeline.hpp"
 #include "rhi/core/IBuffer.hpp"
 #include "rhi/core/ITexture2D.hpp"
+#include "rhi/core/UniformBlock.hpp"
 #include <memory>
 #include <array>
 #include "geometry/Camera.hpp"
@@ -33,4 +34,6 @@ private:
 	float _curTime{};
 	glm::vec4 _lightColor{1.0, 1.0, 1.0, 1.0};
 	std::shared_ptr<rhi::ITexture2D> _texture{};
+	rhi::UniformBlock _ubo{};
+	std::shared_ptr<rhi::IBuffer> _uboBuffer{};
 };

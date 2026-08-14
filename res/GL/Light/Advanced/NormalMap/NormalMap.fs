@@ -1,5 +1,20 @@
-#version 330 core
+#version 430 core
 out vec4 FragColor;
+
+struct ULight { vec4 position; vec4 direction; vec4 ambient; vec4 diffuse; vec4 specular; vec4 params; };
+
+layout(binding = 0) uniform UniformBlock {
+    mat4 projection;
+    mat4 view;
+    mat4 model;
+    mat4 normalMatrix;
+    mat4 viewModel;
+    mat4 extraMat4[14];
+    vec4 vec4Pool[64];
+    vec4 vec3Pool[64];
+    float floatPool[64];
+    ULight lights[2];
+};
 
 in VS_OUT {
     vec3 FragPos;
@@ -10,19 +25,15 @@ in VS_OUT {
     vec3 aNormal;
 } fs_in;
 
-uniform sampler2D diffuseMap;
-uniform sampler2D normalMap;
+layout(binding = 0) uniform sampler2D diffuseMap;
+layout(binding = 1) uniform sampler2D normalMap;
 
-uniform vec3 lightPos;
-uniform vec3 viewPos;
-
-uniform int enableNM;
 void main()
 {           
 
      // obtain normal from normal map in range [0,1]
     vec3 normal = fs_in.aNormal;//texture(normalMap, fs_in.TexCoords).rgb;
-    if(enableNM == 1){
+    if(floatPool[22] > 0.5){
         normal = texture(normalMap, fs_in.TexCoords).rgb;
     }
     // transform normal vector to range [-1,1]

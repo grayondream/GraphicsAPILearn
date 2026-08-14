@@ -26,6 +26,10 @@ bool GLGammaApp::initApp() {
 
 	const auto shaderDir = join(StaticCollector::getGLShaderPath(), "Light");
 
+	_uboBuffer = renderer()->createUniformBuffer();
+	_uboBuffer->init(nullptr, sizeof(rhi::UniformBlock), rhi::BufferType::Uniform);
+	_uboBuffer->bindRange(0, 0, sizeof(rhi::UniformBlock));
+
 	// 光源管线（Sphere shape，pos+color indexed；layout 来自 Create 返回值）
 	{
 		auto shader = renderer()->createShader();
@@ -106,16 +110,18 @@ void GLGammaApp::drawScene(const float dt) {
 		renderer()->setVertexBuffer(_planeVb);
 		renderer()->setVertexBuffer(_planeUv, 1);
 		renderer()->setVertexBuffer(_planeNormal, 2);
-		_targetPipeline->setUniform("projection", glm::value_ptr(projection), 1);
-		_targetPipeline->setUniform("view", glm::value_ptr(view), 1);
-		_targetPipeline->setUniform("model", glm::value_ptr(model), 1);
-		_targetPipeline->setUniform("textureSampler", 0);
-		_targetPipeline->setUniform("lightColor", glm::value_ptr(_lightColor), 1, 4);
-		_targetPipeline->setUniform("lightPositions", glm::value_ptr(lightPoses[0]), static_cast<int>(lightPoses.size()), 3);
-		_targetPipeline->setUniform("lightColors", glm::value_ptr(lightColors[0]), static_cast<int>(lightColors.size()), 3);
-		_targetPipeline->setUniform("viewPos", glm::value_ptr(_camera.getAttr().pos), 1, 3);
-		_targetPipeline->setUniform("enableGamma", _enableGamma);
-		_targetPipeline->setUniform("gammaValue", _gammaValue);
+		rhi::SetUniform(_ubo, "projection", projection);
+		rhi::SetUniform(_ubo, "view", view);
+		rhi::SetUniform(_ubo, "model", model);
+		rhi::SetUniform(_ubo, "lightColor", _lightColor);
+		for (auto i = 0; i < 5; i++) {
+			rhi::SetUniform(_ubo, "lightPositions", i, lightPoses[i]);
+			rhi::SetUniform(_ubo, "lightColors", i, lightColors[i]);
+		}
+		rhi::SetUniform(_ubo, "viewPos", _camera.getAttr().pos);
+		rhi::SetUniform(_ubo, "enableGamma", _enableGamma);
+		rhi::SetUniform(_ubo, "gammaValue", _gammaValue);
+		_uboBuffer->update(&_ubo, sizeof(rhi::UniformBlock), 0);
 		renderer()->draw(_planeVertexCount, 0);
 	}
 
@@ -128,11 +134,12 @@ void GLGammaApp::drawScene(const float dt) {
 
 		renderer()->setPipeline(_lightPipeline);
 		renderer()->setVertexBuffer(_vb);
-		_lightPipeline->setUniform("projection", glm::value_ptr(projection), 1);
-		_lightPipeline->setUniform("view", glm::value_ptr(view), 1);
-		_lightPipeline->setUniform("model", glm::value_ptr(model), 1);
+		rhi::SetUniform(_ubo, "projection", projection);
+		rhi::SetUniform(_ubo, "view", view);
+		rhi::SetUniform(_ubo, "model", model);
 		const glm::vec4 lc(lightColors[i], 1.0f);
-		_lightPipeline->setUniform("lightColor", glm::value_ptr(lc), 1, 4);
+		rhi::SetUniform(_ubo, "lightColor", lc);
+		_uboBuffer->update(&_ubo, sizeof(rhi::UniformBlock), 0);
 		renderer()->setIndexBuffer(_ebo);
 		renderer()->drawIndexed(_indexCount, 0, 0);
 	}

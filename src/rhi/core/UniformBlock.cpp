@@ -28,10 +28,11 @@ constexpr std::size_t XM4(std::size_t i) { return offsetof(UBO, extraMat4) + 64 
 //   0=shininess  1=ambientStrength  2=specularStrength  3=diffuseStrength
 //   4=exposure  5=gammaValue  6=heightScale  7=metallic  8=roughness  9=ao  10=time
 //   11=bloom  12=horizontal  13=hdr  14=count  15=type  16=near_plane  17=far_plane
-//   18=debug  19=shadows  20=enableGamma  21=enableBlinnPhong ... (enable* 依次 20..33)
-//   34/35=inverse_normals/invertedNormals  36=enableReflection  37=enableRefraction
+//   18=debug  19=shadows  20=enableGamma  21=enableBlinnPhong  22=enableNM  23=enableDisp
+//   24=enableOcclusion  25=enableBias ... (enable* 依次 20..33)
+//   34/35=inverse_normals/reverse_normals·invertedNormals  36=enableReflection  37=enableRefraction
 //   38=enableFragCoord  39..42 = enableSSAO/enableSimplePCF/enableSteep/enableVertexId
-//   43/44=enablePointSize/enableFrontFaceCulling  45..63=自由
+//   43/44=enablePointSize/enableFrontFaceCulling  45=light(点光阴影) 46..63=自由
 // extraMat4: 0=lightSpaceMatrix（单灯）  1..6=shadowMatrices[0..5]（点光 6 面）  7..13=自由
 // lights[i]: 0=dirLight  1..4=pointLights  5=spotLight  6..255=Defer/Hdr/Bloom lights[i]
 
@@ -86,8 +87,14 @@ static const SlotInfo kSlots[] = {
     { "shadows",           F4(19), 4, SlotKind::Float1 },
     { "enableGamma",       F4(20), 4, SlotKind::Float1 },
     { "enableBlinnPhong",  F4(21), 4, SlotKind::Float1 },
+    { "enableNM",          F4(22), 4, SlotKind::Float1 },
+    { "enableDisp",        F4(23), 4, SlotKind::Float1 },
+    { "enableOcclusion",   F4(24), 4, SlotKind::Float1 },
+    { "enableBias",        F4(25), 4, SlotKind::Float1 },
     { "inverse_normals",   F4(34), 4, SlotKind::Float1 },
+    { "reverse_normals",   F4(34), 4, SlotKind::Float1 },   // 别名：点光阴影外部大盒法向反转
     { "invertedNormals",   F4(35), 4, SlotKind::Float1 },
+    { "light",             F4(45), 4, SlotKind::Float1 },   // 点光阴影灯位（bool）落自由区
     { "enableReflection",  F4(36), 4, SlotKind::Float1 },
     { "enableRefraction",  F4(37), 4, SlotKind::Float1 },
     { "enableFragCoord",   F4(38), 4, SlotKind::Float1 },
@@ -97,6 +104,7 @@ static const SlotInfo kSlots[] = {
     { "enableVertexId",    F4(42), 4, SlotKind::Float1 },
     { "enablePointSize",   F4(43), 4, SlotKind::Float1 },
     { "enableFrontFaceCulling", F4(44), 4, SlotKind::Float1 },
+    { "enableVolume",      F4(46), 4, SlotKind::Float1 },   // Defer 体积光照裁剪（自由区）
     { "lights",            LGT(0), sizeof(ULight), SlotKind::ULight_Field }, // 数组
 };
 
@@ -163,6 +171,7 @@ void SetUniform(UniformBlock& ubo, const char* name, int v) { float f = (float)v
 void SetUniform(UniformBlock& ubo, const char* name, bool v) { float f = v ? 1.f : 0.f; WriteAt(ubo, name, 0, f, &f, 4); }
 void SetUniform(UniformBlock& ubo, const char* name, uint32_t index, const glm::vec3& v) { WriteAt(ubo, name, static_cast<long>(index), v, glm::value_ptr(v), 12); }
 void SetUniform(UniformBlock& ubo, const char* name, uint32_t index, const glm::vec4& v) { WriteAt(ubo, name, static_cast<long>(index), v, glm::value_ptr(v), 16); }
+void SetUniform(UniformBlock& ubo, const char* name, uint32_t index, const glm::mat4& v) { glm::mat4 m = v; WriteAt(ubo, name, static_cast<long>(index), m, glm::value_ptr(m), 64); }
 
 // 灯光（SetLight demux field→ULight 成员，SetLightParam 写 params 分量）
 void SetLight(UniformBlock& ubo, uint32_t index, const char* field, const glm::vec3& v) {
@@ -189,7 +198,7 @@ void SetLightParam(UniformBlock& ubo, uint32_t index, const char* field, float v
     else if (strcmp(field, "quadratic") == 0)L.params.z = v;
     else if (strcmp(field, "cutOff") == 0)   L.params.w = v;
     else if (strcmp(field, "outerCutOff") == 0) L.direction.w = v;
-    else if (strcmp(field, "Radius") == 0)   L.params.z = v;  // Defer/Hdr/Bloom 光度半径
+    else if (strcmp(field, "Radius") == 0)   L.direction.w = v;  // Defer 光度体积半径（避免与 quadratic/params.z 冲突）
     else if (strcmp(field, "type") == 0)     L.position.w = v; // 0=点/聚光, 1=方向光
 }
 

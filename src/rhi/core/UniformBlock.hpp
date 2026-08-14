@@ -52,6 +52,7 @@ void SetUniform(UniformBlock& ubo, const char* name, int v);
 void SetUniform(UniformBlock& ubo, const char* name, bool v);
 void SetUniform(UniformBlock& ubo, const char* name, uint32_t index, const glm::vec3& v);  // 数组/元素
 void SetUniform(UniformBlock& ubo, const char* name, uint32_t index, const glm::vec4& v);
+void SetUniform(UniformBlock& ubo, const char* name, uint32_t index, const glm::mat4& v);
 void SetLight(UniformBlock& ubo, uint32_t index, const char* field, const glm::vec3& v);
 void SetLightParam(UniformBlock& ubo, uint32_t index, const char* field, float v);
 
