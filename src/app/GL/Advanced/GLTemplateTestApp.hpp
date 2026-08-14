@@ -3,6 +3,7 @@
 #include "rhi/core/ITexture2D.hpp"
 #include "rhi/core/IBuffer.hpp"
 #include "rhi/core/IPipeline.hpp"
+#include "rhi/core/UniformBlock.hpp"
 #include "app/GL/RhiGeometry.hpp"
 #include <memory>
 #include "geometry/Camera.hpp"
@@ -25,4 +26,6 @@ private:
 	uint32_t _cubeIndexCount{};
 	uint32_t _planeVertexCount{};
 	float _curTime{};
+	rhi::UniformBlock _ubo{};
+	std::shared_ptr<rhi::IBuffer> _uboBuffer{};
 };

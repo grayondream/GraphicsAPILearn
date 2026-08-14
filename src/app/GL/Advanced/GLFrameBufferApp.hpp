@@ -4,6 +4,7 @@
 #include "rhi/core/IBuffer.hpp"
 #include "rhi/core/IPipeline.hpp"
 #include "rhi/core/IRenderTarget.hpp"
+#include "rhi/core/UniformBlock.hpp"
 #include "app/GL/RhiGeometry.hpp"
 #include <memory>
 #include <array>
@@ -39,4 +40,6 @@ private:
 	uint32_t _cubeIndexCount{};
 	uint32_t _planeVertexCount{};
 	int _selectEffectType{ 0 };
+	rhi::UniformBlock _ubo{};
+	std::shared_ptr<rhi::IBuffer> _uboBuffer{};
 };

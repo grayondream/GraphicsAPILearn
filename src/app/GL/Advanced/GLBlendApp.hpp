@@ -3,6 +3,7 @@
 #include "rhi/core/ITexture2D.hpp"
 #include "rhi/core/IBuffer.hpp"
 #include "rhi/core/IPipeline.hpp"
+#include "rhi/core/UniformBlock.hpp"
 #include "app/GL/RhiGeometry.hpp"
 #include <memory>
 #include <array>
@@ -32,4 +33,6 @@ private:
 	glm::vec3 _objectScale = glm::vec3(20, 1, 20.0f);
 	glm::vec3 _winPos = glm::vec3(0.5f, 0.5f, 5);
 	int _grassCount = 4;
+	rhi::UniformBlock _ubo{};
+	std::shared_ptr<rhi::IBuffer> _uboBuffer{};
 };

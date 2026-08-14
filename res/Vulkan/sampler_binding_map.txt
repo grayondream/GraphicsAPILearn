@@ -29,7 +29,7 @@ Advanced/PBR/Texture/PBR.frag	normalMap	2
 Advanced/PBR/Texture/PBR.frag	roughnessMap	4
 Advanced/SkyBox/Cube.frag	skyBoxSampler	2
 Advanced/SkyBox/Cube.frag	textureSampler	1
-Advanced/SkyBox/SkyBox.frag	skybox	1
+Advanced/SkyBox/SkyBox.frag	skybox	2
 Advanced/TemplateTest/Basic.frag	textureSampler	1
 Base/Cube.frag	textureSampler	1
 Base/SimpleTexture.frag	textureSampler	1

@@ -31,7 +31,7 @@ constexpr std::size_t XM4(std::size_t i) { return offsetof(UBO, extraMat4) + 64 
 //   18=debug  19=shadows  20=enableGamma  21=enableBlinnPhong ... (enable* 依次 20..33)
 //   34/35=inverse_normals/invertedNormals  36=enableReflection  37=enableRefraction
 //   38=enableFragCoord  39..42 = enableSSAO/enableSimplePCF/enableSteep/enableVertexId
-//   43..63=自由
+//   43/44=enablePointSize/enableFrontFaceCulling  45..63=自由
 // extraMat4: 0=lightSpaceMatrix（单灯）  1..6=shadowMatrices[0..5]（点光 6 面）  7..13=自由
 // lights[i]: 0=dirLight  1..4=pointLights  5=spotLight  6..255=Defer/Hdr/Bloom lights[i]
 
@@ -94,6 +94,8 @@ static const SlotInfo kSlots[] = {
     { "enableSimplePCF",   F4(40), 4, SlotKind::Float1 },
     { "enableSteep",       F4(41), 4, SlotKind::Float1 },
     { "enableVertexId",    F4(42), 4, SlotKind::Float1 },
+    { "enablePointSize",   F4(43), 4, SlotKind::Float1 },
+    { "enableFrontFaceCulling", F4(44), 4, SlotKind::Float1 },
     { "lights",            LGT(0), sizeof(ULight), SlotKind::ULight_Field }, // 数组
 };
 

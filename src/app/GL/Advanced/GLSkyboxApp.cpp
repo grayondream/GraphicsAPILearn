@@ -52,6 +52,9 @@ bool GLSkyboxApp::initApp() {
     _skyBoxTexture = RhiImage::LoadCube(renderer().get(), join(imgPath, "Skybox"));
     ExitIfFailed(_skyBoxTexture != nullptr && _skyBoxTexture->valid(),
                  "Failed to load texture from file {}", join(imgPath, "Skybox"));
+    _uboBuffer = renderer()->createUniformBuffer();
+    _uboBuffer->init(nullptr, sizeof(rhi::UniformBlock), rhi::BufferType::Uniform);
+    _uboBuffer->bindRange(0, 0, sizeof(rhi::UniformBlock));
     return true;
 }
 
@@ -62,20 +65,19 @@ void GLSkyboxApp::drawCube() {
     renderer()->setVertexBuffer(_cubeUv, 1);
     renderer()->setIndexBuffer(_cubeEbo);
     const auto projection = glm::perspective(glm::radians(_camera.zoom()), aspectRatio(), 0.1f, 100.0f);
-    _cubePipeline->setUniform("projection", glm::value_ptr(projection), 1);
+    rhi::SetUniform(_ubo, "projection", projection);
     const auto view = _camera.getViewMatrix();
-    _cubePipeline->setUniform("view", glm::value_ptr(view), 1);
+    rhi::SetUniform(_ubo, "view", view);
     glm::mat4 model = glm::mat4(1.0f);
     model = glm::translate(model, glm::vec3(0, 0, 0));
     model = glm::rotate(model, glm::radians(0.f), glm::vec3(1, 0, 0));
     model = glm::rotate(model, glm::radians(45.f), glm::vec3(0, 1, 0));
-    _cubePipeline->setUniform("model", glm::value_ptr(model), 1);
+    rhi::SetUniform(_ubo, "model", model);
     auto attr = _camera.getAttr();
-    _cubePipeline->setUniform("cameraPos", glm::value_ptr(attr.pos), 1, 3);
-    _cubePipeline->setUniform("textureSampler", 0);
-    _cubePipeline->setUniform("skyBoxSampler", 1);
-    _cubePipeline->setUniform("enableReflection", _enableReflect);
-    _cubePipeline->setUniform("enableRefraction", _enableRefraction);
+    rhi::SetUniform(_ubo, "cameraPos", attr.pos);
+    rhi::SetUniform(_ubo, "enableReflection", _enableReflect ? 1.0f : 0.0f);
+    rhi::SetUniform(_ubo, "enableRefraction", _enableRefraction ? 1.0f : 0.0f);
+    _uboBuffer->update(&_ubo, sizeof(rhi::UniformBlock), 0);
     renderer()->drawIndexed(_cubeIndexCount, 0, 0);
 }
 
@@ -84,12 +86,12 @@ void GLSkyboxApp::drawSkybox() {
     _skyboxPipeline->setDepthMask(false);
     renderer()->setPipeline(_skyboxPipeline);
     const auto projection = glm::perspective(glm::radians(_camera.zoom()), aspectRatio(), 0.1f, 100.0f);
-    _skyboxPipeline->setUniform("projection", glm::value_ptr(projection), 1);
+    rhi::SetUniform(_ubo, "projection", projection);
     auto view = glm::mat4(glm::mat3(_camera.getViewMatrix()));
-    _skyboxPipeline->setUniform("view", glm::value_ptr(view), 1);
+    rhi::SetUniform(_ubo, "view", view);
     renderer()->bindTexture(_skyBoxTexture, 1);
-    _skyboxPipeline->setUniform("skybox", 1);
     renderer()->setVertexBuffer(_skyVb);
+    _uboBuffer->update(&_ubo, sizeof(rhi::UniformBlock), 0);
     renderer()->draw(_skyVertexCount, 0);
     _skyboxPipeline->setDepthMask(true);
     _skyboxPipeline->setDepthFunc(rhi::CompareFunc::Less);

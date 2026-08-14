@@ -40,6 +40,9 @@ bool GLCullFaceApp::initApp() {
     _planeTexture = RhiImage::Load2D(renderer().get(), join(StaticCollector::getImagePath(), "metal.jpg"));
     _grassTexture = RhiImage::Load2D(renderer().get(), join(StaticCollector::getImagePath(), "grass.png"));
     _winTexture = RhiImage::Load2D(renderer().get(), join(StaticCollector::getImagePath(), "window.png"));
+    _uboBuffer = renderer()->createUniformBuffer();
+    _uboBuffer->init(nullptr, sizeof(rhi::UniformBlock), rhi::BufferType::Uniform);
+    _uboBuffer->bindRange(0, 0, sizeof(rhi::UniformBlock));
     return true;
 }
 
@@ -59,17 +62,17 @@ void GLCullFaceApp::drawScene(const float dt) {
     renderer()->setVertexBuffer(_cubeVb);
     renderer()->setVertexBuffer(_cubeUv, 1);
     renderer()->setIndexBuffer(_cubeEbo);
-    _pipeline->setUniform("projection", glm::value_ptr(projection), 1);
-    _pipeline->setUniform("view", glm::value_ptr(view), 1);
+    rhi::SetUniform(_ubo, "projection", projection);
+    rhi::SetUniform(_ubo, "view", view);
     {
         glm::mat4 model = glm::mat4(1.0f);
         model = glm::translate(model, glm::vec3(0, 0, 0) + _objectPosition);
         model = glm::rotate(model, glm::radians(45.f), glm::vec3(1, 0, 0));
         model = glm::rotate(model, glm::radians(45.f), glm::vec3(0, 1, 0));
         model = glm::scale(model, glm::vec3(2.0));
-        _pipeline->setUniform("textureSampler", 0);
-        _pipeline->setUniform("texColor", glm::value_ptr(glm::vec4(1.0, 1.0, 1.0, 0.0)), 1, 4);
-        _pipeline->setUniform("model", glm::value_ptr(model), 1);
+        rhi::SetUniform(_ubo, "texColor", glm::vec4(1.0f, 1.0f, 1.0f, 0.0f));
+        rhi::SetUniform(_ubo, "model", model);
+        _uboBuffer->update(&_ubo, sizeof(rhi::UniformBlock), 0);
         renderer()->drawIndexed(_cubeIndexCount, 0, 0);
     }
     return GLApp::drawScene(dt);

@@ -1,6 +1,8 @@
 #pragma once
 #include "app/GL/Base/GLCameraBaseApp.hpp"
 #include "rhi/core/IPipeline.hpp"
+#include "rhi/core/IBuffer.hpp"
+#include "rhi/core/UniformBlock.hpp"
 #include "app/GL/RhiGeometry.hpp"
 #include <memory>
 #include <array>
@@ -22,4 +24,6 @@ private:
 	std::shared_ptr<rhi::IBuffer> _vb{};
 	uint32_t _vertexCount{0};
 	float _curTime{};
+	rhi::UniformBlock _ubo{};
+	std::shared_ptr<rhi::IBuffer> _uboBuffer{};
 };

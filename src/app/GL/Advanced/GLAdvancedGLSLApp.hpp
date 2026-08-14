@@ -3,6 +3,7 @@
 #include "rhi/core/IPipeline.hpp"
 #include "rhi/core/ITexture2D.hpp"
 #include "rhi/core/IBuffer.hpp"
+#include "rhi/core/UniformBlock.hpp"
 #include <memory>
 #include <array>
 #include "geometry/Camera.hpp"
@@ -26,4 +27,6 @@ private:
     bool _enableFragCoord;
     bool _enableVertexId;
     bool _enableFrontFaceCulling;
+	rhi::UniformBlock _ubo{};
+	std::shared_ptr<rhi::IBuffer> _uboBuffer{};
 };

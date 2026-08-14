@@ -5,6 +5,7 @@
 #include "rhi/core/ITexture3D.hpp"
 #include "rhi/core/IBuffer.hpp"
 #include "rhi/core/IPipeline.hpp"
+#include "rhi/core/UniformBlock.hpp"
 #include <memory>
 #include <array>
 #include "geometry/Camera.hpp"
@@ -34,4 +35,6 @@ private:
 	float _curTime{};
 	bool _enableReflect{};
 	bool _enableRefraction{};
+	rhi::UniformBlock _ubo{};
+	std::shared_ptr<rhi::IBuffer> _uboBuffer{};
 };

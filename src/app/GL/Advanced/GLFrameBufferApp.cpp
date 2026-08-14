@@ -81,6 +81,9 @@ bool GLFrameBufferApp::initApp() {
 	compileShader(cubeGeo.layout);
 	createFrameBuffer();
 	initGLEnv();
+	_uboBuffer = renderer()->createUniformBuffer();
+	_uboBuffer->init(nullptr, sizeof(rhi::UniformBlock), rhi::BufferType::Uniform);
+	_uboBuffer->bindRange(0, 0, sizeof(rhi::UniformBlock));
 	return true;
 }
 
@@ -117,18 +120,18 @@ static std::vector<glm::vec3> initializeCubePositions() {
 
 void GLFrameBufferApp::drawPlane() {
 	renderer()->setPipeline(_contentPipeline);
-	renderer()->bindTexture(_planeTexture, 1);
+	renderer()->bindTexture(_planeTexture, 0);
 	const auto projection = glm::perspective(glm::radians(_camera.zoom()), aspectRatio(), 0.1f, 100.0f);
-	_contentPipeline->setUniform("projection", glm::value_ptr(projection), 1);
+	rhi::SetUniform(_ubo, "projection", projection);
 
 	const auto view = _camera.getViewMatrix();
-	_contentPipeline->setUniform("view", glm::value_ptr(view), 1);
+	rhi::SetUniform(_ubo, "view", view);
 	renderer()->setVertexBuffer(_planeVb);
 	renderer()->setVertexBuffer(_planeUv, 1);
 	glm::mat4 model = glm::mat4(1.0f);
 	model = glm::translate(model, glm::vec3(-1.0, -4.50, -10));
-	_contentPipeline->setUniform("model", glm::value_ptr(model), 1);
-	_contentPipeline->setUniform("textureSampler", 1);
+	rhi::SetUniform(_ubo, "model", model);
+	_uboBuffer->update(&_ubo, sizeof(rhi::UniformBlock), 0);
 	renderer()->draw(_planeVertexCount, 0);
 }
 
@@ -136,15 +139,14 @@ void GLFrameBufferApp::drawCube() {
 	renderer()->setPipeline(_contentPipeline);
 	renderer()->bindTexture(_cubeTexture, 0);
 	const auto projection = glm::perspective(glm::radians(_camera.zoom()), aspectRatio(), 0.1f, 100.0f);
-	_contentPipeline->setUniform("projection", glm::value_ptr(projection), 1);
+	rhi::SetUniform(_ubo, "projection", projection);
 
 	const auto view = _camera.getViewMatrix();
-	_contentPipeline->setUniform("view", glm::value_ptr(view), 1);
+	rhi::SetUniform(_ubo, "view", view);
 
 	renderer()->setVertexBuffer(_cubeVb);
 	renderer()->setVertexBuffer(_cubeUv, 1);
 	renderer()->setIndexBuffer(_cubeEbo);
-	_contentPipeline->setUniform("textureSampler", 0);
 
 	std::vector<glm::vec3> cubePositions = initializeCubePositions();
 	int count = cubePositions.size();
@@ -155,7 +157,8 @@ void GLFrameBufferApp::drawCube() {
 		float angle = 0;
 		model = glm::rotate(model, glm::radians(angle), glm::vec3(1.0f, 0.3f, 0.5f));
 
-		_contentPipeline->setUniform("model", glm::value_ptr(model), 1);
+		rhi::SetUniform(_ubo, "model", model);
+		_uboBuffer->update(&_ubo, sizeof(rhi::UniformBlock), 0);
 		renderer()->drawIndexed(_cubeIndexCount, 0, 0);
 	}
 }
@@ -180,12 +183,12 @@ void GLFrameBufferApp::drawScene(const float dt) {
 	_screenPipeline->setDepthTest(false);
 	renderer()->clearColor(0.1f, 0.1f, 0.1f, 1.0f);
 	renderer()->setPipeline(_screenPipeline);
-	renderer()->bindTexture(_screenFbo->colorTexture2D(0), 1);
-	_screenPipeline->setUniform("textureSampler", 1);
-	_screenPipeline->setUniform("effectType", _selectEffectType);
+	renderer()->bindTexture(_screenFbo->colorTexture2D(0), 0);
+	rhi::SetUniform(_ubo, "effectType", _selectEffectType);
 	renderer()->setVertexBuffer(_screenVb);
 	renderer()->setVertexBuffer(_screenUv, 1);
 	renderer()->setIndexBuffer(_screenEbo);
+	_uboBuffer->update(&_ubo, sizeof(rhi::UniformBlock), 0);
 	renderer()->drawIndexed(6, 0, 0);
 	_screenPipeline->setDepthTest(true);
 	return GLApp::drawScene(dt);

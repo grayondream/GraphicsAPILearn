@@ -58,6 +58,9 @@ bool GLMsaaApp::initApp() {
 	compileShader(cubeGeo.layout);
 	createFrameBuffer();
 	createPostFrameBuffer();
+	_uboBuffer = renderer()->createUniformBuffer();
+	_uboBuffer->init(nullptr, sizeof(rhi::UniformBlock), rhi::BufferType::Uniform);
+	_uboBuffer->bindRange(0, 0, sizeof(rhi::UniformBlock));
 	return true;
 }
 
@@ -100,19 +103,19 @@ void GLMsaaApp::drawFrameBufferMssa() {
 	renderer()->setPipeline(_pipeline);
 	renderer()->bindTexture(_texture, 0);
 	const auto projection = glm::perspective(glm::radians(_camera.zoom()), aspectRatio(), 0.1f, 100.0f);
-	_pipeline->setUniform("projection", glm::value_ptr(projection), 1);
+	rhi::SetUniform(_ubo, "projection", projection);
 	const auto view = _camera.getViewMatrix();
-	_pipeline->setUniform("view", glm::value_ptr(view), 1);
+	rhi::SetUniform(_ubo, "view", view);
 	glm::mat4 model = glm::mat4(1.0f);
 	model = glm::translate(model, glm::vec3(0.0f, 0.0f, 0.0f));
 	model = glm::scale(model, glm::vec3(2.0f));
 	model = glm::rotate(model, glm::radians(45.f), glm::vec3(1.0f, 0.f, 0.f));
 	model = glm::rotate(model, glm::radians(45.f), glm::vec3(0.0f, 1.f, 0.f));
-	_pipeline->setUniform("model", glm::value_ptr(model), 1);
-	_pipeline->setUniform("textureSampler", 0);
+	rhi::SetUniform(_ubo, "model", model);
 	renderer()->setVertexBuffer(_cubeVb);
 	renderer()->setVertexBuffer(_cubeUv, 1);
 	renderer()->setIndexBuffer(_cubeEbo);
+	_uboBuffer->update(&_ubo, sizeof(rhi::UniformBlock), 0);
 	renderer()->drawIndexed(36, 0, 0);
 
 	const auto attr = m_window->getProperties();
@@ -123,10 +126,10 @@ void GLMsaaApp::drawFrameBufferMssa() {
 	_postPipeline->setDepthTest(false);
 	renderer()->setPipeline(_postPipeline);
 	renderer()->bindTexture(_postFbo->colorTexture2D(0), 0);
-	_postPipeline->setUniform("textureSampler", 0);
 	renderer()->setVertexBuffer(_screenVb);
 	renderer()->setVertexBuffer(_screenUv, 1);
 	renderer()->setIndexBuffer(_screenEbo);
+	_uboBuffer->update(&_ubo, sizeof(rhi::UniformBlock), 0);
 	renderer()->drawIndexed(6, 0, 0);
 }
 
@@ -137,19 +140,19 @@ void GLMsaaApp::drawGLMssa() {
 	renderer()->setPipeline(_pipeline);
 	renderer()->bindTexture(_texture, 0);
 	const auto projection = glm::perspective(glm::radians(_camera.zoom()), aspectRatio(), 0.1f, 100.0f);
-	_pipeline->setUniform("projection", glm::value_ptr(projection), 1);
+	rhi::SetUniform(_ubo, "projection", projection);
 	const auto view = _camera.getViewMatrix();
-	_pipeline->setUniform("view", glm::value_ptr(view), 1);
+	rhi::SetUniform(_ubo, "view", view);
 	glm::mat4 model = glm::mat4(1.0f);
 	model = glm::translate(model, glm::vec3(0.0f, 0.0f, 0.0f));
 	model = glm::scale(model, glm::vec3(2.0f));
 	model = glm::rotate(model, glm::radians(45.f), glm::vec3(1.0f, 0.f, 0.f));
 	model = glm::rotate(model, glm::radians(45.f), glm::vec3(0.0f, 1.f, 0.f));
-	_pipeline->setUniform("model", glm::value_ptr(model), 1);
-	_pipeline->setUniform("textureSampler", 0);
+	rhi::SetUniform(_ubo, "model", model);
 	renderer()->setVertexBuffer(_cubeVb);
 	renderer()->setVertexBuffer(_cubeUv, 1);
 	renderer()->setIndexBuffer(_cubeEbo);
+	_uboBuffer->update(&_ubo, sizeof(rhi::UniformBlock), 0);
 	renderer()->drawIndexed(36, 0, 0);
 }
 

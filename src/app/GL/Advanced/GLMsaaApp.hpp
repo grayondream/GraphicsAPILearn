@@ -4,6 +4,7 @@
 #include "rhi/core/IBuffer.hpp"
 #include "rhi/core/IPipeline.hpp"
 #include "rhi/core/IRenderTarget.hpp"
+#include "rhi/core/UniformBlock.hpp"
 #include "app/GL/RhiGeometry.hpp"
 #include <memory>
 #include <array>
@@ -37,4 +38,6 @@ private:
 	std::shared_ptr<rhi::IRenderTarget> _postFbo{};
 	bool _enableMsaa{ false };
 	bool _enableFrameBufferMssa{ false };
+	rhi::UniformBlock _ubo{};
+	std::shared_ptr<rhi::IBuffer> _uboBuffer{};
 };

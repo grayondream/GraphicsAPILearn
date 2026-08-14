@@ -41,6 +41,9 @@ bool GLBlendApp::initApp() {
     _planeTexture = RhiImage::Load2D(renderer().get(), join(StaticCollector::getImagePath(), "metal.jpg"));
     _grassTexture = RhiImage::Load2D(renderer().get(), join(StaticCollector::getImagePath(), "grass.png"));
     _winTexture = RhiImage::Load2D(renderer().get(), join(StaticCollector::getImagePath(), "window.png"));
+    _uboBuffer = renderer()->createUniformBuffer();
+    _uboBuffer->init(nullptr, sizeof(rhi::UniformBlock), rhi::BufferType::Uniform);
+    _uboBuffer->bindRange(0, 0, sizeof(rhi::UniformBlock));
     return true;
 }
 
@@ -70,16 +73,12 @@ void GLBlendApp::drawScene(const float dt) {
     int count = (int)cubePositions.size();
     const auto projection = glm::perspective(glm::radians(_camera.zoom()), aspectRatio(), 0.1f, 100.0f);
     const auto view = _camera.getViewMatrix();
-    renderer()->bindTexture(_cubeTexture, 0);
-    renderer()->bindTexture(_planeTexture, 1);
-    renderer()->bindTexture(_grassTexture, 2);
-    renderer()->bindTexture(_winTexture, 3);
+    rhi::SetUniform(_ubo, "projection", projection);
+    rhi::SetUniform(_ubo, "view", view);
     renderer()->setPipeline(_pipeline);
     renderer()->setVertexBuffer(_cubeVb);
     renderer()->setVertexBuffer(_cubeUv, 1);
     renderer()->setIndexBuffer(_cubeEbo);
-    _pipeline->setUniform("projection", glm::value_ptr(projection), 1);
-    _pipeline->setUniform("view", glm::value_ptr(view), 1);
     static float curTime = 0;
     curTime += dt;
     for (int i = 0; i < count; i++) {
@@ -87,9 +86,10 @@ void GLBlendApp::drawScene(const float dt) {
         model = glm::translate(model, cubePositions[i] + _objectPosition);
         float angle = 0;
         model = glm::rotate(model, glm::radians(angle), glm::vec3(1.0f, 0.3f, 0.5f));
-        _pipeline->setUniform("textureSampler", 1);
-        _pipeline->setUniform("texColor", glm::value_ptr(glm::vec4(1.0, 1.0, 1.0, 0.0)), 1, 4);
-        _pipeline->setUniform("model", glm::value_ptr(model), 1);
+        renderer()->bindTexture(_planeTexture, 0);
+        rhi::SetUniform(_ubo, "texColor", glm::vec4(1.0f, 1.0f, 1.0f, 0.0f));
+        rhi::SetUniform(_ubo, "model", model);
+        _uboBuffer->update(&_ubo, sizeof(rhi::UniformBlock), 0);
         renderer()->drawIndexed(_cubeIndexCount, 0, 0);
     }
     renderer()->setVertexBuffer(_planeVb);
@@ -98,9 +98,10 @@ void GLBlendApp::drawScene(const float dt) {
         glm::mat4 model = glm::mat4(1.0f);
         model = glm::translate(model, glm::vec3(-1.0, -4.50, -10));
         model = glm::scale(model, _objectScale);
-        _pipeline->setUniform("model", glm::value_ptr(model), 1);
-        _pipeline->setUniform("textureSampler", 0);
-        _pipeline->setUniform("texColor", glm::value_ptr(glm::vec4(1.0, 1.0, 1.0, 0.0)), 1, 4);
+        renderer()->bindTexture(_cubeTexture, 0);
+        rhi::SetUniform(_ubo, "model", model);
+        rhi::SetUniform(_ubo, "texColor", glm::vec4(1.0f, 1.0f, 1.0f, 0.0f));
+        _uboBuffer->update(&_ubo, sizeof(rhi::UniformBlock), 0);
         renderer()->draw(_planeVertexCount, 0);
     }
     {
@@ -108,9 +109,10 @@ void GLBlendApp::drawScene(const float dt) {
         model = glm::translate(model, glm::vec3(0.5f, 0.5f, 0.5f));
         model = glm::scale(model, glm::vec3(0.5, 0.5, 0.5));
         model = glm::rotate(model, glm::radians(90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
-        _pipeline->setUniform("model", glm::value_ptr(model), 1);
-        _pipeline->setUniform("textureSampler", 2);
-        _pipeline->setUniform("texColor", glm::value_ptr(glm::vec4(1.0, 1.0, 1.0, 0.0)), 1, 4);
+        renderer()->bindTexture(_grassTexture, 0);
+        rhi::SetUniform(_ubo, "model", model);
+        rhi::SetUniform(_ubo, "texColor", glm::vec4(1.0f, 1.0f, 1.0f, 0.0f));
+        _uboBuffer->update(&_ubo, sizeof(rhi::UniformBlock), 0);
         renderer()->draw(_planeVertexCount, 0);
     }
     {
@@ -119,9 +121,10 @@ void GLBlendApp::drawScene(const float dt) {
             model = glm::scale(model, glm::vec3(0.5, 0.5, 0.5));
             model = glm::rotate(model, glm::radians(90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
             model = glm::translate(model, _winPos + glm::vec3(-0.5 * i, 1 * i, 0));
-            _pipeline->setUniform("model", glm::value_ptr(model), 1);
-            _pipeline->setUniform("textureSampler", 3);
-            _pipeline->setUniform("texColor", glm::value_ptr(glm::vec4(1.0, 1.0, 1.0, 0.0)), 1, 4);
+            renderer()->bindTexture(_winTexture, 0);
+            rhi::SetUniform(_ubo, "model", model);
+            rhi::SetUniform(_ubo, "texColor", glm::vec4(1.0f, 1.0f, 1.0f, 0.0f));
+            _uboBuffer->update(&_ubo, sizeof(rhi::UniformBlock), 0);
             renderer()->draw(_planeVertexCount, 0);
         }
     }

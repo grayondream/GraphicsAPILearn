@@ -37,6 +37,9 @@ bool GLDepthTestApp::initApp() {
     _contentPipeline->setDepthTest(true);
     _cubeTexture = RhiImage::Load2D(renderer().get(), join(StaticCollector::getImagePath(), "marble.jpg"));
     _planeTexture = RhiImage::Load2D(renderer().get(), join(StaticCollector::getImagePath(), "metal.jpg"));
+    _uboBuffer = renderer()->createUniformBuffer();
+    _uboBuffer->init(nullptr, sizeof(rhi::UniformBlock), rhi::BufferType::Uniform);
+    _uboBuffer->bindRange(0, 0, sizeof(rhi::UniformBlock));
     return true;
 }
 
@@ -65,21 +68,21 @@ void GLDepthTestApp::drawScene(const float dt) {
     renderer()->setVertexBuffer(_cubeVb);
     renderer()->setVertexBuffer(_cubeUv, 1);
     renderer()->setIndexBuffer(_cubeEbo);
-    _contentPipeline->setUniform("projection", glm::value_ptr(projection), 1);
-    _contentPipeline->setUniform("view", glm::value_ptr(view), 1);
-    _contentPipeline->setUniform("textureSampler", 0);
+    rhi::SetUniform(_ubo, "projection", projection);
+    rhi::SetUniform(_ubo, "view", view);
     for (int i = 0; i < count; i++) {
         glm::mat4 model = glm::mat4(1.0f);
         model = glm::translate(model, cubePositions[i]);
-        _contentPipeline->setUniform("model", glm::value_ptr(model), 1);
+        rhi::SetUniform(_ubo, "model", model);
+        _uboBuffer->update(&_ubo, sizeof(rhi::UniformBlock), 0);
         renderer()->drawIndexed(_cubeIndexCount, 0, 0);
     }
     renderer()->setVertexBuffer(_planeVb);
     renderer()->setVertexBuffer(_planeUv, 1);
-    renderer()->bindTexture(_planeTexture, 1);
-    _contentPipeline->setUniform("textureSampler", 1);
+    renderer()->bindTexture(_planeTexture, 0);
     glm::mat4 model = glm::translate(glm::mat4(1.0f), glm::vec3(-1.0f, -4.50f, -10));
-    _contentPipeline->setUniform("model", glm::value_ptr(model), 1);
+    rhi::SetUniform(_ubo, "model", model);
+    _uboBuffer->update(&_ubo, sizeof(rhi::UniformBlock), 0);
     renderer()->draw(_planeVertexCount, 0);
     return GLApp::drawScene(dt);
 }

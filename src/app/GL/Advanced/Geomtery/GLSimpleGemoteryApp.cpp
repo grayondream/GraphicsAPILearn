@@ -46,6 +46,9 @@ bool GLSimpleGemoteryApp::initApp() {
 	_vb = geo.vertexBuffer; _vertexCount = geo.vertexCount;
 	_pipeline = renderer()->createPipeline(geo.layout, shader);
 	_pipeline->setPrimitiveType(rhi::PrimitiveType::Points);
+	_uboBuffer = renderer()->createUniformBuffer();
+	_uboBuffer->init(nullptr, sizeof(rhi::UniformBlock), rhi::BufferType::Uniform);
+	_uboBuffer->bindRange(0, 0, sizeof(rhi::UniformBlock));
 	return true;
 }
 
@@ -55,6 +58,7 @@ void GLSimpleGemoteryApp::drawScene(const float dt) {
 
 	renderer()->setPipeline(_pipeline);
 	renderer()->setVertexBuffer(_vb);
+	_uboBuffer->update(&_ubo, sizeof(rhi::UniformBlock), 0);
 	renderer()->draw(_vertexCount, 0);
 
 	return GLApp::drawScene(dt);

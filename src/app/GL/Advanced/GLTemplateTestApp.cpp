@@ -62,6 +62,9 @@ bool GLTemplateTestApp::initApp() {
 
 	_cubeTexture = RhiImage::Load2D(renderer().get(), join(StaticCollector::getImagePath(), "marble.jpg"));
 	_planeTexture = RhiImage::Load2D(renderer().get(), join(StaticCollector::getImagePath(), "metal.jpg"));
+	_uboBuffer = renderer()->createUniformBuffer();
+	_uboBuffer->init(nullptr, sizeof(rhi::UniformBlock), rhi::BufferType::Uniform);
+	_uboBuffer->bindRange(0, 0, sizeof(rhi::UniformBlock));
 	return true;
 }
 
@@ -103,10 +106,11 @@ void GLTemplateTestApp::drawScene(const float dt) {
 		renderer()->setPipeline(_pipeline);
 		renderer()->setVertexBuffer(_planeVb);
 		renderer()->setVertexBuffer(_planeUv, 1);
+		renderer()->bindTexture(_planeTexture, 0);
 		auto model = glm::mat4(1.0f);
 		model = glm::translate(model, glm::vec3(-1.0, -4.50, -10));
-		_pipeline->setUniform("model", glm::value_ptr(model), 1);
-		_pipeline->setUniform("textureSampler", 1);
+		rhi::SetUniform(_ubo, "model", model);
+		_uboBuffer->update(&_ubo, sizeof(rhi::UniformBlock), 0);
 		renderer()->draw(_planeVertexCount, 0);
 	}
 
@@ -114,8 +118,8 @@ void GLTemplateTestApp::drawScene(const float dt) {
 	renderer()->setVertexBuffer(_cubeVb);
 	renderer()->setVertexBuffer(_cubeUv, 1);
 	renderer()->setIndexBuffer(_cubeEbo);
-	_pipeline->setUniform("projection", glm::value_ptr(projection), 1);
-	_pipeline->setUniform("view", glm::value_ptr(view), 1);
+	rhi::SetUniform(_ubo, "projection", projection);
+	rhi::SetUniform(_ubo, "view", view);
 	for (int i = 0; i < count; i++) {
 		{
 			_pipeline->setStencilFunc(rhi::CompareFunc::Always, 1, 0xFF);
@@ -123,8 +127,8 @@ void GLTemplateTestApp::drawScene(const float dt) {
 			auto model = glm::mat4(1.0f);
 			model = glm::translate(model, cubePositions[i]);
 			model = glm::scale(model, glm::vec3(1));
-			_pipeline->setUniform("model", glm::value_ptr(model), 1);
-			_pipeline->setUniform("textureSampler", 0);
+			rhi::SetUniform(_ubo, "model", model);
+			_uboBuffer->update(&_ubo, sizeof(rhi::UniformBlock), 0);
 			renderer()->drawIndexed(_cubeIndexCount, 0, 0);
 		}
 
@@ -139,9 +143,10 @@ void GLTemplateTestApp::drawScene(const float dt) {
 			auto model = glm::mat4(1.0f);
 			model = glm::translate(model, cubePositions[i]);
 			model = glm::scale(model, glm::vec3(1.1f));
-			_borderPipeline->setUniform("model", glm::value_ptr(model), 1);
-			_borderPipeline->setUniform("projection", glm::value_ptr(projection), 1);
-			_borderPipeline->setUniform("view", glm::value_ptr(view), 1);
+			rhi::SetUniform(_ubo, "model", model);
+			rhi::SetUniform(_ubo, "projection", projection);
+			rhi::SetUniform(_ubo, "view", view);
+			_uboBuffer->update(&_ubo, sizeof(rhi::UniformBlock), 0);
 			renderer()->drawIndexed(_cubeIndexCount, 0, 0);
 			renderer()->setPipeline(_pipeline);
 			renderer()->setVertexBuffer(_cubeVb);

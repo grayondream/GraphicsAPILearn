@@ -32,6 +32,9 @@ bool GLAdvancedGLSLApp::initApp() {
     _indexCount = geo.indexCount;
     _pipeline = renderer()->createPipeline(geo.layout, shader);
     _texture = RhiImage::Load2D(renderer().get(), join(StaticCollector::getImagePath(), "dog.jpg"));
+    _uboBuffer = renderer()->createUniformBuffer();
+    _uboBuffer->init(nullptr, sizeof(rhi::UniformBlock), rhi::BufferType::Uniform);
+    _uboBuffer->bindRange(0, 0, sizeof(rhi::UniformBlock));
     return true;
 }
 
@@ -72,17 +75,18 @@ void GLAdvancedGLSLApp::drawScene(const float dt) {
         renderer()->setVertexBuffer(_vb);
         renderer()->setVertexBuffer(_uv, 1);
         renderer()->setIndexBuffer(_ebo);
-        _pipeline->setUniform("projection", glm::value_ptr(projection), 1);
-        _pipeline->setUniform("view", glm::value_ptr(view), 1);
+        rhi::SetUniform(_ubo, "projection", projection);
+        rhi::SetUniform(_ubo, "view", view);
         glm::mat4 model = glm::mat4(1.0f);
         model = glm::translate(model, cubePositions[i]);
         float angle = 20.0f * (i + 1) * curTime;
         model = glm::rotate(model, glm::radians(angle), glm::vec3(1.0f, 0.3f, 0.5f));
-        _pipeline->setUniform("model", glm::value_ptr(model), 1);
-        _pipeline->setUniform("enablePointSize", _enablePointSize);
-        _pipeline->setUniform("enableFragCoord", _enableFragCoord);
-        _pipeline->setUniform("enableVertexId", _enableVertexId);
-        _pipeline->setUniform("enableFrontFaceCulling", _enableFrontFaceCulling);
+        rhi::SetUniform(_ubo, "model", model);
+        rhi::SetUniform(_ubo, "enablePointSize", _enablePointSize);
+        rhi::SetUniform(_ubo, "enableFragCoord", _enableFragCoord);
+        rhi::SetUniform(_ubo, "enableVertexId", _enableVertexId);
+        rhi::SetUniform(_ubo, "enableFrontFaceCulling", _enableFrontFaceCulling);
+        _uboBuffer->update(&_ubo, sizeof(rhi::UniformBlock), 0);
         renderer()->drawIndexed(_indexCount, 0, 0);
     }
     return GLApp::drawScene(dt);
