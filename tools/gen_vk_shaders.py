@@ -22,7 +22,9 @@ _UNIFORM_BLOCK_RE = re.compile(
     r'layout\s*\(\s*binding\s*=\s*0\s*\)\s*(uniform\s+UniformBlock\b)'
 )
 _SAMPLER_RE = re.compile(r'uniform\s+sampler\w+\s+\w+\s*;')
-_SAMPLER_DECL_RE = re.compile(r'^uniform\s+(sampler\w+)\s+(\w+)\s*;')
+_SAMPLER_BINDING_RE = re.compile(
+    r'(layout\s*\(\s*binding\s*=\s*(\d+)\s*\)\s*)?uniform\s+(sampler\w+)\s+(\w+)\s*;'
+)
 _GL_LAYER_RE = re.compile(r'^\s*(gl_Layer\s*=\s*[^;]+;)', re.MULTILINE)
 _VERSION_RE = re.compile(r'#version\s+(?:330|430)\s+core\b')
 
@@ -39,20 +41,27 @@ def convert_src(text, ext):
 
 
 def _rewrite_samplers(text):
-    """Rewrite sampler declarations to layout(set=0, binding=N) in declaration order."""
-    samplers = _SAMPLER_RE.findall(text)
-    if len(samplers) > MAX_SAMPLER_BINDINGS:
+    """Rewrite sampler declarations to layout(set=0, binding=N) in declaration order.
+
+    GL samplers carry `layout(binding = N)` with N = App texture unit (block occupies
+    binding=0 in its own namespace, so GL sampler bindings may also start at 0). In Vulkan
+    the block occupies set=0/binding=0 in the same descriptor-set namespace, so sampler
+    bindings are shifted by +1. Samplers without an explicit binding are assigned by
+    declaration order (idx+1)."""
+    matches = list(_SAMPLER_BINDING_RE.finditer(text))
+    if len(matches) > MAX_SAMPLER_BINDINGS:
         raise RuntimeError(
-            'too many samplers (%d > %d)' % (len(samplers), MAX_SAMPLER_BINDINGS)
+            'too many samplers (%d > %d)' % (len(matches), MAX_SAMPLER_BINDINGS)
         )
     out = []
     pos = 0
-    for idx, decl in enumerate(samplers):
-        match = _SAMPLER_RE.search(text, pos)
-        m = _SAMPLER_DECL_RE.match(decl)
-        binding = idx + 1
+    for idx, match in enumerate(matches):
+        existing = match.group(2)
+        binding = int(existing) + 1 if existing is not None else idx + 1
+        sampler_type = match.group(3)
+        name = match.group(4)
         out.append(text[pos:match.start()])
-        out.append('layout(set=0, binding=%d) uniform %s %s;' % (binding, m.group(1), m.group(2)))
+        out.append('layout(set=0, binding=%d) uniform %s %s;' % (binding, sampler_type, name))
         pos = match.end()
     out.append(text[pos:])
     return ''.join(out)
@@ -80,10 +89,11 @@ def main():
                 f.write(new_text)
             shader_count += 1
             print('%s -> %s' % (rel, out_rel))
-            bindings = _SAMPLER_RE.findall(new_text)
-            for idx, decl in enumerate(bindings):
-                m = _SAMPLER_DECL_RE.match(decl)
-                map_lines.append('%s\t%s\t%d' % (out_rel, m.group(2), idx + 1))
+            # map uses the VK form emitted by _rewrite_samplers: layout(set=0, binding=N)
+            vk_binding_re = re.compile(r'layout\(set=0,\s*binding=(\d+)\)\s*uniform\s+sampler\w+\s+(\w+)\s*;')
+            bindings = vk_binding_re.findall(new_text)
+            for binding_str, name in bindings:
+                map_lines.append('%s\t%s\t%d' % (out_rel, name, int(binding_str)))
 
     os.makedirs(os.path.join(dst_root, 'Common'), exist_ok=True)
     shutil.copyfile(os.path.join(src_root, 'Common', 'UniformBlock.glsl'),

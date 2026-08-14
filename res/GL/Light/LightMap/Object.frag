@@ -16,8 +16,8 @@ layout(binding = 0) uniform UniformBlock {
     ULight lights[256];
 };
 
-uniform sampler2D diffuseMap;
-uniform sampler2D specularMap;
+layout(binding = 0) uniform sampler2D diffuseMap;
+layout(binding = 1) uniform sampler2D specularMap;
 
 in vec4 normal;
 in vec4 fragPos;
