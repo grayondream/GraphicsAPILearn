@@ -90,6 +90,9 @@ bool GLBloomApp::initApp() {
 }
 
 void GLBloomApp::compileShader(const rhi::VertexLayout& cubeLayout, const rhi::VertexLayout& quadLayout) {
+	m_uboBuffer = renderer()->createUniformBuffer();
+	m_uboBuffer->init(nullptr, sizeof(rhi::UniformBlock), rhi::BufferType::Uniform);
+	m_uboBuffer->bindRange(0, 0, sizeof(rhi::UniformBlock));
 	const auto shaderDir = join(StaticCollector::getGLShaderPath(), "Light", "Advanced", "Bloom");
 	{
 		auto shader = renderer()->createShader();
@@ -175,18 +178,18 @@ void GLBloomApp::renderOneCube(std::shared_ptr<rhi::IPipeline>& program, const g
 	renderer()->setVertexBuffer(m_cubeUv, 1);
 	renderer()->setVertexBuffer(m_cubeNormal, 2);
 	renderer()->setIndexBuffer(m_cubeEbo);
-	program->setUniform("model", glm::value_ptr(model), 1);
-	program->setUniform("projection", glm::value_ptr(projection), 1);
-	program->setUniform("view", glm::value_ptr(view), 1);
+	rhi::SetUniform(m_ubo, "model", model);
+	rhi::SetUniform(m_ubo, "projection", projection);
+	rhi::SetUniform(m_ubo, "view", view);
 	renderer()->bindTexture(m_woodTexture, 0);
-	program->setUniform("diffuseTexture", 0);
+	m_uboBuffer->update(&m_ubo, sizeof(rhi::UniformBlock), 0);
 	renderer()->drawIndexed(m_cubeIndexCount, 0, 0);
 }
 
 void GLBloomApp::renderCubes(std::shared_ptr<rhi::IPipeline>& program, const glm::mat4 &projection, const glm::mat4 &view, const glm::vec3 &viewPos) {
 	auto cubePositions = GetCubePositions();
 	renderer()->setPipeline(program);
-	program->setUniform("viewPos", glm::value_ptr(viewPos), 1, 3);
+	rhi::SetUniform(m_ubo, "viewPos", viewPos);
 	for (const auto& pos : cubePositions) {
 		glm::mat4 model = glm::mat4(1.0f);
 		model = glm::translate(model, pos);
@@ -200,14 +203,14 @@ void GLBloomApp::renderPlane(std::shared_ptr<rhi::IPipeline>& program, const glm
 	renderer()->setVertexBuffer(m_planeVb);
 	renderer()->setVertexBuffer(m_planeUv, 1);
 	renderer()->setVertexBuffer(m_planeNormal, 2);
-	program->setUniform("viewPos", glm::value_ptr(viewPos), 1, 3);
+	rhi::SetUniform(m_ubo, "viewPos", viewPos);
 	glm::mat4 model = glm::mat4(1.0f);
 	renderer()->bindTexture(m_brickTexture, 0);
-	program->setUniform("diffuseTexture", 0);
 	model = glm::translate(model, glm::vec3(0.0));
-	program->setUniform("model", glm::value_ptr(model), 1);
-	program->setUniform("view", glm::value_ptr(view), 1);
-	program->setUniform("projection", glm::value_ptr(projection), 1);
+	rhi::SetUniform(m_ubo, "model", model);
+	rhi::SetUniform(m_ubo, "view", view);
+	rhi::SetUniform(m_ubo, "projection", projection);
+	m_uboBuffer->update(&m_ubo, sizeof(rhi::UniformBlock), 0);
 	renderer()->draw(m_planeVertexCount, 0);
 }
 
@@ -219,10 +222,8 @@ void GLBloomApp::extractBrightPart(const glm::mat4 &projection, const glm::mat4 
 	const auto [lightPositions, lightColors] = GetLightPosAndColor();
 	renderer()->setPipeline(m_bloomProgram);
 	for (int i = 0; i < lightPositions.size(); i++) {
-		m_bloomProgram->setUniform("lights[" + std::to_string(i) + "].Position",
-		                           glm::value_ptr(lightPositions[i]), 1, 3);
-		m_bloomProgram->setUniform("lights[" + std::to_string(i) + "].Color",
-		                           glm::value_ptr(lightColors[i]), 1, 3);
+		rhi::SetLight(m_ubo, i, "Position", lightPositions[i]);
+		rhi::SetLight(m_ubo, i, "Color", lightColors[i]);
 	}
 	renderCubes(m_bloomProgram, projection, view, viewPos);
 	renderPlane(m_bloomProgram, projection, view, viewPos);
@@ -236,8 +237,8 @@ void GLBloomApp::blurBrightPart() {
 		renderer()->setPipeline(m_blurProgram);
 		renderer()->bindTexture(first_iteration ? m_hdrFBO->colorTexture2D(1)
 		                                        : m_pingpongFBO[!horizontal]->colorTexture2D(0), 0);
-		m_blurProgram->setUniform("image", 0);
-		m_blurProgram->setUniform("horizontal", horizontal);
+		rhi::SetUniform(m_ubo, "horizontal", horizontal);
+		m_uboBuffer->update(&m_ubo, sizeof(rhi::UniformBlock), 0);
 		renderQuad();
 		horizontal = !horizontal;
 		first_iteration = false;
@@ -249,11 +250,10 @@ void GLBloomApp::renderFinal() {
 	renderer()->clearColor(0.0f, 0.0f, 0.0f, 1.0f);
 	renderer()->setPipeline(m_finalProgram);
 	renderer()->bindTexture(m_hdrFBO->colorTexture2D(0), 0);
-	m_finalProgram->setUniform("scene", 0);
 	renderer()->bindTexture(m_pingpongFBO[1]->colorTexture2D(0), 1);
-	m_finalProgram->setUniform("bloomBlur", 1);
-	m_finalProgram->setUniform("bloom", m_enableBloom);
-	m_finalProgram->setUniform("exposure", m_expose);
+	rhi::SetUniform(m_ubo, "bloom", m_enableBloom);
+	rhi::SetUniform(m_ubo, "exposure", m_expose);
+	m_uboBuffer->update(&m_ubo, sizeof(rhi::UniformBlock), 0);
 	renderQuad();
 }
 
@@ -271,7 +271,7 @@ void GLBloomApp::renderLight(std::shared_ptr<rhi::IPipeline>& program, const glm
 		glm::mat4 model = glm::mat4(1.0f);
 		model = glm::translate(model, lightPositions[i]);
 		model = glm::scale(model, glm::vec3(0.25f));
-		program->setUniform("lightColor", glm::value_ptr(lightColors[i]), 1, 3);
+		rhi::SetUniform(m_ubo, "lightColor", lightColors[i]);
 		renderOneCube(program, model, projection, view);
 	}
 }

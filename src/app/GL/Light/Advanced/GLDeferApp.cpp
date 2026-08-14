@@ -150,6 +150,9 @@ void GLDeferApp::createTextures() {
 }
 
 void GLDeferApp::compileShader(const rhi::VertexLayout& cubeLayout, const rhi::VertexLayout& quadLayout) {
+	m_uboBuffer = renderer()->createUniformBuffer();
+	m_uboBuffer->init(nullptr, sizeof(rhi::UniformBlock), rhi::BufferType::Uniform);
+	m_uboBuffer->bindRange(0, 0, sizeof(rhi::UniformBlock));
 	const auto shaderDir = join(StaticCollector::getGLShaderPath(), "Light", "Advanced", "Defer");
 	{
 		auto shader = renderer()->createShader();
@@ -188,18 +191,18 @@ void GLDeferApp::renderOneCube(std::shared_ptr<rhi::IPipeline>& program, const g
 	renderer()->setVertexBuffer(m_cubeUv, 1);
 	renderer()->setVertexBuffer(m_cubeNormal, 2);
 	renderer()->setIndexBuffer(m_cubeEbo);
-	program->setUniform("model", glm::value_ptr(model), 1);
-	program->setUniform("projection", glm::value_ptr(projection), 1);
-	program->setUniform("view", glm::value_ptr(view), 1);
+	rhi::SetUniform(m_ubo, "model", model);
+	rhi::SetUniform(m_ubo, "projection", projection);
+	rhi::SetUniform(m_ubo, "view", view);
+	m_uboBuffer->update(&m_ubo, sizeof(rhi::UniformBlock), 0);
 	renderer()->drawIndexed(m_cubeIndexCount, 0, 0);
 }
 
 void GLDeferApp::renderCubes(std::shared_ptr<rhi::IPipeline>& program, const glm::mat4 &projection, const glm::mat4 &view, const glm::vec3 &viewPos) {
 	auto cubePositions = GetPositions(m_Count, 1, glm::vec3(0,0.5,0));
 	renderer()->setPipeline(program);
-	program->setUniform("viewPos", glm::value_ptr(viewPos), 1, 3);
+	rhi::SetUniform(m_ubo, "viewPos", viewPos);
 	renderer()->bindTexture(m_woodTexture, 0);
-	program->setUniform("diffuseTexture", 0);
 	for (const auto& pos : cubePositions) {
 		glm::mat4 model = glm::mat4(1.0f);
 		model = glm::translate(model, pos);
@@ -213,37 +216,36 @@ void GLDeferApp::renderPlane(std::shared_ptr<rhi::IPipeline>& program, const glm
 	renderer()->setVertexBuffer(m_planeVb);
 	renderer()->setVertexBuffer(m_planeUv, 1);
 	renderer()->setVertexBuffer(m_planeNormal, 2);
-	program->setUniform("viewPos", glm::value_ptr(viewPos), 1, 3);
+	rhi::SetUniform(m_ubo, "viewPos", viewPos);
 	glm::mat4 model = glm::mat4(1.0f);
 	renderer()->bindTexture(m_brickTexture, 0);
-	program->setUniform("diffuseTexture", 0);
 	model = glm::translate(model, glm::vec3(0.0));
-	program->setUniform("model", glm::value_ptr(model), 1);
-	program->setUniform("view", glm::value_ptr(view), 1);
-	program->setUniform("projection", glm::value_ptr(projection), 1);
+	rhi::SetUniform(m_ubo, "model", model);
+	rhi::SetUniform(m_ubo, "view", view);
+	rhi::SetUniform(m_ubo, "projection", projection);
+	m_uboBuffer->update(&m_ubo, sizeof(rhi::UniformBlock), 0);
 	renderer()->draw(m_planeVertexCount, 0);
 }
 
 void GLDeferApp::renderLight(std::shared_ptr<rhi::IPipeline>& program, const glm::mat4 &projection, const glm::mat4 &view) {
 	renderer()->setPipeline(program);
-	renderer()->bindTexture(m_gBuffer->colorTexture2D(0), 0); program->setUniform("gPosition", 0);
-	renderer()->bindTexture(m_gBuffer->colorTexture2D(1), 1); program->setUniform("gNormal", 1);
-	renderer()->bindTexture(m_gBuffer->colorTexture2D(2), 2); program->setUniform("gAlbedoSpec", 2);
-	program->setUniform("viewPos", glm::value_ptr(_camera.getAttr().pos), 1, 3);
+	renderer()->bindTexture(m_gBuffer->colorTexture2D(0), 0);
+	renderer()->bindTexture(m_gBuffer->colorTexture2D(1), 1);
+	renderer()->bindTexture(m_gBuffer->colorTexture2D(2), 2);
+	rhi::SetUniform(m_ubo, "viewPos", _camera.getAttr().pos);
 	const float linear = 0.7f, quadratic = 1.8f, constant = 1.0f;
-	program->setUniform("enableVolume", m_enableVolume);
+	rhi::SetUniform(m_ubo, "enableVolume", m_enableVolume);
 	auto lightPositionsColor = GetLightPosAndColors(m_Count, 2);
 	for (unsigned int i = 0; i < lightPositionsColor.size(); i++) {
-		program->setUniform("lights[" + std::to_string(i) + "].Position",
-		                    glm::value_ptr(lightPositionsColor[i].first), 1, 3);
-		program->setUniform("lights[" + std::to_string(i) + "].Color",
-		                    glm::value_ptr(lightPositionsColor[i].second), 1, 3);
-		program->setUniform("lights[" + std::to_string(i) + "].Linear", linear);
-		program->setUniform("lights[" + std::to_string(i) + "].Quadratic", quadratic);
+		rhi::SetLight(m_ubo, i, "Position", lightPositionsColor[i].first);
+		rhi::SetLight(m_ubo, i, "Color", lightPositionsColor[i].second);
+		rhi::SetLightParam(m_ubo, i, "Linear", linear);
+		rhi::SetLightParam(m_ubo, i, "Quadratic", quadratic);
 		const float maxBrightness = std::fmaxf(std::fmaxf(lightPositionsColor[i].second.r, lightPositionsColor[i].second.g), lightPositionsColor[i].second.b);
 		float radius = (-linear + std::sqrt(linear * linear - 4 * quadratic * (constant - (256.0f / 5.0f) * maxBrightness))) / (2.0f * quadratic);
-		program->setUniform("lights[" + std::to_string(i) + "].Radius", radius);
+		rhi::SetLightParam(m_ubo, i, "Radius", radius);
 	}
+	m_uboBuffer->update(&m_ubo, sizeof(rhi::UniformBlock), 0);
 	renderer()->setVertexBuffer(m_quadVb);
 	renderer()->draw(m_quadVertexCount, 0);
 }
@@ -255,7 +257,7 @@ void GLDeferApp::renderLightBox(std::shared_ptr<rhi::IPipeline>& program, const 
 		glm::mat4 model = glm::mat4(1.0f);
 		model = glm::translate(model, posColor.first);
 		model = glm::scale(model, glm::vec3(0.1f));
-		program->setUniform("lightColor", glm::value_ptr(posColor.second), 1, 3);
+		rhi::SetUniform(m_ubo, "lightColor", posColor.second);
 		renderOneCube(program, model, projection, view);
 	}
 }
@@ -264,13 +266,11 @@ void GLDeferApp::renderGBuffer(std::shared_ptr<rhi::IPipeline>& program, const g
 	renderer()->setRenderTarget(m_gBuffer);
 	renderer()->clearColor(0.0f, 0.0f, 0.0f, 1.0f);
 	renderer()->setPipeline(program);
-	program->setUniform("projection", glm::value_ptr(projection), 1);
-	program->setUniform("view", glm::value_ptr(view), 1);
+	rhi::SetUniform(m_ubo, "projection", projection);
+	rhi::SetUniform(m_ubo, "view", view);
 	renderer()->bindTexture(m_woodTexture, 0);
-	program->setUniform("diffuseTexture", 0);
 	renderCubes(program, projection, view, _camera.getAttr().pos);
 	renderer()->bindTexture(m_brickTexture, 0);
-	program->setUniform("diffuseTexture", 0);
 	renderPlane(program, projection, view, _camera.getAttr().pos);
 	renderer()->setRenderTarget(nullptr);
 }

@@ -120,6 +120,9 @@ bool GLHdrApp::initApp() {
 }
 
 void GLHdrApp::compileShader(const rhi::VertexLayout& cubeLayout, const rhi::VertexLayout& quadLayout) {
+	_uboBuffer = renderer()->createUniformBuffer();
+	_uboBuffer->init(nullptr, sizeof(rhi::UniformBlock), rhi::BufferType::Uniform);
+	_uboBuffer->bindRange(0, 0, sizeof(rhi::UniformBlock));
 	const auto shaderDir = join(StaticCollector::getGLShaderPath(), "Light", "Advanced", "Hdr");
 	{
 		auto shader = renderer()->createShader();
@@ -163,22 +166,20 @@ void GLHdrApp::render2FrameBuffer() {
 	renderer()->setPipeline(_objPipeline);
 	renderer()->setVertexBuffer(_vb);
 	renderer()->bindTexture(_brick, 0);
-	_objPipeline->setUniform("diffuseTexture", 0);
-	_objPipeline->setUniform("projection", glm::value_ptr(projection), 1);
-	_objPipeline->setUniform("view", glm::value_ptr(view), 1);
+	rhi::SetUniform(_ubo, "projection", projection);
+	rhi::SetUniform(_ubo, "view", view);
 	auto [lightPositions, lightColors] = GetLightPosColor();
 	for (unsigned int i = 0; i < lightPositions.size(); i++) {
-		_objPipeline->setUniform("lights[" + std::to_string(i) + "].Position",
-		                         glm::value_ptr(lightPositions[i]), 1, 3);
-		_objPipeline->setUniform("lights[" + std::to_string(i) + "].Color",
-		                         glm::value_ptr(lightColors[i]), 1, 3);
+		rhi::SetLight(_ubo, i, "Position", lightPositions[i]);
+		rhi::SetLight(_ubo, i, "Color", lightColors[i]);
 	}
-	_objPipeline->setUniform("viewPos", glm::value_ptr(_camera.getAttr().pos), 1, 3);
+	rhi::SetUniform(_ubo, "viewPos", _camera.getAttr().pos);
 	glm::mat4 model = glm::mat4(1.0f);
 	model = glm::translate(model, glm::vec3(0.0f, 0.0f, 25.0));
 	model = glm::scale(model, glm::vec3(2.5f, 2.5f, 27.5f));
-	_objPipeline->setUniform("model", glm::value_ptr(model), 1);
-	_objPipeline->setUniform("inverse_normals", true);
+	rhi::SetUniform(_ubo, "model", model);
+	rhi::SetUniform(_ubo, "inverse_normals", true);
+	_uboBuffer->update(&_ubo, sizeof(rhi::UniformBlock), 0);
 	renderer()->draw(_cubeVertexCount, 0);
 	renderer()->setRenderTarget(nullptr);
 }
@@ -187,9 +188,9 @@ void GLHdrApp::renderHdr() {
 	renderer()->clearColor(0.0f, 0.0f, 0.0f, 1.0f);
 	renderer()->setPipeline(_hdrPipeline);
 	renderer()->bindTexture(_hdrRT->colorTexture2D(0), 0);
-	_hdrPipeline->setUniform("hdrBuffer", 0);
-	_hdrPipeline->setUniform("hdr", _enableHdr);
-	_hdrPipeline->setUniform("exposure", _exposure);
+	rhi::SetUniform(_ubo, "hdr", _enableHdr);
+	rhi::SetUniform(_ubo, "exposure", _exposure);
+	_uboBuffer->update(&_ubo, sizeof(rhi::UniformBlock), 0);
 	renderer()->setVertexBuffer(_quadVb);
 	renderer()->draw(_quadVertexCount, 0);
 }

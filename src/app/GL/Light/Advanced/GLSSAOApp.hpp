@@ -3,6 +3,8 @@
 #include "rhi/core/IPipeline.hpp"
 #include "rhi/core/IRenderTarget.hpp"
 #include "rhi/core/ITexture2D.hpp"
+#include "rhi/core/IBuffer.hpp"
+#include "rhi/core/UniformBlock.hpp"
 #include <memory>
 
 #include "geometry/Camera.hpp"
@@ -61,4 +63,6 @@ private:
 	std::shared_ptr< Model> m_model{};
 	bool m_enableSSAO{};
 	float _curTime{};
+	rhi::UniformBlock m_ubo{};
+	std::shared_ptr<rhi::IBuffer> m_uboBuffer{};
 };

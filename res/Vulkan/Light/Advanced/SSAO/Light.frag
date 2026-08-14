@@ -3,6 +3,21 @@ out vec4 FragColor;
 
 in vec2 TexCoords;
 
+struct ULight { vec4 position; vec4 direction; vec4 ambient; vec4 diffuse; vec4 specular; vec4 params; };
+
+layout(set=0, binding=0) uniform UniformBlock {
+    mat4 projection;
+    mat4 view;
+    mat4 model;
+    mat4 normalMatrix;
+    mat4 viewModel;
+    mat4 extraMat4[14];
+    vec4 vec4Pool[64];
+    vec4 vec3Pool[64];
+    float floatPool[64];
+    ULight lights[2];
+};
+
 layout(set=0, binding=1) uniform sampler2D gPosition;
 layout(set=0, binding=2) uniform sampler2D gNormal;
 layout(set=0, binding=3) uniform sampler2D gAlbedo;
@@ -15,16 +30,21 @@ struct Light {
     float Linear;
     float Quadratic;
 };
-uniform Light light;
-uniform bool enableSSAO;
+
 void main()
 {             
     // retrieve data from gbuffer
     vec3 FragPos = texture(gPosition, TexCoords).rgb;
     vec3 Normal = texture(gNormal, TexCoords).rgb;
     vec3 Diffuse = texture(gAlbedo, TexCoords).rgb;
-    float AmbientOcclusion = enableSSAO ? texture(ssao, TexCoords).r : 1.0;
-    
+    float AmbientOcclusion = floatPool[39] > 0.5 ? texture(ssao, TexCoords).r : 1.0;   // enableSSAO
+
+    Light light;
+    light.Position = lights[0].position.xyz;
+    light.Color = lights[0].diffuse.xyz;
+    light.Linear = lights[0].params.y;
+    light.Quadratic = lights[0].params.z;
+
     // then calculate lighting as usual
     vec3 ambient = vec3(0.3 * Diffuse * AmbientOcclusion);
     vec3 lighting  = ambient; 

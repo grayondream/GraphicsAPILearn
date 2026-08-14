@@ -166,6 +166,9 @@ void GLSSAOApp::createTextures() {
 }
 
 void GLSSAOApp::compileShader(const rhi::VertexLayout& cubeLayout, const rhi::VertexLayout& quadLayout) {
+	m_uboBuffer = renderer()->createUniformBuffer();
+	m_uboBuffer->init(nullptr, sizeof(rhi::UniformBlock), rhi::BufferType::Uniform);
+	m_uboBuffer->bindRange(0, 0, sizeof(rhi::UniformBlock));
 	const auto shaderDir = join(StaticCollector::getGLShaderPath(), "Light", "Advanced", "SSAO");
 	auto build = [&](const std::string& vs, const std::string& fs, const rhi::VertexLayout& layout, bool depthTest, rhi::PrimitiveType prim) {
 		auto shader = renderer()->createShader();
@@ -238,37 +241,37 @@ void GLSSAOApp::renderGBuffer(std::shared_ptr<rhi::IPipeline>& program, const gl
 	renderer()->setRenderTarget(m_gBuffer.gbuffer);
 	renderer()->clearColor(0.0f, 0.0f, 0.0f, 1.0f);
 	renderer()->setPipeline(program);
-	program->setUniform("projection", glm::value_ptr(projection), 1);
-	program->setUniform("view", glm::value_ptr(view), 1);
+	rhi::SetUniform(m_ubo, "projection", projection);
+	rhi::SetUniform(m_ubo, "view", view);
 	// room cube
 	auto model = glm::scale(glm::translate(glm::mat4(1.0f), glm::vec3(0.0, 7.0f, 0.0f)), glm::vec3(15.0f));  // 见下注
-	program->setUniform("model", glm::value_ptr(model), 1);
-	program->setUniform("invertedNormals", 1);
+	rhi::SetUniform(m_ubo, "model", model);
+	rhi::SetUniform(m_ubo, "invertedNormals", 1);
+	m_uboBuffer->update(&m_ubo, sizeof(rhi::UniformBlock), 0);
 	renderOneCube();
-	program->setUniform("invertedNormals", 0);
+	rhi::SetUniform(m_ubo, "invertedNormals", 0);
 	// backpack
 	auto model2 = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.5f, 0.0));
 	model2 = glm::rotate(model2, glm::radians(-90.0f), glm::vec3(1.0, 0.0, 0.0));
 	renderer()->setPipeline(m_modelPipeline);
-	m_modelPipeline->setUniform("projection", glm::value_ptr(projection), 1);
-	m_modelPipeline->setUniform("view", glm::value_ptr(view), 1);
-	m_modelPipeline->setUniform("model", glm::value_ptr(model2), 1);
-	m_modelPipeline->setUniform("invertedNormals", 0);
+	rhi::SetUniform(m_ubo, "model", model2);
+	m_uboBuffer->update(&m_ubo, sizeof(rhi::UniformBlock), 0);
 	m_model->draw(renderer().get(), m_modelPipeline.get());
 	renderer()->setRenderTarget(nullptr);
 }
 
 void GLSSAOApp::renderSSAOTexture(std::shared_ptr<rhi::IPipeline>& program, const glm::mat4& projection){
 	renderer()->setPipeline(program);
-	renderer()->bindTexture(m_gBuffer.gPosition, 0); program->setUniform("gPosition", 0);
-	renderer()->bindTexture(m_gBuffer.gNormal, 1); program->setUniform("gNormal", 1);
-	renderer()->bindTexture(m_ssaoBuffer.noiseTexture, 2); program->setUniform("texNoise", 2);
+	renderer()->bindTexture(m_gBuffer.gPosition, 0);
+	renderer()->bindTexture(m_gBuffer.gNormal, 1);
+	renderer()->bindTexture(m_ssaoBuffer.noiseTexture, 2);
 	const auto ssaoKernel = GenerateSSAOKernel();
 	for (unsigned int i = 0; i < 64; ++i)
-		program->setUniform("samples[" + std::to_string(i) + "]", glm::value_ptr(ssaoKernel[i]), 1, 3);
-	program->setUniform("projection", glm::value_ptr(projection), 1);
+		rhi::SetUniform(m_ubo, "samples", i, ssaoKernel[i]);
+	rhi::SetUniform(m_ubo, "projection", projection);
 	renderer()->setRenderTarget(m_ssaoBuffer.fbo);
 	renderer()->clearColor(0.0f, 0.0f, 0.0f, 1.0f);
+	m_uboBuffer->update(&m_ubo, sizeof(rhi::UniformBlock), 0);
 	renderQuad();
 	renderer()->setRenderTarget(nullptr);
 }
@@ -276,7 +279,6 @@ void GLSSAOApp::renderSSAOTexture(std::shared_ptr<rhi::IPipeline>& program, cons
 void GLSSAOApp::renderBlurSSAOTexture(std::shared_ptr<rhi::IPipeline>& program){
 	renderer()->setPipeline(program);
 	renderer()->bindTexture(m_ssaoBuffer.ssaoColorBuffer, 0);
-	program->setUniform("ssaoInput", 0);
 	renderer()->setRenderTarget(m_ssaoBuffer.blurFbo);
 	renderer()->clearColor(0.0f, 0.0f, 0.0f, 1.0f);
 	renderQuad();
@@ -285,20 +287,21 @@ void GLSSAOApp::renderBlurSSAOTexture(std::shared_ptr<rhi::IPipeline>& program){
 
 void GLSSAOApp::renderLightPass(std::shared_ptr<rhi::IPipeline>& program){
 	renderer()->setPipeline(program);
-	renderer()->bindTexture(m_gBuffer.gPosition, 0); program->setUniform("gPosition", 0);
-	renderer()->bindTexture(m_gBuffer.gNormal, 1); program->setUniform("gNormal", 1);
-	renderer()->bindTexture(m_gBuffer.gAlbedoSpec, 2); program->setUniform("gAlbedo", 2);
-	renderer()->bindTexture(m_ssaoBuffer.ssaoColorBuffer, 3); program->setUniform("ssao", 3);
+	renderer()->bindTexture(m_gBuffer.gPosition, 0);
+	renderer()->bindTexture(m_gBuffer.gNormal, 1);
+	renderer()->bindTexture(m_gBuffer.gAlbedoSpec, 2);
+	renderer()->bindTexture(m_ssaoBuffer.ssaoColorBuffer, 3);
 	renderer()->clearColor(0.0f, 0.0f, 0.0f, 1.0f);
 	const glm::vec3 lightPos = glm::vec3(2.0, 4.0, -2.0);
 	const glm::vec3 lightColor = glm::vec3(0.2, 0.2, 0.7);
 	glm::vec3 lightPosView = glm::vec3(_camera.getViewMatrix() * glm::vec4(lightPos, 1.0));
-	program->setUniform("light.Position", glm::value_ptr(lightPosView), 1, 3);
-	program->setUniform("light.Color", glm::value_ptr(lightColor), 1, 3);
+	rhi::SetLight(m_ubo, 0, "Position", lightPosView);
+	rhi::SetLight(m_ubo, 0, "Color", lightColor);
 	const float linear = 0.09f, quadratic = 0.032f;
-	program->setUniform("enableSSAO", m_enableSSAO ? 1 : 0);
-	program->setUniform("light.Linear", linear);
-	program->setUniform("light.Quadratic", quadratic);
+	rhi::SetUniform(m_ubo, "enableSSAO", m_enableSSAO ? 1 : 0);
+	rhi::SetLightParam(m_ubo, 0, "Linear", linear);
+	rhi::SetLightParam(m_ubo, 0, "Quadratic", quadratic);
+	m_uboBuffer->update(&m_ubo, sizeof(rhi::UniformBlock), 0);
 	renderQuad();
 }
 

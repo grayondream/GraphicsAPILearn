@@ -3,11 +3,24 @@ out float FragColor;
 
 in vec2 TexCoords;
 
+struct ULight { vec4 position; vec4 direction; vec4 ambient; vec4 diffuse; vec4 specular; vec4 params; };
+
+layout(set=0, binding=0) uniform UniformBlock {
+    mat4 projection;
+    mat4 view;
+    mat4 model;
+    mat4 normalMatrix;
+    mat4 viewModel;
+    mat4 extraMat4[14];
+    vec4 vec4Pool[64];
+    vec4 vec3Pool[64];
+    float floatPool[64];
+    ULight lights[2];
+};
+
 layout(set=0, binding=1) uniform sampler2D gPosition;
 layout(set=0, binding=2) uniform sampler2D gNormal;
 layout(set=0, binding=3) uniform sampler2D texNoise;
-
-uniform vec3 samples[64];
 
 // parameters (you'd probably want to use them as uniforms to more easily tweak the effect)
 int kernelSize = 64;
@@ -16,8 +29,6 @@ float bias = 0.025;
 
 // tile noise texture over screen based on screen dimensions divided by noise size
 const vec2 noiseScale = vec2(800.0/4.0, 600.0/4.0); 
-
-uniform mat4 projection;
 
 void main()
 {
@@ -34,7 +45,7 @@ void main()
     for(int i = 0; i < kernelSize; ++i)
     {
         // get sample position
-        vec3 samplePos = TBN * samples[i]; // from tangent to view-space
+        vec3 samplePos = TBN * vec3Pool[i].xyz; // samples[i] → vec3Pool[0..63], from tangent to view-space
         samplePos = fragPos + samplePos * radius; 
         
         // project sample position (to sample texture) (to get position on screen/texture)

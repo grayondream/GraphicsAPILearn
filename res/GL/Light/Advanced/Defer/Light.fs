@@ -1,11 +1,26 @@
-#version 330 core
+#version 430 core
 out vec4 FragColor;
 
 in vec2 TexCoords;
 
-uniform sampler2D gPosition;
-uniform sampler2D gNormal;
-uniform sampler2D gAlbedoSpec;
+struct ULight { vec4 position; vec4 direction; vec4 ambient; vec4 diffuse; vec4 specular; vec4 params; };
+
+layout(binding = 0) uniform UniformBlock {
+    mat4 projection;
+    mat4 view;
+    mat4 model;
+    mat4 normalMatrix;
+    mat4 viewModel;
+    mat4 extraMat4[14];
+    vec4 vec4Pool[64];
+    vec4 vec3Pool[64];
+    float floatPool[64];
+    ULight lights[256];
+};
+
+layout(binding = 0) uniform sampler2D gPosition;
+layout(binding = 1) uniform sampler2D gNormal;
+layout(binding = 2) uniform sampler2D gAlbedoSpec;
 
 struct Light {
     vec3 Position;
@@ -17,9 +32,6 @@ struct Light {
 };
 
 const int NR_LIGHTS = 13 * 13;
-uniform Light lights[NR_LIGHTS];
-uniform vec3 viewPos;
-uniform bool enableVolume;
 
 void main()
 {             
@@ -31,29 +43,36 @@ void main()
     
     // then calculate lighting as usual
     vec3 lighting  = Diffuse * 0.1; // hard-coded ambient component
-    vec3 viewDir  = normalize(viewPos - FragPos);
+    vec3 viewDir  = normalize(vec4Pool[0].xyz - FragPos);   // viewPos
     for(int i = 0; i < NR_LIGHTS; ++i)
     {
+        Light light;
+        light.Position = lights[i].position.xyz;
+        light.Color = lights[i].diffuse.xyz;
+        light.Linear = lights[i].params.y;
+        light.Quadratic = lights[i].params.z;
+        light.Radius = lights[i].direction.w;   // Radius 存 direction.w（与 quadratic/params.z 分离）
+
         float distance = 0;
-        if(enableVolume){
-            distance = length(lights[i].Position - FragPos);
+        if(floatPool[46] > 0.5){   // enableVolume
+            distance = length(light.Position - FragPos);
         }
 
-        if(distance > lights[i].Radius){
+        if(distance > light.Radius){
             continue;
         }
 
         {
             // diffuse
-            vec3 lightDir = normalize(lights[i].Position - FragPos);
-            vec3 diffuse = max(dot(Normal, lightDir), 0.0) * Diffuse * lights[i].Color;
+            vec3 lightDir = normalize(light.Position - FragPos);
+            vec3 diffuse = max(dot(Normal, lightDir), 0.0) * Diffuse * light.Color;
             // specular
             vec3 halfwayDir = normalize(lightDir + viewDir);  
             float spec = pow(max(dot(Normal, halfwayDir), 0.0), 16.0);
-            vec3 specular = lights[i].Color * spec * Specular;
+            vec3 specular = light.Color * spec * Specular;
             // attenuation
-            float distance = length(lights[i].Position - FragPos);
-            float attenuation = 1.0 / (1.0 + lights[i].Linear * distance + lights[i].Quadratic * distance * distance);
+            float distance2 = length(light.Position - FragPos);
+            float attenuation = 1.0 / (1.0 + light.Linear * distance2 + light.Quadratic * distance2 * distance2);
             diffuse *= attenuation;
             specular *= attenuation;
             lighting += diffuse + specular;        
