@@ -3,6 +3,7 @@
 #include "base/ErrorHandle.hpp"
 #include "rhi/core/IShader.hpp"
 #include "rhi/core/IPipeline.hpp"
+#include "rhi/core/UniformBlock.hpp"
 #include "rhi/core/Common.hpp"
 #include "app/GL/RhiGeometry.hpp"
 #include <glm/glm.hpp>
@@ -37,6 +38,10 @@ bool GLExplodeApp::initApp(){
 	_vb = geo.vertexBuffer; _normal = geo.normalBuffer; _ebo = geo.indexBuffer;
 	_indexCount = geo.indexCount;
 	_pipeline = renderer()->createPipeline(geo.layout, shader);
+
+	_uboBuffer = renderer()->createUniformBuffer();
+	_uboBuffer->init(nullptr, sizeof(rhi::UniformBlock), rhi::BufferType::Uniform);
+	_uboBuffer->bindRange(0, 0, sizeof(rhi::UniformBlock));
 	return true;
 }
 
@@ -63,10 +68,11 @@ void GLExplodeApp::drawScene(const float dt) {
 		renderer()->setVertexBuffer(_vb);
 		renderer()->setVertexBuffer(_normal, 2);
 		renderer()->setIndexBuffer(_ebo);
-		_pipeline->setUniform("projection", glm::value_ptr(projection), 1);
-		_pipeline->setUniform("view", glm::value_ptr(view), 1);
-		_pipeline->setUniform("model", glm::value_ptr(model), 1);
-		_pipeline->setUniform("time", curTime);
+		rhi::SetUniform(_ubo, "projection", projection);
+		rhi::SetUniform(_ubo, "view", view);
+		rhi::SetUniform(_ubo, "model", model);
+		rhi::SetUniform(_ubo, "time", curTime);
+		_uboBuffer->update(&_ubo, sizeof(rhi::UniformBlock), 0);
 		renderer()->drawIndexed(_indexCount, 0, 0);
 	}
 

@@ -4,19 +4,29 @@ layout (location = 1) in vec3 aNormal;
 layout (location = 2) in vec2 aTexCoords;
 layout (location = 3) in mat4 aInstanceMatrix;
 
-out vec2 TexCoords;
+struct ULight { vec4 position; vec4 direction; vec4 ambient; vec4 diffuse; vec4 specular; vec4 params; };
 
-uniform mat4 view;
-uniform mat4 projection;
-uniform vec3 radiusPos; // 中心点
-uniform float time;     // 时间变量
+layout(set=0, binding=0) uniform UniformBlock {
+    mat4 projection;
+    mat4 view;
+    mat4 model;
+    mat4 normalMatrix;
+    mat4 viewModel;
+    mat4 extraMat4[14];
+    vec4 vec4Pool[64];
+    vec4 vec3Pool[64];
+    float floatPool[64];
+    ULight lights[1];
+};
+
+out vec2 TexCoords;
 
 void main() {
     float radiuse = 20.0; // 半径
     TexCoords = aTexCoords;
 
     // 计算逆时针旋转角度
-    float angle = -time / 10; // 逆时针旋转
+    float angle = -floatPool[10] / 10; // 逆时针旋转
 
     // 计算新的位置偏移
     float xOffset = radiuse * cos(angle);
@@ -32,7 +42,7 @@ void main() {
 
     // 更新实例矩阵，添加平移到中心点
     mat4 translationMatrix = mat4(1.0);
-    translationMatrix[3] = vec4(radiusPos, 1.0);
+    translationMatrix[3] = vec4(vec4Pool[45].xyz, 1.0);
 
     // 计算新的实例矩阵
     mat4 newInstanceMatrix = translationMatrix * rotationMatrix * aInstanceMatrix;

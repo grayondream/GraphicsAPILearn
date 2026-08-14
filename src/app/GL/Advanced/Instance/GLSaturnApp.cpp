@@ -3,6 +3,7 @@
 #include "base/ErrorHandle.hpp"
 #include "rhi/core/IShader.hpp"
 #include "rhi/core/IBuffer.hpp"
+#include "rhi/core/UniformBlock.hpp"
 #include "rhi/core/Common.hpp"
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -64,6 +65,10 @@ bool GLSaturnApp::initApp() {
 	_saturnPos = glm::vec3(0, 0, -3);
 	loadModel();
 	initSaturnPipeline();
+
+	_uboBuffer = renderer()->createUniformBuffer();
+	_uboBuffer->init(nullptr, sizeof(rhi::UniformBlock), rhi::BufferType::Uniform);
+	_uboBuffer->bindRange(0, 0, sizeof(rhi::UniformBlock));
 	return true;
 }
 
@@ -130,26 +135,27 @@ void GLSaturnApp::drawScene(const float dt) {
 	model = glm::scale(model, glm::vec3(scale, scale, scale));
 	{
 		renderer()->setPipeline(_saturnPipeline);
-		_saturnPipeline->setUniform("projection", glm::value_ptr(projection), 1);
-		_saturnPipeline->setUniform("view", glm::value_ptr(view), 1);
+		rhi::SetUniform(_ubo, "projection", projection);
+		rhi::SetUniform(_ubo, "view", view);
 		model = glm::rotate(model, glm::radians(curTime * 5), glm::vec3(1.0, 1.0, 0.0));
-		_saturnPipeline->setUniform("model", glm::value_ptr(model), 1);
+		rhi::SetUniform(_ubo, "model", model);
+		_uboBuffer->update(&_ubo, sizeof(rhi::UniformBlock), 0);
 		_saturn->draw(renderer().get(), _saturnPipeline.get());
 	}
 
 	{
 		renderer()->setPipeline(_rockPipeline);
-		_rockPipeline->setUniform("projection", glm::value_ptr(projection), 1);
-		_rockPipeline->setUniform("view", glm::value_ptr(view), 1);
+		rhi::SetUniform(_ubo, "projection", projection);
+		rhi::SetUniform(_ubo, "view", view);
 		model = glm::translate(model, glm::vec3(0.0f, 0.f, 0.0f));
-		_rockPipeline->setUniform("model", glm::value_ptr(model), 1);
-		_rockPipeline->setUniform("time", curTime);
-		_rockPipeline->setUniform("radiusPos", glm::value_ptr(_saturnPos), 1, 3);
+		rhi::SetUniform(_ubo, "model", model);
+		rhi::SetUniform(_ubo, "time", curTime);
+		rhi::SetUniform(_ubo, "radiusPos", _saturnPos);
+		_uboBuffer->update(&_ubo, sizeof(rhi::UniformBlock), 0);
 		for (size_t i = 0; i < _rock->meshes.size(); i++) {
 			const auto& mesh = _rock->meshes[i];
 			for (size_t k = 0; k < mesh.textures.size(); k++) {
 				renderer()->bindTexture(mesh.textures[k].texture, (unsigned int)k);
-				_rockPipeline->setUniform(mesh.textures[k].type + "1", (int)k);
 			}
 			renderer()->setVertexBuffer(mesh.vertexBuffer());
 			renderer()->setIndexBuffer(mesh.indexBuffer());

@@ -22,7 +22,7 @@ constexpr std::size_t XM4(std::size_t i) { return offsetof(UBO, extraMat4) + 64 
 // vec4Pool（每个 App 写入它需要的槽；shader 读取同索引）:
 //   0=viewPos  1=cameraPos(camPos 同)  2=lightPos  3=lightColor  4=objectColor
 //   5=cubeColor  6=texColor  7=material.ambient  8=material.diffuse(颜色变体)  9=material.specular
-//   10..12=material 自由预留  13..28=lightPositions[i]    29..44=lightColors[i]    45..63=自由
+//   10..12=material 自由预留  13..28=lightPositions[i]    29..44=lightColors[i]    45=radiusPos(Saturn) 46..63=自由
 // vec3Pool:  0..63 = SSAO samples[64]（唯一消费者）
 // floatPool:
 //   0=shininess  1=ambientStrength  2=specularStrength  3=diffuseStrength
@@ -57,6 +57,7 @@ static const SlotInfo kSlots[] = {
     { "material.ambient",  V4(7), 16, SlotKind::Vec4 },
     { "material.diffuse",  V4(8), 16, SlotKind::Vec4 },   // 颜色变体（采样器变体不进 block）
     { "material.specular", V4(9), 16, SlotKind::Vec4 },
+    { "radiusPos",         V4(45), 16, SlotKind::Vec4 },  // Saturn 岩石环中心（vec3 写低 12 字节）
     { "lightPositions",    V4(13), 16, SlotKind::Vec4 },  // 数组 [0..15]
     { "lightColors",       V4(29), 16, SlotKind::Vec4 },  // 数组 [0..15]
     { "samples",           V3(0), 16, SlotKind::Vec3 },   // SSAO [0..63]

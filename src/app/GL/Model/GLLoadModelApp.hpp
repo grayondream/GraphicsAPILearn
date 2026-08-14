@@ -1,5 +1,8 @@
 #pragma once
 #include "app/GL/Base/GLCameraBaseApp.hpp"
+#include "rhi/core/IPipeline.hpp"
+#include "rhi/core/IBuffer.hpp"
+#include "rhi/core/UniformBlock.hpp"
 #include <memory>
 #include <array>
 #include "geometry/Camera.hpp"
@@ -25,4 +28,6 @@ private:
 	std::shared_ptr<rhi::IPipeline> _pipeline{};
 	float _curTime{};
 	std::shared_ptr<Model> _model{};
+	rhi::UniformBlock _ubo{};
+	std::shared_ptr<rhi::IBuffer> _uboBuffer{};
 };

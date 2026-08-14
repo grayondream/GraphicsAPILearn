@@ -37,7 +37,8 @@ def convert_src(text, ext):
         text = _rewrite_samplers(text)
     if ext == '.geom':
         text = _GL_LAYER_RE.sub(r'// \1', text)
-    text = text.replace('gl_VertexID', 'gl_VertexIndex')  # VK GLSL: gl_VertexIndex (GL: gl_VertexID)
+    text = text.replace('gl_VertexID', 'gl_VertexIndex')    # VK GLSL: gl_VertexIndex (GL: gl_VertexID)
+    text = text.replace('gl_InstanceID', 'gl_InstanceIndex')  # VK GLSL: gl_InstanceIndex (GL: gl_InstanceID)
     return text
 
 

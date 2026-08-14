@@ -3,6 +3,7 @@
 #include "base/ErrorHandle.hpp"
 #include "rhi/core/IShader.hpp"
 #include "rhi/core/IPipeline.hpp"
+#include "rhi/core/UniformBlock.hpp"
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
@@ -49,6 +50,10 @@ void GLLoadModelApp::initShader() {
 
 	_pipeline = renderer()->createPipeline(_model->vertexLayout(), shader);
 	_pipeline->setDepthTest(true);
+
+	_uboBuffer = renderer()->createUniformBuffer();
+	_uboBuffer->init(nullptr, sizeof(rhi::UniformBlock), rhi::BufferType::Uniform);
+	_uboBuffer->bindRange(0, 0, sizeof(rhi::UniformBlock));
 }
 
 void GLLoadModelApp::drawUI() {
@@ -63,11 +68,12 @@ void GLLoadModelApp::drawScene(const float dt) {
 	const auto projection = glm::perspective(glm::radians(_camera.zoom()), aspectRatio(), 0.1f, 100.0f);
 	const auto view = _camera.getViewMatrix();
 	renderer()->setPipeline(_pipeline);
-	_pipeline->setUniform("projection", glm::value_ptr(projection), 1);
-	_pipeline->setUniform("view", glm::value_ptr(view), 1);
+	rhi::SetUniform(_ubo, "projection", projection);
+	rhi::SetUniform(_ubo, "view", view);
 	glm::mat4 model = glm::mat4(1.0f);
     model = glm::translate(model, glm::vec3(0.0f, 0.0f, 0.0f)); // translate it down so it's at the center of the scene
     model = glm::scale(model, glm::vec3(1.0f, 1.0f, 1.0f));	// it's a bit too big for our scene, so scale it down
-	_pipeline->setUniform("model", glm::value_ptr(model), 1);
+	rhi::SetUniform(_ubo, "model", model);
+	_uboBuffer->update(&_ubo, sizeof(rhi::UniformBlock), 0);
 	_model->draw(renderer().get(), _pipeline.get());
 }

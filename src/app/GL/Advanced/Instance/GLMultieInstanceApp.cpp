@@ -3,6 +3,7 @@
 #include "base/ErrorHandle.hpp"
 #include "rhi/core/IShader.hpp"
 #include "rhi/core/IBuffer.hpp"
+#include "rhi/core/UniformBlock.hpp"
 #include "rhi/core/Common.hpp"
 #include "app/GL/RhiGeometry.hpp"
 #include <glm/glm.hpp>
@@ -62,6 +63,10 @@ bool GLMultieInstanceApp::initApp() {
 
 	_pipeline = renderer()->createPipeline(geo.layout, shader);
 	_pipeline->setPolygonMode(rhi::PolygonMode::Line);
+
+	_uboBuffer = renderer()->createUniformBuffer();
+	_uboBuffer->init(nullptr, sizeof(rhi::UniformBlock), rhi::BufferType::Uniform);
+	_uboBuffer->bindRange(0, 0, sizeof(rhi::UniformBlock));
 	return true;
 }
 
@@ -87,10 +92,11 @@ void GLMultieInstanceApp::drawScene(const float dt) {
 		renderer()->setVertexBuffer(_normal, 2);
 		renderer()->setVertexBuffer(_instanceVb, 3);
 		renderer()->setIndexBuffer(_ebo);
-		_pipeline->setUniform("projection", glm::value_ptr(projection), 1);
-		_pipeline->setUniform("view", glm::value_ptr(view), 1);
-		_pipeline->setUniform("model", glm::value_ptr(model), 1);
-		_pipeline->setUniform("count", _count * _count);
+		rhi::SetUniform(_ubo, "projection", projection);
+		rhi::SetUniform(_ubo, "view", view);
+		rhi::SetUniform(_ubo, "model", model);
+		rhi::SetUniform(_ubo, "count", _count * _count);
+		_uboBuffer->update(&_ubo, sizeof(rhi::UniformBlock), 0);
 		renderer()->drawIndexedInstanced(_indexCount, (uint32_t)(_count * _count), 0, 0);
 	}
 
