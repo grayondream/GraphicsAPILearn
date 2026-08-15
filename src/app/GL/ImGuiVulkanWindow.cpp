@@ -1,10 +1,16 @@
 #include "ImGuiVulkanWindow.hpp"
 #include "base/Log.hpp"
+#include <GLFW/glfw3.h>
+
+// GL-only 构建（ENABLE_VULKAN=OFF）下本文件仍会被 GLOB 编译，但 Vulkan 头与
+// VKBackend.hpp（含 vulkan.hpp）不在 include 路径中，且此窗口仅 Vulkan 模式使用。
+#if ENABLE_VULKAN
 #include "rhi/vk/VKBackend.hpp"
-#include <imgui.h>
 #include <imgui_impl_glfw.h>
 #include <imgui_impl_vulkan.h>
-#include <GLFW/glfw3.h>
+#endif
+
+#include <imgui.h>
 
 ImGuiVulkanWindow::~ImGuiVulkanWindow() {
 }
@@ -21,6 +27,7 @@ void ImGuiVulkanWindow::init(GLFWwindow* win) {
         return;
     }
 
+#if ENABLE_VULKAN
     rhi::VKImGuiInitInfo initInfo{};
     if (!m_renderer->imguiInitInfo(initInfo)) {
         LOGE("ImGuiVulkanWindow: renderer has no Vulkan imgui info, overlay disabled");
@@ -45,7 +52,7 @@ void ImGuiVulkanWindow::init(GLFWwindow* win) {
     vkInfo.QueueFamily = initInfo.graphicsFamily;
     vkInfo.Queue = static_cast<VkQueue>(initInfo.graphicsQueue);
     vkInfo.DescriptorPoolSize = 256;
-    vkInfo.MinImageCount = initInfo.imageCount > 2 ? 2 : 1;
+    vkInfo.MinImageCount = 2;   // backend 断言 MinImageCount>=2；VKSwapchain 强制 imageCount>=3
     vkInfo.ImageCount = initInfo.imageCount;
     vkInfo.MinAllocationSize = initInfo.minAllocationSize;
     vkInfo.PipelineInfoMain.RenderPass =
@@ -57,26 +64,36 @@ void ImGuiVulkanWindow::init(GLFWwindow* win) {
     }
 
     m_ready = true;
+#else
+    (void)win;
+    LOGE("ImGuiVulkanWindow: Vulkan backend disabled in build, overlay disabled");
+#endif
 }
 
 void ImGuiVulkanWindow::newFrame() {
+#if ENABLE_VULKAN
     ImGui_ImplVulkan_NewFrame();
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
+#endif
 }
 
 void ImGuiVulkanWindow::render() {
+#if ENABLE_VULKAN
     ImGui::Render();
     if (m_ready && m_renderer)
         m_renderer->renderImGuiDrawData(ImGui::GetDrawData());
+#endif
 }
 
 void ImGuiVulkanWindow::destroy() {
+#if ENABLE_VULKAN
     if (m_ready) {
         ImGui_ImplVulkan_Shutdown();
         ImGui_ImplGlfw_Shutdown();
         ImGui::DestroyContext();
         m_ready = false;
     }
+#endif
     m_renderer.reset();
 }
