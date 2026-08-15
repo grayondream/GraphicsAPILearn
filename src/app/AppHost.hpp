@@ -1,29 +1,48 @@
 #pragma once
 #include "IApplication.hpp"
-#include "GLFWWindow.hpp"
-#include "IImGuiWindow.hpp"
-#include "app/sample/Sample.hpp"
-#include "rhi/core/IRenderer.hpp"
+#include "app/AppType.hpp"
 #include <memory>
 
-// AppHost：驱动 Sample 的宿主（GL 后端运行器）。Task 1 迁移样例后，
-// 旧 GLAppFactory 仍返回 IApplication，故以 AppHost 包装 Sample 接入既有 main 运行链。
-// Task 3 将把 AppHost 重构为正式总控宿主并删除本临时实现。
+class GLFWWindow;
+class IImGuiWindow;
+class Sample;
+namespace rhi { class IRenderer; }
+
 class AppHost : public IApplication {
 public:
-    explicit AppHost(std::shared_ptr<Sample> sample);
+    AppHost();
     ~AppHost();
-
     bool init(const GLFWWindowProperties& properties) override;
     int run() override;
     void exit() override;
     unsigned int getSampleCount() const override;
 
-private:
-    void initInput();
+    void setSample(AppType type);
+    void setBackend(GraphicsType type);
+    AppType currentSample() const { return _sampleType; }
+    GraphicsType currentBackend() const { return _backend; }
 
-    std::shared_ptr<Sample> _sample{};
-    std::unique_ptr<GLFWWindow> _window{};
-    std::unique_ptr<IImGuiWindow> _imguiWindow{};
+private:
+    void hookWindowCallbacks();
+    void forwardKey(int key, int scancode, int action, int mods);
+    void forwardMouseMove(double x, double y);
+    void forwardMouseScroll(double xoffset, double yoffset);
+    void forwardMouseButton(int button, int action, int mods);
+    void forwardWinResize(int width, int height);
+    bool rebuildBackend(const GLFWWindowProperties& props);
+    bool reloadSample();
+    void applyPendingChanges();
+    void destroyBackendResources();
+    void renderTotalBar();
+    float aspect() const;
+
+    std::unique_ptr<GLFWWindow> m_window{};
+    std::unique_ptr<IImGuiWindow> m_imguiWindow{};
     std::shared_ptr<rhi::IRenderer> _renderer{};
+    std::shared_ptr<Sample> _sample{};
+    AppType _sampleType{ AppType::Base };
+    GraphicsType _backend{ GraphicsType::GL };
+    bool _pendingSample{ false };
+    bool _pendingBackend{ false };
+    bool _exitRequested{ false };
 };
