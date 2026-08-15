@@ -28,6 +28,14 @@ if(ENABLE_OPENGL)
     list(APPEND IMGUI_SRC_FILES ${IMGUI_OPENGL_SRC_FILES})
 endif()
 
+if(ENABLE_VULKAN)
+    include_directories(${IMGUI_SRC_PATH}/Vulkan)
+    aux_source_directory(${IMGUI_SRC_PATH}/Vulkan IMGUI_VULKAN_SRC_FILES)
+    message(STATUS "IMGUI_VULKAN_SRC_FILES: ${IMGUI_VULKAN_SRC_FILES}")
+
+    list(APPEND IMGUI_SRC_FILES ${IMGUI_VULKAN_SRC_FILES})
+endif()
+
 if(ENABLE_METAL)
     include_directories(${IMGUI_SRC_PATH}/Metal)
     aux_source_directory(${IMGUI_SRC_PATH}/Metal IMGUI_METAL_SRC_FILES)
@@ -35,8 +43,6 @@ if(ENABLE_METAL)
 
     list(APPEND IMGUI_SRC_FILES ${IMGUI_METAL_SRC_FILES})
 endif()
-
-# ImGui Vulkan backend 不接入（vulkan-backend-unified-ubo 计划：VK 下禁用 ImGui，复用 IImGuiWindow 空实现）
 
 set(IMGUI_SRC_FILES ${IMGUI_SRC_FILES} CACHE STRING "imgui source files" FORCE)
 
