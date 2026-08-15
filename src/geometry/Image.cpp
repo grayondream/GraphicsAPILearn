@@ -23,8 +23,10 @@ Image& Image::load(bool flip, int targetChannel) {
 		m_pdata = reinterpret_cast<uint8_t*>(ptr);
 	}else {
 		m_pdata = stbi_load(m_file.c_str(), &m_size.width, &m_size.height, &m_size.channel, targetChannel);
+		if (targetChannel > 0) {
+			m_size.channel = targetChannel;   // stb 保证输出 targetChannel 字节/像素，同步通道数
+		}
 	}
-
 	m_format = GLUtils::PixelChannel2PixelFormat(m_size.channel, m_option.IsHdr);
 	return *this;
 }
