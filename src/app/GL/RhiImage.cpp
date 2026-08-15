@@ -18,6 +18,11 @@ std::shared_ptr<rhi::ITexture2D> Load2D(rhi::IRenderer* renderer, const std::str
     if (img.size().channel == 1) {
         img.load(true, 4);
     }
+    // Vulkan 端 UploadStagingToImage 假定数据字节 = w*h*texelSize(RGBA8)。
+    // 3 通道（RGB）数据与 RGBA8 image 格式不匹配会导致上传越界读，统一转 4 通道。
+    if (img.size().channel == 3) {
+        img.load(true, 4);
+    }
 
     auto tex = renderer->createTexture2D();
     rhi::TextureDesc desc;

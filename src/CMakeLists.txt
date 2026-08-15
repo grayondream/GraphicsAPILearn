@@ -69,7 +69,20 @@ if(${ENABLE_VULKAN})
         add_custom_target(vk_shaders ALL DEPENDS ${VK_SPV_OUTPUTS})
     endif()
     find_package(Vulkan REQUIRED)
-    target_link_libraries(${PROJECT_NAME} Vulkan::Vulkan)
+    # 链接系统 libvulkan 而非 vcpkg 的 Vulkan loader：
+    # vcpkg 构建的 loader（debug/lib/libvulkan.so.1.4.357）不含窗口系统 surface 扩展
+    # （无 VK_KHR_xcb_surface/xlib_surface/wayland_surface），glfw 运行时 dlopen 复用该
+    # loader 后 glfwGetRequiredInstanceExtensions 返回 NULL，导致 VK 初始化失败。
+    if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+        find_library(VULKAN_SYSTEM_LIB NAMES libvulkan.so.1 PATHS /usr/lib/x86_64-linux-gnu /usr/lib NO_DEFAULT_PATH)
+        if(NOT VULKAN_SYSTEM_LIB)
+            message(FATAL_ERROR "System libvulkan not found - install mesa-vulkan-drivers / libvulkan1")
+        endif()
+        target_link_libraries(${PROJECT_NAME} ${VULKAN_SYSTEM_LIB})
+        target_include_directories(${PROJECT_NAME} PRIVATE ${Vulkan_INCLUDE_DIR})
+    else()
+        target_link_libraries(${PROJECT_NAME} Vulkan::Vulkan)
+    endif()
 endif()
 
 if(${ENABLE_DX11})

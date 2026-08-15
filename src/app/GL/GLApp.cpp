@@ -2,6 +2,7 @@
 #include "base/ErrorHandle.hpp"
 #include "base/Log.hpp"
 #include "ImGuiOpenglWindow.hpp"
+#include "ImGuiContextWindow.hpp"
 #include "rhi/gl/GLBackend.hpp"
 #include "rhi/gl/GLFWSurface.hpp"
 #if ENABLE_VULKAN
@@ -34,6 +35,10 @@ bool GLApp::initGraphics() {
         }
         _renderer->setViewport(rhi::Viewport{0, 0, static_cast<int>(props.width), static_cast<int>(props.height)});
         _renderer->setPipeline(nullptr);
+        // VK 模式复用 GL App 的 ImGui 面板代码，但无 GL 渲染后端：
+        // 仅初始化 ImGui 核心上下文，保证 ImGui::Begin/End 断言不崩。
+        m_imguiWindow = std::make_unique<ImGuiContextWindow>();
+        m_imguiWindow->init(m_window->getNativeGLFWWindow());
         return true;
     }
 #else
