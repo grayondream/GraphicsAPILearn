@@ -82,7 +82,6 @@ void GLPointLightShadowApp::compileShader(const rhi::VertexLayout& cubeLayout) {
     {
         auto shader = renderer()->createShader();
         auto ok = shader->compile({ {rhi::ShaderStage::Vertex, join(shaderDir, "ShadowMappingDepth.vs"), "main", false},
-                                    {rhi::ShaderStage::Geometry, join(shaderDir, "ShadowMappingDepth.gs"), "main", false},
                                     {rhi::ShaderStage::Fragment, join(shaderDir, "ShadowMappingDepth.fs"), "main", false} });
         ExitIfFailed(ok, "Create RHI shader failed: {}", shader->getLog());
         _depthProgram = renderer()->createPipeline(cubeLayout, shader);
@@ -147,12 +146,16 @@ void GLPointLightShadowApp::renderScene2FrameBuffer(std::shared_ptr<rhi::IPipeli
     renderer()->setPipeline(program);
     renderer()->setViewport(rhi::Viewport{0, 0, Constexpr::GetShadowMapWidth(), Constexpr::GetShadowMapHeight()});
     renderer()->setRenderTarget(_shadowDepthMapFbo);
-    renderer()->clearColor(0.0f, 0.0f, 0.0f, 1.0f);   // RHI clearColor 同时清 depth
-    for (unsigned int i = 0; i < 6; ++i)
-        rhi::SetUniform(_ubo, "shadowMatrices", i, shadowTransforms[i]);
     rhi::SetUniform(_ubo, "far_plane", _far);
     rhi::SetUniform(_ubo, "lightPos", lightPos);
-    renderScene(program, lightPos);
+    for (int face = 0; face < 6; ++face) {
+        renderer()->setRenderTarget(_shadowDepthMapFbo);                      // VK: 结束上一面 render pass（重建 framebuffer 前必须）；GL: 重绑 FBO
+        _shadowDepthMapFbo->attachCubeFace(_shadowDepthMap.get(), face, 0);   // 逐面 framebuffer（GL 绑定 depth face / VK 单面 view）
+        renderer()->clearColor(0.0f, 0.0f, 0.0f, 1.0f);                       // GL: 清当前面 depth；VK: 记录 clear 值（beginRenderPass 用）
+        rhi::SetUniform(_ubo, "shadowMatrices", 0, shadowTransforms[face]);   // 固定槽 extraMat4[1]
+        _uboBuffer->update(&_ubo, sizeof(rhi::UniformBlock), 0);
+        renderScene(program, lightPos);
+    }
     renderer()->setRenderTarget(nullptr);
     const auto props = m_window->getProperties();
     renderer()->setViewport(rhi::Viewport{0, 0, props.width, props.height});

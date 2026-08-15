@@ -19,7 +19,11 @@ layout(binding = 0) uniform UniformBlock {
     ULight lights[2];
 };
 
+out vec4 FragPos;
+
 void main()
 {
-    gl_Position = model * aPos;
+    vec4 worldPos = model * aPos;
+    FragPos = worldPos;
+    gl_Position = extraMat4[1] * worldPos;   // 当前面的 shadow matrix（固定槽 extraMat4[1] = shadowMatrices[0]）
 }

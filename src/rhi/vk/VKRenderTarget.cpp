@@ -250,8 +250,15 @@ bool VKRenderTarget::attachCubeFace(ITexture3D* cube, int face, int mip) {
     if (_framebuffer != nullptr) _framebuffer = vk::raii::Framebuffer{nullptr};
 
     std::vector<vk::ImageView> views;
-    if (!_colors.empty()) views.push_back(vkCube->faceView(face, mip));
-    if (_depthAttachment) views.push_back(*_depth.view);
+    if (_cubeDepth) {
+        // Depth-only cubemap: attach the requested face's single-layer depth view
+        // (render pass from attachDepthCube already carries the depth attachment).
+        views.push_back(vkCube->faceView(face, mip));
+    } else {
+        if (!_colors.empty()) views.push_back(vkCube->faceView(face, mip));
+        if (_depthAttachment) views.push_back(*_depth.view);
+    }
+    if (views.empty()) return false;
 
     vk::FramebufferCreateInfo fci{};
     fci.renderPass = *_renderPass;

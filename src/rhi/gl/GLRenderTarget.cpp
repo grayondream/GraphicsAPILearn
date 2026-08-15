@@ -1,4 +1,5 @@
 #include "GLRenderTarget.hpp"
+#include "GLTexture3D.hpp"
 #include "rhi/core/ITexture3D.hpp"
 
 namespace rhi {
@@ -122,11 +123,20 @@ bool GLRenderTarget::create(const FramebufferDesc& desc) {
 
 bool GLRenderTarget::attachCubeFace(ITexture3D* cube, int face, int mip) {
     if (!cube || face < 0 || face > 5 || !_fbo) return false;
+    const bool isDepth = (static_cast<GLTexture3D*>(cube)->desc().format == TextureFormat::Depth32F);
     glBindFramebuffer(GL_FRAMEBUFFER, _fbo);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
-                           GL_TEXTURE_CUBE_MAP_POSITIVE_X + face,
-                           static_cast<GLuint>(reinterpret_cast<uintptr_t>(cube->handle())), mip);
-    glDrawBuffer(GL_COLOR_ATTACHMENT0);
+    if (isDepth) {
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT,
+                               GL_TEXTURE_CUBE_MAP_POSITIVE_X + face,
+                               static_cast<GLuint>(reinterpret_cast<uintptr_t>(cube->handle())), mip);
+        glDrawBuffer(GL_NONE);
+        glReadBuffer(GL_NONE);
+    } else {
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
+                               GL_TEXTURE_CUBE_MAP_POSITIVE_X + face,
+                               static_cast<GLuint>(reinterpret_cast<uintptr_t>(cube->handle())), mip);
+        glDrawBuffer(GL_COLOR_ATTACHMENT0);
+    }
     return true;
 }
 

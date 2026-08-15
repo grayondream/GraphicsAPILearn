@@ -1,15 +1,28 @@
-#version 330 core
+#version 430 core
 in vec4 FragPos;
 
-uniform vec3 lightPos;
-uniform float far_plane;
+struct ULight { vec4 position; vec4 direction; vec4 ambient; vec4 diffuse; vec4 specular; vec4 params; };
+
+layout(binding = 0) uniform UniformBlock {
+    mat4 projection;
+    mat4 view;
+    mat4 model;
+    mat4 normalMatrix;
+    mat4 viewModel;
+    mat4 extraMat4[14];
+    vec4 vec4Pool[64];
+    vec4 vec3Pool[64];
+    float floatPool[64];
+    ULight lights[2];
+};
 
 void main()
 {
-    float lightDistance = length(FragPos.xyz - lightPos);
+    // lightPos → vec4Pool[2].xyz, far_plane → floatPool[17]（与 ShadowMapping.fs 同槽）
+    float lightDistance = length(FragPos.xyz - vec4Pool[2].xyz);
     
     // map to [0;1] range by dividing by far_plane
-    lightDistance = lightDistance / far_plane;
+    lightDistance = lightDistance / floatPool[17];
     
     // write this as modified depth
     gl_FragDepth = lightDistance;

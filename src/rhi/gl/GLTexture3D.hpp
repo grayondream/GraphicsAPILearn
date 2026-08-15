@@ -14,6 +14,7 @@ public:
     void* handle() override;
     bool valid() const override { return _id != 0; }
     void release() override;
+    const TextureDesc& desc() const { return _desc; }
 
 private:
     GLuint _id{0};
