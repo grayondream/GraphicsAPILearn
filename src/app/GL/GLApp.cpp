@@ -70,6 +70,9 @@ void GLApp::clearColor() {
 }
 
 void GLApp::beginDrawScene() {
+    // VK 后端用开始帧 acquire 交换链图像并开始录制命令缓冲；
+    // GL 后端 beginFrame 为 no-op，两层均安全。
+    _renderer->beginFrame();
     return Application::beginDrawScene();
 }
 
@@ -85,6 +88,7 @@ void GLApp::drawScene(const float dt) {
 }
 
 void GLApp::endDrawScene() {
+    _renderer->endFrame();
     _renderer->present();
     return Application::endDrawScene();
 }

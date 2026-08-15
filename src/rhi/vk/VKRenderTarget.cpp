@@ -3,6 +3,7 @@
 #include "VKTexture3D.hpp"
 #include "base/Log.hpp"
 #include <vector>
+#include <cstdlib>
 
 namespace rhi {
 
@@ -68,6 +69,15 @@ bool VKRenderTarget::buildFromDesc(const FramebufferDesc& desc) {
 
 bool VKRenderTarget::makeImage(Image& img, TextureFormat format, vk::ImageUsageFlags usage,
                                vk::SampleCountFlagBits samples, bool layered) {
+    // llvmpipe/软渲染下 float 离屏 RT 无法可靠写入（HDR/Bloom/SSAO/Defer 等
+    // 依赖 float RT 的 App 会整帧黑屏），回退为 RGBA8 保证画面正常。
+    if (_floatRtFallback &&
+        (format == TextureFormat::RGBA16F || format == TextureFormat::RGB16F ||
+         format == TextureFormat::RGBA32F || format == TextureFormat::RG16F ||
+         format == TextureFormat::R32F || format == TextureFormat::RGB8)) {
+        LOGI("VKRenderTarget: float RT {} -> RGB8 (llvmpipe fallback)", static_cast<int>(format));
+        format = TextureFormat::RGB8;
+    }
     img.format = format;
     const vk::Format vkFormat = ToVkTextureFormat(format);
     vk::ImageCreateInfo ici{};
@@ -354,6 +364,133 @@ void VKRenderTarget::release() {
     clearImages();
     _valid = false;
     _samples = 1;
+}
+
+void VKRenderTarget::debugDumpPPM(const char* path, uint32_t colorAtt) const {
+    if (colorAtt >= _colors.size()) return;
+    const vk::Image img = colorImage(colorAtt);
+    const vk::Format fmt = colorFormat(colorAtt);
+    if (!img) return;
+    _dev.waitIdle();
+
+    const uint64_t stagesize = static_cast<uint64_t>(_extent.width) * _extent.height * 4;
+    vk::BufferCreateInfo bci{};
+    bci.size = stagesize;
+    bci.usage = vk::BufferUsageFlagBits::eTransferDst;
+    bci.sharingMode = vk::SharingMode::eExclusive;
+    auto br = _dev.createBuffer(bci);
+    if (br.result != vk::Result::eSuccess) { return; }
+    vk::raii::Buffer stage = std::move(br.value);
+    const vk::MemoryRequirements sreq = stage.getMemoryRequirements();
+    const vk::PhysicalDeviceMemoryProperties props = _phys.getMemoryProperties();
+    uint32_t smemIdx = UINT32_MAX;
+    for (uint32_t i = 0; i < props.memoryTypeCount; i++) {
+        if ((sreq.memoryTypeBits & (1u << i)) &&
+            (props.memoryTypes[i].propertyFlags & vk::MemoryPropertyFlagBits::eHostVisible) &&
+            (props.memoryTypes[i].propertyFlags & vk::MemoryPropertyFlagBits::eHostCoherent)) { smemIdx = i; break; }
+    }
+    if (smemIdx == UINT32_MAX) { LOGE("debugDump: no host mem"); return; }
+    vk::MemoryAllocateInfo smai(sreq.size, smemIdx);
+    auto sar = _dev.allocateMemory(smai);
+    if (sar.result != vk::Result::eSuccess) return;
+    vk::raii::DeviceMemory stageMem = std::move(sar.value);
+    vk::BindBufferMemoryInfo sbbmi(*stage, *stageMem, 0);
+    _dev.bindBufferMemory2({sbbmi});
+
+    vk::CommandPoolCreateInfo cpci{};
+    cpci.flags = vk::CommandPoolCreateFlagBits::eTransient;
+    cpci.queueFamilyIndex = _graphicsFamily;
+    auto cpr = _dev.createCommandPool(cpci);
+    if (cpr.result != vk::Result::eSuccess) return;
+    vk::raii::CommandPool pool = std::move(cpr.value);
+    vk::CommandBufferAllocateInfo cba(*pool, vk::CommandBufferLevel::ePrimary, 1);
+    auto cbr = _dev.allocateCommandBuffers(cba);
+    if (cbr.result != vk::Result::eSuccess) return;
+    vk::raii::CommandBuffer cb = std::move(cbr.value[0]);
+
+    const vk::ImageAspectFlags aspect = vk::ImageAspectFlagBits::eColor;
+    vk::CommandBufferBeginInfo cbbi(vk::CommandBufferUsageFlagBits::eOneTimeSubmit);
+    cb.begin(cbbi);
+    const auto setBarrier = [&](const vk::Image& image, vk::ImageLayout oldL, vk::ImageLayout newL,
+                                vk::AccessFlags srcA, vk::AccessFlags dstA,
+                                vk::PipelineStageFlags srcS, vk::PipelineStageFlags dstS,
+                                vk::ImageAspectFlags asp) {
+        vk::ImageMemoryBarrier barrier{};
+        barrier.srcAccessMask = srcA;
+        barrier.dstAccessMask = dstA;
+        barrier.oldLayout = oldL;
+        barrier.newLayout = newL;
+        barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        barrier.image = image;
+        barrier.subresourceRange.aspectMask = asp;
+        barrier.subresourceRange.baseMipLevel = 0;
+        barrier.subresourceRange.levelCount = 1;
+        barrier.subresourceRange.baseArrayLayer = 0;
+        barrier.subresourceRange.layerCount = 1;
+        cb.pipelineBarrier(srcS, dstS, {}, {}, {}, {barrier});
+    };
+    setBarrier(img, vk::ImageLayout::eShaderReadOnlyOptimal, vk::ImageLayout::eTransferSrcOptimal,
+               vk::AccessFlagBits::eColorAttachmentWrite, vk::AccessFlagBits::eTransferRead,
+               vk::PipelineStageFlagBits::eColorAttachmentOutput, vk::PipelineStageFlagBits::eTransfer, aspect);
+    vk::BufferImageCopy region{};
+    region.imageSubresource.aspectMask = aspect;
+    region.imageSubresource.mipLevel = 0;
+    region.imageSubresource.baseArrayLayer = 0;
+    region.imageSubresource.layerCount = 1;
+    region.imageOffset = vk::Offset3D(0, 0, 0);
+    region.imageExtent = vk::Extent3D(_extent.width, _extent.height, 1);
+    cb.copyImageToBuffer(img, vk::ImageLayout::eTransferSrcOptimal, *stage, {region});
+    cb.end();
+
+    vk::FenceCreateInfo fci{};
+    auto fr = _dev.createFence(fci);
+    if (fr.result != vk::Result::eSuccess) return;
+    vk::raii::Fence fence = std::move(fr.value);
+    vk::CommandBuffer raw = *cb;
+    vk::SubmitInfo si{};
+    si.commandBufferCount = 1;
+    si.pCommandBuffers = &raw;
+    _queue.submit({si}, *fence);
+    (void)_dev.waitForFences({*fence}, vk::True, UINT64_MAX);
+
+    auto mp = stageMem.mapMemory(0, stagesize);
+    if (mp.result != vk::Result::eSuccess) return;
+    const unsigned char* px = static_cast<const unsigned char*>(mp.value);
+    FILE* fp = std::fopen(path, "wb");
+    if (!fp) { stageMem.unmapMemory(); return; }
+    std::fprintf(fp, "P6\n%u %u\n255\n", _extent.width, _extent.height);
+    const bool isF16 = (fmt == vk::Format::eR16G16B16A16Sfloat);
+    for (uint32_t y = 0; y < _extent.height; y++) {
+        for (uint32_t x = 0; x < _extent.width; x++) {
+            float r = 0, g = 0, b = 0, a = 1.0f;
+            if (isF16) {
+                const uint16_t* fp16 = reinterpret_cast<const uint16_t*>(px + static_cast<size_t>(y) * _extent.width * 8 + static_cast<size_t>(x) * 8);
+                const auto conv = [](uint16_t half) {
+                    uint32_t sign = (half >> 15) & 1, exp = (half >> 10) & 0x1f, man = half & 0x3ff;
+                    if (exp == 0) return man == 0 ? 0.0f : (man / 1024.0f) * (1 / 16384.0f);
+                    if (exp == 31) return man == 0 ? (sign ? -1e30f : 1e30f) : 0.0f / 0.0f;
+                    int e = static_cast<int>(exp) - 15;
+                    float m = 1.0f + man / 1024.0f;
+                    float v = m * std::pow(2.0f, static_cast<float>(e));
+                    return sign ? -v : v;
+                };
+                r = conv(fp16[0]); g = conv(fp16[1]); b = conv(fp16[2]); a = conv(fp16[3]);
+            } else {
+                const unsigned char* p = px + static_cast<size_t>(y) * _extent.width * 4 + static_cast<size_t>(x) * 4;
+                r = p[2] / 255.0f; g = p[1] / 255.0f; b = p[0] / 255.0f; a = p[3] / 255.0f;
+            }
+            float rr = std::fmin(1.0f, std::fmax(0.0f, r * a));
+            float gg = std::fmin(1.0f, std::fmax(0.0f, g * a));
+            float bb = std::fmin(1.0f, std::fmax(0.0f, b * a));
+            std::fputc(static_cast<int>(rr * 255.0f + 0.5f), fp);
+            std::fputc(static_cast<int>(gg * 255.0f + 0.5f), fp);
+            std::fputc(static_cast<int>(bb * 255.0f + 0.5f), fp);
+        }
+    }
+    std::fclose(fp);
+    stageMem.unmapMemory();
+    LOGI("debugDumpPPM: saved {} ({}x{})", path, _extent.width, _extent.height);
 }
 
 } // namespace rhi

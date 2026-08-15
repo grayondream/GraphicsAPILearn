@@ -58,7 +58,7 @@ private:
 	rhi::VertexLayout m_quadLayout{};
 
 	bool m_enableBloom{};
-	float m_expose{};
+	float m_expose{1.0f};
 	rhi::UniformBlock m_ubo{};
 	std::shared_ptr<rhi::IBuffer> m_uboBuffer{};
 };

@@ -22,6 +22,7 @@ public:
     uint32_t imageCount() const { return static_cast<uint32_t>(_images.size()); }
     uint32_t currentImage() const { return _imageIndex; }
     vk::ImageView imageView(uint32_t index) const { return *_views[index]; }
+    vk::Image image(uint32_t index) const { return _images[index]; }
     vk::Extent2D extent() const { return _extent; }
     vk::Format format() const { return _format; }
 

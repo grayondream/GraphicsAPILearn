@@ -84,7 +84,7 @@ bool VKSwapchain::createSwapchain(int width, int height) {
     ci.imageColorSpace = format.colorSpace;
     ci.imageExtent = ext;
     ci.imageArrayLayers = 1;
-    ci.imageUsage = vk::ImageUsageFlagBits::eColorAttachment;
+    ci.imageUsage = vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eTransferSrc;
     ci.imageSharingMode = vk::SharingMode::eExclusive;
     ci.preTransform = caps.currentTransform;
     ci.compositeAlpha = vk::CompositeAlphaFlagBitsKHR::eOpaque;

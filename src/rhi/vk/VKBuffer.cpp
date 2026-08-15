@@ -13,13 +13,20 @@ bool VKBuffer::init(const void* data, size_t size, BufferType type) {
     _size = size;
     const bool uniform = (type == BufferType::Uniform);
 
+    // 多 pass App 会在一个 command buffer 内多次 update 同一 UBO，而 Vulkan 的
+    // GPU 是异步读 buffer 的：后一次覆盖会让前一个 pass 的 draw 也读到新数据
+    // （表现为 Bloom/Hdr/SSAO/Defer 等整帧黑）。因此 uniform buffer 分配 kRingSlots
+    // 份槽，每次 update 落到下一个槽，descriptor 绑到对应槽，避免覆盖。
+    const size_t allocSize = uniform ? size * kRingSlots : size;
+    if (uniform) _slotSize = size;
+
     vk::BufferUsageFlags usage = uniform ? vk::BufferUsageFlagBits::eUniformBuffer
         : ((type == BufferType::Index) ? vk::BufferUsageFlagBits::eIndexBuffer
                                        : vk::BufferUsageFlagBits::eVertexBuffer);
     if (!uniform) usage |= vk::BufferUsageFlagBits::eTransferDst;
 
     vk::BufferCreateInfo bci{};
-    bci.size = size;
+    bci.size = allocSize;
     bci.usage = usage;
     bci.sharingMode = vk::SharingMode::eExclusive;
     auto br = _dev.createBuffer(bci);
@@ -64,25 +71,37 @@ bool VKBuffer::init(const void* data, size_t size, BufferType type) {
         }
     }
 
-    if (uniform && _notifier) _notifier->onUniformCreated(this);
+    if (uniform && _notifier) _notifier->onUniformCreated(this, 0, _slotSize);
     return true;
 }
 
 bool VKBuffer::update(const void* data, size_t size, size_t offset) {
     if (_buffer == nullptr || _memory == nullptr || !data) return false;
+
+    uint32_t slot = 0;
+    size_t dstOffset = offset;
+    size_t dstSize = size;
+    if (_type == BufferType::Uniform && _slotSize > 0) {
+        _ringHead++;
+        slot = _ringHead % kRingSlots;
+        dstOffset = slot * _slotSize + offset;
+        dstSize = size;
+        _submittedBase = slot * _slotSize;
+    }
+
     if (_memProps & vk::MemoryPropertyFlagBits::eHostVisible) {
-        auto mp = _memory.mapMemory(offset, size);
+        auto mp = _memory.mapMemory(dstOffset, dstSize);
         if (mp.result != vk::Result::eSuccess) return false;
-        std::memcpy(mp.value, data, size);
-        if (!(_memProps & vk::MemoryPropertyFlagBits::eHostCoherent)) {
-            vk::MappedMemoryRange range(*_memory, offset, size);
+        std::memcpy(mp.value, data, dstSize);
+        {
+            vk::MappedMemoryRange range(*_memory, dstOffset, dstSize);
             _dev.flushMappedMemoryRanges({range});
         }
         _memory.unmapMemory();
-    } else if (!uploadStaging(data, size, offset)) {
+    } else if (!uploadStaging(data, size, dstOffset)) {
         return false;
     }
-    if (_type == BufferType::Uniform && _notifier) _notifier->onUniformUpdated(this);
+    if (_type == BufferType::Uniform && _notifier) _notifier->onUniformUpdated(this, slot, dstOffset, dstSize);
     return true;
 }
 

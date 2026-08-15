@@ -10,8 +10,10 @@ class VKTexture3D;
 class VKRenderTarget : public IRenderTarget {
 public:
     VKRenderTarget(vk::raii::Device& device, vk::raii::PhysicalDevice& phys,
-                   vk::raii::Queue& queue, uint32_t graphicsFamily)
-        : _dev(device), _phys(phys), _queue(queue), _graphicsFamily(graphicsFamily) {}
+                   vk::raii::Queue& queue, uint32_t graphicsFamily,
+                   bool floatRtFallback = false)
+        : _dev(device), _phys(phys), _queue(queue), _graphicsFamily(graphicsFamily),
+          _floatRtFallback(floatRtFallback) {}
 
     bool create(int width, int height) override;
     bool create(const FramebufferDesc& desc) override;
@@ -45,6 +47,7 @@ public:
     vk::Image colorImage(uint32_t i) const;
     vk::Format colorFormat(uint32_t i) const;
     vk::Image depthImage() const;
+    void debugDumpPPM(const char* path, uint32_t colorAtt = 0) const;
 
 private:
     struct Image {
@@ -70,6 +73,7 @@ private:
     vk::Extent2D _extent{};
     uint32_t _samples{1};
     uint32_t _colorCount{0};
+    bool _floatRtFallback{false};
     std::vector<Image> _colors{};
     std::vector<Image> _resolved{};
     Image _depth;

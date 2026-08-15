@@ -12,6 +12,8 @@
 #include "rhi/core/ISurface.hpp"
 #include "base/Log.hpp"
 #include <cstring>
+#include <cstdio>
+#include <cstdlib>
 #include <array>
 #include <vector>
 #include <memory>
@@ -26,6 +28,8 @@ struct QueueFamilies {
 
 class VKRenderer final : public IRenderer, public VKBuffer::Notifier {
 public:
+    static constexpr size_t kUboSlots = 32;
+    using DescriptorSet = vk::raii::DescriptorSet;
     VKRenderer() = default;
     ~VKRenderer() override { shutdown(); }
 
@@ -62,8 +66,8 @@ public:
     void blitFramebuffer(const std::shared_ptr<IRenderTarget>&, const std::shared_ptr<IRenderTarget>&, BlitMask) override;
     BackendCapabilities backendCapabilities() override;
 
-    void onUniformCreated(VKBuffer* buffer) override;
-    void onUniformUpdated(VKBuffer* buffer) override;
+    void onUniformCreated(VKBuffer* buffer, size_t offset, size_t size) override;
+    void onUniformUpdated(VKBuffer* buffer, uint32_t slot, size_t offset, size_t size) override;
 
 private:
     bool pickPhysicalDevice();
@@ -79,6 +83,7 @@ private:
     void applyViewport();
     bool bindPipelineAndState();
     bool bindVertexBuffers();
+    void dumpFrame();
     vk::Extent2D extent() const { return _swapchain ? _swapchain->extent() : vk::Extent2D{}; }
 
     std::shared_ptr<ISurface> _surface{};
@@ -95,12 +100,19 @@ private:
 
     vk::raii::DescriptorSetLayout _dsLayout{nullptr};
     vk::raii::DescriptorPool _dsPool{nullptr};
-    vk::raii::DescriptorSet _uboDs{nullptr};
+    std::vector<vk::raii::DescriptorSet> _uboDs{};
     vk::raii::PipelineLayout _pipelineLayout{nullptr};
     vk::raii::RenderPass _renderPass{nullptr};
     std::vector<vk::raii::Framebuffer> _framebuffers{};
     vk::raii::CommandPool _cmdPool{nullptr};
     vk::raii::CommandBuffer _cmd{nullptr};
+    vk::raii::CommandPool _dumpPool{nullptr};
+    vk::raii::CommandBuffer _dumpCmd{nullptr};
+    vk::raii::Buffer _dumpBuffer{nullptr};
+    vk::raii::DeviceMemory _dumpMemory{nullptr};
+    vk::raii::Fence _dumpFence{nullptr};
+    std::vector<vk::Image> _dumpImages{};
+    bool _dumpDone{false};
     vk::raii::Semaphore _imageReady{nullptr};
     vk::raii::Semaphore _rendered{nullptr};
     vk::raii::Fence _frameFence{nullptr};
@@ -108,12 +120,16 @@ private:
     bool _recording{false};
     bool _rpActive{false};
     bool _viewportSet{false};
+    bool _floatRtFallback{false};
     Viewport _viewport{};
     float _clearColor[4]{0.0f, 0.0f, 0.0f, 1.0f};
     std::shared_ptr<IPipeline> _pipeline{};
     std::array<std::shared_ptr<IBuffer>, 16> _vertexBuffers{};
     std::shared_ptr<IBuffer> _indexBuffer{};
     VKBuffer* _uboBuffer{nullptr};
+    size_t _uboSlotOffset{0};
+    size_t _uboSlotSize{0};
+    uint32_t _uboSlotIndex{0};
     std::shared_ptr<IRenderTarget> _renderTarget{};
     std::shared_ptr<VKRenderTarget> _vkRenderTarget{};
 };
@@ -159,6 +175,11 @@ bool VKRenderer::init(const std::shared_ptr<ISurface>& surface) {
     _surfaceKHR = vk::raii::SurfaceKHR(_instance, rawSurface);
 
     if (!pickPhysicalDevice()) return false;
+    // llvmpipe(软件渲染) 下 float 离屏 RT 无法可靠写入(HDR 场景整帧黑屏/崩溃)，
+    // 降级为 RGBA8 保证画面；真机 GPU 不受影响。
+    const std::string devName = _phys.getProperties().deviceName;
+    if (devName.find("llvmpipe") != std::string::npos) _floatRtFallback = true;
+    LOGI("VKRenderer: device={} floatRtFallback={}", devName, _floatRtFallback);
     QueueFamilies families = findQueueFamilies(_phys);
     if (!families.found) {
         LOGE("VKRenderer: no queue families support graphics+present");
@@ -199,11 +220,11 @@ bool VKRenderer::createDescriptors() {
     _dsLayout = std::move(dlr.value);
 
     vk::DescriptorPoolSize sizes[] = {
-        vk::DescriptorPoolSize(vk::DescriptorType::eUniformBuffer, 16),
-        vk::DescriptorPoolSize(vk::DescriptorType::eCombinedImageSampler, 16 * 15),
+        vk::DescriptorPoolSize(vk::DescriptorType::eUniformBuffer, 255),
+        vk::DescriptorPoolSize(vk::DescriptorType::eCombinedImageSampler, 255 * 15),
     };
     vk::DescriptorPoolCreateInfo dpci{};
-    dpci.maxSets = 16;
+    dpci.maxSets = 255;
     dpci.poolSizeCount = 2;
     dpci.pPoolSizes = sizes;
     auto dpr = _device.createDescriptorPool(dpci);
@@ -213,13 +234,19 @@ bool VKRenderer::createDescriptors() {
     }
     _dsPool = std::move(dpr.value);
 
-    vk::DescriptorSetAllocateInfo dsai(*_dsPool, 1, &*_dsLayout);
+    // 为 UBO ring 的每个 slot 预分配一个独立 descriptor set：multi-pass App 在
+    // 同一 command buffer 内多次 update 同一 UBO，每个 pass 的 draw 必须绑到各自
+    // 槽对应的 set，否则 GPU 读到的总是最后一次覆盖的偏移（整帧黑）。
+    const uint32_t setCount = kUboSlots;
+    std::vector<vk::DescriptorSetLayout> lay(setCount, * _dsLayout);
+    vk::DescriptorSetAllocateInfo dsai(*_dsPool, static_cast<uint32_t>(lay.size()), lay.data());
     auto dar = _device.allocateDescriptorSets(dsai);
     if (dar.result != vk::Result::eSuccess) {
         LOGE("VKRenderer: allocateDescriptorSets failed");
         return false;
     }
-    _uboDs = std::move(dar.value[0]);
+    _uboDs.clear();
+    for (auto& v : dar.value) _uboDs.emplace_back(std::move(v));
 
     vk::PipelineLayoutCreateInfo plci{};
     plci.setLayoutCount = 1;
@@ -326,7 +353,7 @@ void VKRenderer::shutdown() {
     _framebuffers.clear();
     _renderPass = vk::raii::RenderPass{nullptr};
     _pipelineLayout = vk::raii::PipelineLayout{nullptr};
-    _uboDs = vk::raii::DescriptorSet{nullptr};
+    _uboDs.clear();
     _dsPool = vk::raii::DescriptorPool{nullptr};
     _dsLayout = vk::raii::DescriptorSetLayout{nullptr};
     _cmd = vk::raii::CommandBuffer{nullptr};
@@ -381,7 +408,7 @@ std::shared_ptr<ITexture3D> VKRenderer::createTexture3D() {
     return std::make_shared<VKTexture3D>(_device, _phys, _graphicsQueue, _graphicsFamily);
 }
 std::shared_ptr<IRenderTarget> VKRenderer::createRenderTarget() {
-    return std::make_shared<VKRenderTarget>(_device, _phys, _graphicsQueue, _graphicsFamily);
+    return std::make_shared<VKRenderTarget>(_device, _phys, _graphicsQueue, _graphicsFamily, _floatRtFallback);
 }
 std::shared_ptr<ISwapchain> VKRenderer::getSwapchain() { return _swapchain; }
 
@@ -396,7 +423,6 @@ void VKRenderer::beginFrame() {
     if (br != vk::Result::eSuccess) return;
     _recording = true;
     _rpActive = false;
-    _cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *_pipelineLayout, 0, {*_uboDs}, {});
 }
 
 void VKRenderer::endFrame() {
@@ -423,24 +449,198 @@ void VKRenderer::endFrame() {
 
 bool VKRenderer::present() {
     if (!_swapchain) return false;
+    dumpFrame();
     _swapchain->setPresentSemaphore(static_cast<vk::Semaphore>(*_rendered));
     return _swapchain->present();
 }
 
-void VKRenderer::onUniformCreated(VKBuffer* buffer) {
+void VKRenderer::dumpFrame() {
+    const char* dumpPath = std::getenv("RHI_DUMP_FRAME");
+    if (!dumpPath || _dumpDone || !_swapchain) return;
+    _dumpDone = true;
+
+    const vk::Extent2D ext = _swapchain->extent();
+    const uint32_t idx = _swapchain->currentImage();
+    const bool f16Swap = (_swapchain->format() == vk::Format::eR16G16B16A16Sfloat);
+    const uint32_t fbpp = f16Swap ? 8u : 4u;
+    const uint64_t pixelBytes = static_cast<uint64_t>(ext.width) * ext.height * fbpp;
+
+    _device.waitIdle();
+
+    vk::BufferCreateInfo bci{};
+    bci.size = pixelBytes;
+    bci.usage = vk::BufferUsageFlagBits::eTransferDst;
+    bci.sharingMode = vk::SharingMode::eExclusive;
+    auto br = _device.createBuffer(bci);
+    if (br.result != vk::Result::eSuccess) { LOGE("dumpFrame: createBuffer failed"); return; }
+    _dumpBuffer = std::move(br.value);
+
+    vk::MemoryRequirements mreq = _dumpBuffer.getMemoryRequirements();
+    uint32_t memIdx = UINT32_MAX;
+    vk::PhysicalDeviceMemoryProperties memProps = _phys.getMemoryProperties();
+    for (uint32_t i = 0; i < memProps.memoryTypeCount; i++) {
+        if ((mreq.memoryTypeBits & (1u << i)) &&
+            (memProps.memoryTypes[i].propertyFlags & vk::MemoryPropertyFlagBits::eHostVisible) &&
+            (memProps.memoryTypes[i].propertyFlags & vk::MemoryPropertyFlagBits::eHostCoherent)) {
+            memIdx = i; break;
+        }
+    }
+    if (memIdx == UINT32_MAX) { LOGE("dumpFrame: no host-visible memory"); return; }
+    vk::MemoryAllocateInfo mai(mreq.size, memIdx);
+    auto ar = _device.allocateMemory(mai);
+    if (ar.result != vk::Result::eSuccess) { LOGE("dumpFrame: allocateMemory failed"); return; }
+    _dumpMemory = std::move(ar.value);
+    vk::BindBufferMemoryInfo bbmi(*_dumpBuffer, *_dumpMemory, 0);
+    _device.bindBufferMemory2({bbmi});
+
+    vk::CommandPoolCreateInfo cpci{};
+    cpci.flags = vk::CommandPoolCreateFlagBits::eTransient;
+    cpci.queueFamilyIndex = _graphicsFamily;
+    auto cpr = _device.createCommandPool(cpci);
+    if (cpr.result != vk::Result::eSuccess) { LOGE("dumpFrame: createCommandPool failed"); return; }
+    _dumpPool = std::move(cpr.value);
+    vk::CommandBufferAllocateInfo cba(*_dumpPool, vk::CommandBufferLevel::ePrimary, 1);
+    auto cbr = _device.allocateCommandBuffers(cba);
+    if (cbr.result != vk::Result::eSuccess) { LOGE("dumpFrame: alloc cmd failed"); return; }
+    _dumpCmd = std::move(cbr.value[0]);
+
+    vk::Image img = _swapchain->image(idx);
+    _dumpImages = {img};
+    vk::CommandBufferBeginInfo cbbi(vk::CommandBufferUsageFlagBits::eOneTimeSubmit);
+    _dumpCmd.begin(cbbi);
+    vk::ImageMemoryBarrier barrier{};
+    barrier.srcAccessMask = vk::AccessFlagBits::eColorAttachmentWrite;
+    barrier.dstAccessMask = vk::AccessFlagBits::eTransferRead;
+    barrier.oldLayout = vk::ImageLayout::ePresentSrcKHR;
+    barrier.newLayout = vk::ImageLayout::eTransferSrcOptimal;
+    barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier.image = img;
+    barrier.subresourceRange.aspectMask = vk::ImageAspectFlagBits::eColor;
+    barrier.subresourceRange.baseMipLevel = 0;
+    barrier.subresourceRange.levelCount = 1;
+    barrier.subresourceRange.baseArrayLayer = 0;
+    barrier.subresourceRange.layerCount = 1;
+    _dumpCmd.pipelineBarrier(vk::PipelineStageFlagBits::eColorAttachmentOutput,
+                             vk::PipelineStageFlagBits::eTransfer, {}, {}, {}, {barrier});
+    vk::BufferImageCopy region{};
+    region.bufferOffset = 0;
+    region.bufferRowLength = 0;
+    region.bufferImageHeight = 0;
+    region.imageSubresource.aspectMask = vk::ImageAspectFlagBits::eColor;
+    region.imageSubresource.mipLevel = 0;
+    region.imageSubresource.baseArrayLayer = 0;
+    region.imageSubresource.layerCount = 1;
+    region.imageOffset = vk::Offset3D(0, 0, 0);
+    region.imageExtent = vk::Extent3D(ext.width, ext.height, 1);
+    _dumpCmd.copyImageToBuffer(img, vk::ImageLayout::eTransferSrcOptimal, *_dumpBuffer, {region});
+    barrier.srcAccessMask = vk::AccessFlagBits::eTransferRead;
+    barrier.dstAccessMask = vk::AccessFlagBits::eColorAttachmentWrite;
+    barrier.oldLayout = vk::ImageLayout::eTransferSrcOptimal;
+    barrier.newLayout = vk::ImageLayout::ePresentSrcKHR;
+    _dumpCmd.pipelineBarrier(vk::PipelineStageFlagBits::eTransfer,
+                             vk::PipelineStageFlagBits::eColorAttachmentOutput, {}, {}, {}, {barrier});
+    _dumpCmd.end();
+
+    vk::FenceCreateInfo fci{};
+    auto fr = _device.createFence(fci);
+    if (fr.result != vk::Result::eSuccess) { LOGE("dumpFrame: createFence failed"); return; }
+    _dumpFence = std::move(fr.value);
+
+    vk::CommandBuffer cb = *_dumpCmd;
+    vk::SubmitInfo si{};
+    si.commandBufferCount = 1;
+    si.pCommandBuffers = &cb;
+    _graphicsQueue.submit({si}, *_dumpFence);
+    (void)_device.waitForFences({*_dumpFence}, vk::True, UINT64_MAX);
+
+    void* mapped = nullptr;
+    auto mr = _dumpMemory.mapMemory(0, pixelBytes);
+    if (mr.result != vk::Result::eSuccess) { LOGE("dumpFrame: mapMemory failed"); return; }
+    mapped = mr.value;
+    unsigned char* px = static_cast<unsigned char*>(mapped);
+    std::string path = dumpPath;
+    const bool isF16 = (_swapchain->format() == vk::Format::eR16G16B16A16Sfloat);
+    const uint32_t bpp = isF16 ? 8u : 4u;
+    {
+        FILE* fp = std::fopen(path.c_str(), "wb");
+        if (!fp) { LOGE("dumpFrame: cannot open {}", path); _dumpMemory.unmapMemory(); return; }
+        std::fprintf(fp, "P6\n%u %u\n255\n", ext.width, ext.height);
+        for (uint32_t y = 0; y < ext.height; y++) {
+            const unsigned char* row = px + static_cast<size_t>(y) * ext.width * bpp;
+            for (uint32_t x = 0; x < ext.width; x++) {
+                float r, g, b;
+                if (isF16) {
+                    const uint16_t* p = reinterpret_cast<const uint16_t*>(row + static_cast<size_t>(x) * 8);
+                    const auto half = [](uint16_t h) {
+                        uint32_t s = (h >> 15) & 1, e = (h >> 10) & 0x1f, m = h & 0x3ff;
+                        if (e == 0) return m == 0 ? 0.0f : (m / 1024.0f) * (1.0f / 16384.0f);
+                        if (e == 31) return m == 0 ? (s ? -1e30f : 1e30f) : 0.0f;
+                        int ex = static_cast<int>(e) - 15;
+                        float v = (1.0f + m / 1024.0f) * std::pow(2.0f, static_cast<float>(ex));
+                        return s ? -v : v;
+                    };
+                    r = half(p[2]); g = half(p[1]); b = half(p[0]);
+                } else {
+                    b = row[x * 4 + 0] / 255.0f; g = row[x * 4 + 1] / 255.0f; r = row[x * 4 + 2] / 255.0f;
+                }
+                auto cl = [](float v) { return static_cast<int>((v < 0 ? 0 : (v > 1 ? 1 : v)) * 255.0f + 0.5f); };
+                std::fputc(cl(r), fp); std::fputc(cl(g), fp); std::fputc(cl(b), fp);
+            }
+        }
+        std::fclose(fp);
+    }
+    _dumpMemory.unmapMemory();
+    LOGI("dumpFrame: saved {} ({}x{})", path, ext.width, ext.height);
+
+    uint32_t black = 0, nonblack = 0;
+    for (uint64_t i = 0; i < ext.width * ext.height; i++) {
+        const unsigned char* p = px + i * bpp;
+        uint8_t c0, c1, c2;
+        if (isF16) {
+            const uint16_t* q = reinterpret_cast<const uint16_t*>(p);
+            const auto half = [](uint16_t h) -> float {
+                uint32_t e = (h >> 10) & 0x1f, m = h & 0x3ff;
+                if (e == 0) return 0.0f;
+                if (e == 31) return 1.0f;
+                int ex = static_cast<int>(e) - 15;
+                return (1.0f + m / 1024.0f) * std::pow(2.0f, static_cast<float>(ex));
+            };
+            float r = half(q[2]), g = half(q[1]), b2 = half(q[0]);
+            c0 = static_cast<uint8_t>((r < 0 ? 0 : (r > 1 ? 1 : r)) * 255.0f);
+            c1 = static_cast<uint8_t>((g < 0 ? 0 : (g > 1 ? 1 : g)) * 255.0f);
+            c2 = static_cast<uint8_t>((b2 < 0 ? 0 : (b2 > 1 ? 1 : b2)) * 255.0f);
+        } else {
+            c0 = p[0]; c1 = p[1]; c2 = p[2];
+        }
+        if (c0 < 8 && c1 < 8 && c2 < 8) black++; else nonblack++;
+    }
+    LOGI("dumpFrame: pixels black={} nonblack={}", black, nonblack);
+    _device.waitIdle();
+}
+
+void VKRenderer::onUniformCreated(VKBuffer* buffer, size_t offset, size_t size) {
     _uboBuffer = buffer;
+    _uboSlotOffset = offset;
+    _uboSlotSize = size;
     updateUboDescriptor();
 }
 
-void VKRenderer::onUniformUpdated(VKBuffer* buffer) {
-    if (_uboBuffer == buffer) updateUboDescriptor();
+void VKRenderer::onUniformUpdated(VKBuffer* buffer, uint32_t slot, size_t offset, size_t size) {
+    if (_uboBuffer != buffer) return;
+    _uboSlotIndex = slot;
+    _uboSlotOffset = offset;
+    _uboSlotSize = size;
+    updateUboDescriptor();
 }
 
 void VKRenderer::updateUboDescriptor() {
-    if (_uboDs == nullptr || _uboBuffer == nullptr) return;
-    vk::DescriptorBufferInfo info(_uboBuffer->raw(), 0, _uboBuffer->size());
+    if (_uboDs.empty() || _uboBuffer == nullptr) return;
+    DescriptorSet& ds = _uboDs[_uboSlotIndex % _uboDs.size()];
+    if (ds == nullptr) return;
+    vk::DescriptorBufferInfo info(_uboBuffer->raw(), _uboSlotOffset, _uboSlotSize);
     vk::WriteDescriptorSet wds{};
-    wds.dstSet = *_uboDs;
+    wds.dstSet = *ds;
     wds.dstBinding = 0;
     wds.dstArrayElement = 0;
     wds.descriptorCount = 1;
@@ -501,16 +701,22 @@ void VKRenderer::bindTexture(rhi::ITexture2D* texture, unsigned int unit) {
 }
 
 void VKRenderer::updateSamplerDescriptor(uint32_t binding, vk::Sampler sampler, vk::ImageView view) {
-    if (_uboDs == nullptr || !sampler || !view) return;
+    if (_uboDs.empty() || !sampler || !view) return;
+    // sampler 写入所有 UBO slot 对应的 set：draw 绑定的 set 可能不同于最后一次
+    // bindTexture 时的 set（slot 由每次 uniform update 推进），因此每个 set 都要
+    // 持有同一 sampler，否则 llvmpipe 读到未绑的 sampler 会崩。
     vk::DescriptorImageInfo info(sampler, view, vk::ImageLayout::eShaderReadOnlyOptimal);
-    vk::WriteDescriptorSet wds{};
-    wds.dstSet = *_uboDs;
-    wds.dstBinding = binding;
-    wds.dstArrayElement = 0;
-    wds.descriptorCount = 1;
-    wds.descriptorType = vk::DescriptorType::eCombinedImageSampler;
-    wds.pImageInfo = &info;
-    _device.updateDescriptorSets({wds}, {});
+    for (auto& set : _uboDs) {
+        if (!*set) continue;
+        vk::WriteDescriptorSet wds{};
+        wds.dstSet = *set;
+        wds.dstBinding = binding;
+        wds.dstArrayElement = 0;
+        wds.descriptorCount = 1;
+        wds.descriptorType = vk::DescriptorType::eCombinedImageSampler;
+        wds.pImageInfo = &info;
+        _device.updateDescriptorSets({wds}, {});
+    }
 }
 
 void VKRenderer::blitFramebuffer(const std::shared_ptr<IRenderTarget>& src,
@@ -696,7 +902,9 @@ void VKRenderer::applyViewport() {
     float y = _viewportSet ? static_cast<float>(_viewport.y) : 0.0f;
     float w = _viewportSet ? static_cast<float>(_viewport.width) : static_cast<float>(ext.width);
     float h = _viewportSet ? static_cast<float>(_viewport.height) : static_cast<float>(ext.height);
-    vk::Viewport vp(x, y, w, h, 0.0f, 1.0f);
+    // VK NDC y 向下，App 投影矩阵为 GL 语义（y 向上）：用负高度 viewport 翻转 y 轴。
+    // 深度：GL 投影 z 属 [-1,1]，负高度 viewport 的深度变换 z_ndc/2+0.5 恰好映射到 VK [0,1]。
+    vk::Viewport vp(x, y + h, w, -h, 0.0f, 1.0f);
     vk::Rect2D sc({static_cast<int32_t>(x), static_cast<int32_t>(y)},
                   {static_cast<uint32_t>(w), static_cast<uint32_t>(h)});
     _cmd.setViewport(0, {vp});
@@ -721,6 +929,11 @@ bool VKRenderer::bindPipelineAndState() {
     vk::Pipeline p = vkp->pipelineFor(rp, samples);
     if (!p) return false;
     _cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, p);
+    // bind描述符集：每个 draw 绑到当前 UBO slot 对应的 set
+    if (!_uboDs.empty()) {
+        DescriptorSet& ds = _uboDs[_uboSlotIndex % _uboDs.size()];
+        if (*ds) _cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *_pipelineLayout, 0, {*ds}, {});
+    }
     vkp->applyDynamicState(_cmd);
     return true;
 }
