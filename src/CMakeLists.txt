@@ -35,6 +35,11 @@ endif()
 if(${ENABLE_VULKAN})
     message("Graphic API Enable Vulkan")
     target_compile_definitions(${PROJECT_NAME} PRIVATE ENABLE_VULKAN=1)
+    # VKRenderer 需要 imgui_impl_vulkan.h（imgui Vulkan 后端头，位于 3party/imgui/Vulkan）。
+    # 该目录由 3party/imgui 子 CMake 的 include_directories 声明，但因 add_subdirectory 隔离
+    # 不传播到 src 的 renderLearn target（imgui_impl_vulkan.cpp 靠同目录引号 include 编译），
+    # 故这里对本 target 显式添加。
+    target_include_directories(${PROJECT_NAME} PRIVATE "${RENDER_3PARTY_PATH}/imgui/Vulkan")
     set(VK_SHADER_SOURCE "${CMAKE_SOURCE_DIR}/res/Vulkan")
     set(VK_SHADER_OUTPUT "${CMAKE_BINARY_DIR}/res/Vulkan")
     set(GLSLANG_VALIDATOR "" CACHE FILEPATH "Path to glslangValidator")

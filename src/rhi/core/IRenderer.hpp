@@ -13,6 +13,7 @@ class ITexture3D;
 class IRenderTarget;
 class ISurface;
 class ISwapchain;
+struct VKImGuiInitInfo;
 
 class IRenderer {
 public:
@@ -59,6 +60,10 @@ public:
                                  BlitMask mask = static_cast<BlitMask>(static_cast<uint8_t>(BlitMask::Color) |
                                                                        static_cast<uint8_t>(BlitMask::Depth))) = 0;  // 新增：MSAA resolve / 拷贝
     virtual BackendCapabilities backendCapabilities() = 0;                                                    // 新增
+
+    // ImGui / overlay 扩展钩子（默认 no-op 内联实现；VKRenderer 覆写，GL 后端不受影响）
+    virtual bool imguiInitInfo(VKImGuiInitInfo& out) { (void)out; return false; }
+    virtual void renderImGuiDrawData(void* drawData) { (void)drawData; }
 };
 
 } // namespace rhi

@@ -9,6 +9,8 @@
 #include "VKTexture3D.hpp"
 #include "VKRenderTarget.hpp"
 #include <GLFW/glfw3.h>
+#include <imgui.h>
+#include <imgui_impl_vulkan.h>
 #include "rhi/core/ISurface.hpp"
 #include "base/Log.hpp"
 #include <cstring>
@@ -65,6 +67,9 @@ public:
     void drawInstanced(uint32_t vertexCount, uint32_t instanceCount, uint32_t firstVertex) override;
     void blitFramebuffer(const std::shared_ptr<IRenderTarget>&, const std::shared_ptr<IRenderTarget>&, BlitMask) override;
     BackendCapabilities backendCapabilities() override;
+
+    bool imguiInitInfo(VKImGuiInitInfo& out) override;
+    void renderImGuiDrawData(void* drawData) override;
 
     void onUniformCreated(VKBuffer* buffer, size_t offset, size_t size) override;
     void onUniformUpdated(VKBuffer* buffer, uint32_t slot, size_t offset, size_t size) override;
@@ -1070,6 +1075,30 @@ BackendCapabilities VKRenderer::backendCapabilities() {
     caps.maxSamples = 8;
     caps.maxUniformBlockSize = 65536;
     return caps;
+}
+
+bool VKRenderer::imguiInitInfo(VKImGuiInitInfo& out) {
+    if (_device == nullptr || !_swapchain) return false;
+    out.instance = *_instance;
+    out.physDevice = *_phys;
+    out.device = *_device;
+    out.graphicsFamily = _graphicsFamily;
+    out.graphicsQueue = *_graphicsQueue;
+    out.dsPool = *_dsPool;
+    out.imageCount = _swapchain->imageCount();
+    out.renderPass = *_renderPass;
+    return true;
+}
+
+void VKRenderer::renderImGuiDrawData(void* drawData) {
+    if (!drawData || !_recording || !_rpActive) return;
+    ImGui_ImplVulkan_RenderDrawData(static_cast<ImDrawData*>(drawData),
+                                    static_cast<VkCommandBuffer>(*_cmd));
+    // ImGui backend 渲染时会把 viewport/scissor 设为自身的正高度值。bindPipelineAndState
+    // → VKPipeline::applyDynamicState 不会重设 viewport/scissor（它们仅在 ensureRenderPass
+    // 与 setViewport 处应用），因此这里主动重放本后端的负高度 viewport，保证同一 render
+    // pass 内后续 3D draw 仍为正确的上下翻转。
+    applyViewport();
 }
 
 std::shared_ptr<IRenderer> createVKRenderer() {
