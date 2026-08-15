@@ -17,8 +17,8 @@ using namespace ErrorHandle;
 
 GLCullFaceApp::~GLCullFaceApp() {}
 
-bool GLCullFaceApp::initApp() {
-    if (!GLApp::initApp()) return false;
+bool GLCullFaceApp::load(std::shared_ptr<rhi::IRenderer> rhiRenderer) {
+    if (!Sample::load(rhiRenderer)) return false;
     const auto vfile = join(StaticCollector::getGLShaderPath(), "Advanced", "CullFace", "Basic.vert");
     const auto ffile = join(StaticCollector::getGLShaderPath(), "Advanced", "CullFace", "Basic.frag");
     auto shader = renderer()->createShader();
@@ -46,7 +46,7 @@ bool GLCullFaceApp::initApp() {
     return true;
 }
 
-void GLCullFaceApp::drawScene(const float dt) {
+void GLCullFaceApp::draw(const float dt) {
     ImGui::Begin("OpenGL");
     ImGui::SetNextItemWidth(200);
     ImGui::SliderInt("Grass Count", &_grassCount, 1, 10);
@@ -75,5 +75,4 @@ void GLCullFaceApp::drawScene(const float dt) {
         _uboBuffer->update(&_ubo, sizeof(rhi::UniformBlock), 0);
         renderer()->drawIndexed(_cubeIndexCount, 0, 0);
     }
-    return GLApp::drawScene(dt);
 }

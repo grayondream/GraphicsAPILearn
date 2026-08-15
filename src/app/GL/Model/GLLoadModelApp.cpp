@@ -18,8 +18,8 @@ using namespace ErrorHandle;
 GLLoadModelApp::~GLLoadModelApp() {
 }
 
-bool GLLoadModelApp::initApp() {
-	if (!GLApp::initApp()) {
+bool GLLoadModelApp::load(std::shared_ptr<rhi::IRenderer> rhiRenderer) {
+	if (!Sample::load(rhiRenderer)) {
 		return false;
 	}
 	
@@ -61,8 +61,7 @@ void GLLoadModelApp::drawUI() {
 	ImGui::End();
 }
 
-void GLLoadModelApp::drawScene(const float dt) {
-	GLApp::drawScene(dt);
+void GLLoadModelApp::draw(const float dt) {
 	drawUI();
 
 	const auto projection = glm::perspective(glm::radians(_camera.zoom()), aspectRatio(), 0.1f, 100.0f);

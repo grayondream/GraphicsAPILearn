@@ -85,8 +85,8 @@ static RhiGeometry::Geometry CreateRectBuffer(rhi::IRenderer* renderer) {
 	return RhiGeometry::CreateFromArray(renderer, quadVertices, sizeof(quadVertices), 6, layout);
 }
 
-bool GLParallaxMapApp::initApp() {
-	if (!GLCameraBaseApp::initApp()) {
+bool GLParallaxMapApp::load(std::shared_ptr<rhi::IRenderer> rhiRenderer) {
+	if (!GLCameraBaseApp::load(rhiRenderer)) {
 		return false;
 	}
 
@@ -129,8 +129,7 @@ void GLParallaxMapApp::compileShader() {
 	ExitIfFailed(ok, "Create RHI shader failed: {}", _shader->getLog());
 }
 
-void GLParallaxMapApp::drawScene(const float dt) {
-	GLApp::drawScene(dt);
+void GLParallaxMapApp::draw(const float dt) {
 	ImGui::Begin("OpenGL");
 	ImGui::Checkbox("Enable Normal Map", &_enableDisp);
 	ImGui::Checkbox("Enable Steep", &_enableSteep);
@@ -167,5 +166,4 @@ void GLParallaxMapApp::drawScene(const float dt) {
 	_uboBuffer->update(&_ubo, sizeof(rhi::UniformBlock), 0);
 	renderer()->draw(_vertexCount, 0);
 
-	return GLApp::drawScene(dt);
 }

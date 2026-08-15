@@ -18,8 +18,8 @@ using namespace ErrorHandle;
 
 GLTemplateTestApp::~GLTemplateTestApp() {}
 
-bool GLTemplateTestApp::initApp() {
-	if (!GLCameraBaseApp::initApp()) {
+bool GLTemplateTestApp::load(std::shared_ptr<rhi::IRenderer> rhiRenderer) {
+	if (!GLCameraBaseApp::load(rhiRenderer)) {
 		return false;
 	}
 
@@ -82,7 +82,7 @@ static std::vector<glm::vec3> initializeCubePositions() {
 	return positions;
 }
 
-void GLTemplateTestApp::drawScene(const float dt) {
+void GLTemplateTestApp::draw(const float dt) {
 	renderer()->clearColor(0.1f, 0.1f, 0.1f, 1.0f);
 	renderer()->bindTexture(_cubeTexture, 0);
 	renderer()->bindTexture(_planeTexture, 1);
@@ -159,5 +159,4 @@ void GLTemplateTestApp::drawScene(const float dt) {
 	_pipeline->setStencilFunc(rhi::CompareFunc::Always, 0, 0xFF);
 	_pipeline->setDepthTest(true);
 
-	return GLApp::drawScene(dt);
 }

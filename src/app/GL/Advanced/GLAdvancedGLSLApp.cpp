@@ -18,8 +18,8 @@ using namespace ErrorHandle;
 
 GLAdvancedGLSLApp::~GLAdvancedGLSLApp() {}
 
-bool GLAdvancedGLSLApp::initApp() {
-    if (!GLCameraBaseApp::initApp()) return false;
+bool GLAdvancedGLSLApp::load(std::shared_ptr<rhi::IRenderer> rhiRenderer) {
+    if (!GLCameraBaseApp::load(rhiRenderer)) return false;
     const auto vfile = join(StaticCollector::getGLShaderPath(), "Advanced", "GLSL", "Cube.vert");
     const auto ffile = join(StaticCollector::getGLShaderPath(), "Advanced", "GLSL", "Cube.frag");
     auto shader = renderer()->createShader();
@@ -38,7 +38,7 @@ bool GLAdvancedGLSLApp::initApp() {
     return true;
 }
 
-void GLAdvancedGLSLApp::drawScene(const float dt) {
+void GLAdvancedGLSLApp::draw(const float dt) {
     ImGui::Begin("OpenGL");
     static int count{ 1 };
     ImGui::Checkbox("Enable Point Size", &_enablePointSize);
@@ -89,5 +89,4 @@ void GLAdvancedGLSLApp::drawScene(const float dt) {
         _uboBuffer->update(&_ubo, sizeof(rhi::UniformBlock), 0);
         renderer()->drawIndexed(_indexCount, 0, 0);
     }
-    return GLApp::drawScene(dt);
 }

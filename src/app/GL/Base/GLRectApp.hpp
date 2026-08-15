@@ -8,8 +8,8 @@ class GLRectApp : public App {
 public:
 	virtual ~GLRectApp();
 protected:
-	virtual bool initApp() override;
-	virtual void drawScene(const float dt) override;
+	virtual bool load(std::shared_ptr<rhi::IRenderer> rhiRenderer) override;
+	virtual void draw(const float dt) override;
 private:
 	std::shared_ptr<rhi::IPipeline> _pipeline{};
 	std::shared_ptr<rhi::IBuffer> _vb{};

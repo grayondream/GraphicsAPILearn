@@ -41,8 +41,8 @@ std::pair<std::vector<glm::vec3>, std::vector<glm::vec3>> GLPBRBaseApp::GetLight
     return std::make_pair(lightPositions, lightColors);
 }
 
-bool GLPBRBaseApp::initApp() {
-    if (!GLCameraBaseApp::initApp()) return false;
+bool GLPBRBaseApp::load(std::shared_ptr<rhi::IRenderer> rhiRenderer) {
+    if (!GLCameraBaseApp::load(rhiRenderer)) return false;
     _uboBuffer = renderer()->createUniformBuffer();
     _uboBuffer->init(nullptr, sizeof(rhi::UniformBlock), rhi::BufferType::Uniform);
     _uboBuffer->bindRange(0, 0, sizeof(rhi::UniformBlock));
@@ -87,8 +87,7 @@ void GLPBRBaseApp::renderSphere(const std::shared_ptr<rhi::IPipeline>& program, 
     renderer()->drawIndexed(_sphereIndexCount, 0, 0);
 }
 
-void GLPBRBaseApp::drawScene(const float dt) {
-    GLCameraBaseApp::drawScene(dt);
+void GLPBRBaseApp::draw(const float dt) {
     auto pos = _camera.getAttr().pos;
     const auto projection = glm::perspective(glm::radians(_camera.zoom()), aspectRatio(), 0.1f, 100.0f);
     const auto view = _camera.getViewMatrix();

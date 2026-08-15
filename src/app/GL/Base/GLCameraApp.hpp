@@ -10,9 +10,9 @@ public:
 	virtual ~GLCameraApp();
 
 protected:
-	virtual bool initApp() override;
+	virtual bool load(std::shared_ptr<rhi::IRenderer> rhiRenderer) override;
 
-	virtual void drawScene(const float dt);
+	virtual void draw(const float dt) override;
 
 private:
 	std::shared_ptr<rhi::IPipeline> _pipeline{};

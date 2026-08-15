@@ -14,8 +14,8 @@ public:
 	virtual ~GLBloomApp();
 
 protected:
-	virtual bool initApp() override;
-	virtual void drawScene(const float dt);
+	virtual bool load(std::shared_ptr<rhi::IRenderer> rhiRenderer) override;
+	virtual void draw(const float dt) override;
 
 private:
 	void compileShader(const rhi::VertexLayout& cubeLayout, const rhi::VertexLayout& quadLayout);

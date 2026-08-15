@@ -18,8 +18,8 @@ using namespace ErrorHandle;
 GLSimpleGemoteryApp::~GLSimpleGemoteryApp() {
 }
 
-bool GLSimpleGemoteryApp::initApp() {
-	if (!GLCameraBaseApp::initApp()) {
+bool GLSimpleGemoteryApp::load(std::shared_ptr<rhi::IRenderer> rhiRenderer) {
+	if (!GLCameraBaseApp::load(rhiRenderer)) {
 		return false;
 	}
 	
@@ -52,7 +52,7 @@ bool GLSimpleGemoteryApp::initApp() {
 	return true;
 }
 
-void GLSimpleGemoteryApp::drawScene(const float dt) {
+void GLSimpleGemoteryApp::draw(const float dt) {
 	ImGui::Begin("OpenGL");
 	ImGui::End();
 
@@ -61,5 +61,4 @@ void GLSimpleGemoteryApp::drawScene(const float dt) {
 	_uboBuffer->update(&_ubo, sizeof(rhi::UniformBlock), 0);
 	renderer()->draw(_vertexCount, 0);
 
-	return GLApp::drawScene(dt);
 }

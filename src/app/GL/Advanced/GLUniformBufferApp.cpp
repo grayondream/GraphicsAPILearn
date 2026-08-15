@@ -18,8 +18,8 @@ using namespace ErrorHandle;
 
 GLUniformBufferApp::~GLUniformBufferApp() {}
 
-bool GLUniformBufferApp::initApp() {
-	if (!GLCameraBaseApp::initApp()) {
+bool GLUniformBufferApp::load(std::shared_ptr<rhi::IRenderer> rhiRenderer) {
+	if (!GLCameraBaseApp::load(rhiRenderer)) {
 		return false;
 	}
 
@@ -51,7 +51,7 @@ bool GLUniformBufferApp::initApp() {
 	return true;
 }
 
-void GLUniformBufferApp::drawScene(const float dt) {
+void GLUniformBufferApp::draw(const float dt) {
 	ImGui::Begin("OpenGL");
 	ImGui::End();
 	const auto x = 1;
@@ -86,5 +86,4 @@ void GLUniformBufferApp::drawScene(const float dt) {
 		renderer()->drawIndexed(_indexCount, 0, 0);
 	}
 
-	return GLApp::drawScene(dt);
 }

@@ -82,8 +82,8 @@ static RhiGeometry::Geometry CreateQuadBuffer(rhi::IRenderer* renderer) {
 	return RhiGeometry::CreateFromArray(renderer, quadVertices, sizeof(quadVertices), 4, layout);
 }
 
-bool GLHdrApp::initApp() {
-	if (!GLCameraBaseApp::initApp()) {
+bool GLHdrApp::load(std::shared_ptr<rhi::IRenderer> rhiRenderer) {
+	if (!GLCameraBaseApp::load(rhiRenderer)) {
 		return false;
 	}
 
@@ -99,8 +99,8 @@ bool GLHdrApp::initApp() {
 
 	compileShader(cubeLayout, quadLayout);
 
-	const int w = static_cast<int>(m_window->getProperties().width);
-	const int h = static_cast<int>(m_window->getProperties().height);
+	const int w = static_cast<int>(windowWidth());
+	const int h = static_cast<int>(windowHeight());
 	_hdrRT = renderer()->createRenderTarget();
 	rhi::FramebufferDesc fbd;
 	fbd.width = w; fbd.height = h;
@@ -195,8 +195,7 @@ void GLHdrApp::renderHdr() {
 	renderer()->draw(_quadVertexCount, 0);
 }
 
-void GLHdrApp::drawScene(const float dt) {
-	GLApp::drawScene(dt);
+void GLHdrApp::draw(const float dt) {
 	ImGui::Begin("OpenGL");
 	ImGui::Checkbox("Enable Hdr", &_enableHdr);
 	ImGui::InputFloat("Exposure", &_exposure, 0.1f, 4.0f, "%.2f");

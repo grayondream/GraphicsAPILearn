@@ -57,8 +57,8 @@ std::shared_ptr<rhi::IBuffer> GLSaturnApp::generateRockInstanceBuffer(int count)
 	return buf;
 }
 
-bool GLSaturnApp::initApp() {
-	if (!GLCameraBaseApp::initApp()) {
+bool GLSaturnApp::load(std::shared_ptr<rhi::IRenderer> rhiRenderer) {
+	if (!GLCameraBaseApp::load(rhiRenderer)) {
 		return false;
 	}
 	
@@ -120,7 +120,7 @@ void GLSaturnApp::loadModel() {
 	}
 }
 
-void GLSaturnApp::drawScene(const float dt) {
+void GLSaturnApp::draw(const float dt) {
 	ImGui::Begin("OpenGL");
 	ImGui::End();
 	static float curTime = 0;
@@ -164,5 +164,4 @@ void GLSaturnApp::drawScene(const float dt) {
 		}
 	}
 
-	return GLApp::drawScene(dt);
 }

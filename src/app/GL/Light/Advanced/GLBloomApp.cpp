@@ -53,8 +53,8 @@ void GLBloomApp::createQuadBuffer() {
 	m_quadLayout = geo.layout;
 }
 
-bool GLBloomApp::initApp() {
-	if (!GLCameraBaseApp::initApp()) {
+bool GLBloomApp::load(std::shared_ptr<rhi::IRenderer> rhiRenderer) {
+	if (!GLCameraBaseApp::load(rhiRenderer)) {
 		return false;
 	}
 
@@ -63,8 +63,8 @@ bool GLBloomApp::initApp() {
 	compileShader(m_cubeLayout, m_quadLayout);
 	createTextures();
 
-	const int w = static_cast<int>(m_window->getProperties().width);
-	const int h = static_cast<int>(m_window->getProperties().height);
+	const int w = static_cast<int>(windowWidth());
+	const int h = static_cast<int>(windowHeight());
 	// HDR FBO：2 个 RGBA16F 颜色附件 + 深度
 	m_hdrFBO = renderer()->createRenderTarget();
 	rhi::FramebufferDesc fbd;
@@ -276,8 +276,7 @@ void GLBloomApp::renderLight(std::shared_ptr<rhi::IPipeline>& program, const glm
 	}
 }
 
-void GLBloomApp::drawScene(const float dt) {
-	GLCameraBaseApp::drawScene(dt);
+void GLBloomApp::draw(const float dt) {
 	auto pos = _camera.getAttr().pos;
 	ImGui::Begin("OpenGL");
 	ImGui::Checkbox("Enable Bloom", &m_enableBloom);

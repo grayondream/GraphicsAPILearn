@@ -43,8 +43,8 @@ static std::shared_ptr<rhi::IBuffer> createObjectPositions(rhi::IRenderer* rende
 	return instanceVb;
 }
 
-bool GLMultieInstanceApp::initApp() {
-	if (!GLCameraBaseApp::initApp()) {
+bool GLMultieInstanceApp::load(std::shared_ptr<rhi::IRenderer> rhiRenderer) {
+	if (!GLCameraBaseApp::load(rhiRenderer)) {
 		return false;
 	}
 
@@ -70,7 +70,7 @@ bool GLMultieInstanceApp::initApp() {
 	return true;
 }
 
-void GLMultieInstanceApp::drawScene(const float dt) {
+void GLMultieInstanceApp::draw(const float dt) {
 	ImGui::Begin("OpenGL");
 	ImGui::End();
 
@@ -100,5 +100,4 @@ void GLMultieInstanceApp::drawScene(const float dt) {
 		renderer()->drawIndexedInstanced(_indexCount, (uint32_t)(_count * _count), 0, 0);
 	}
 
-	return GLApp::drawScene(dt);
 }

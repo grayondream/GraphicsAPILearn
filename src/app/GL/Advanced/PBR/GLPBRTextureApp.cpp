@@ -30,14 +30,13 @@ void GLPBRTextureApp::loadTexture() {
     m_normalMap = load("normal.png");
 }
 
-bool GLPBRTextureApp::initApp() {
-    if (!GLPBRBaseApp::initApp()) return false;
+bool GLPBRTextureApp::load(std::shared_ptr<rhi::IRenderer> rhiRenderer) {
+    if (!GLPBRBaseApp::load(rhiRenderer)) return false;
     loadTexture();
     return true;
 }
 
-void GLPBRTextureApp::drawScene(const float dt) {
-    GLCameraBaseApp::drawScene(dt);
+void GLPBRTextureApp::draw(const float dt) {
     auto pos = _camera.getAttr().pos;
     const auto projection = glm::perspective(glm::radians(_camera.zoom()), aspectRatio(), 0.1f, 100.0f);
     const auto view = _camera.getViewMatrix();

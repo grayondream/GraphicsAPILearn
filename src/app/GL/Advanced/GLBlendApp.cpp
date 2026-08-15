@@ -18,8 +18,8 @@ using namespace ErrorHandle;
 
 GLBlendApp::~GLBlendApp() {}
 
-bool GLBlendApp::initApp() {
-    if (!GLApp::initApp()) return false;
+bool GLBlendApp::load(std::shared_ptr<rhi::IRenderer> rhiRenderer) {
+    if (!Sample::load(rhiRenderer)) return false;
     const auto vfile = join(StaticCollector::getGLShaderPath(), "Advanced", "Blend", "Basic.vert");
     const auto ffile = join(StaticCollector::getGLShaderPath(), "Advanced", "Blend", "Basic.frag");
     auto shader = renderer()->createShader();
@@ -61,7 +61,7 @@ static std::vector<glm::vec3> initializeCubePositions() {
 	return positions;
 }
 
-void GLBlendApp::drawScene(const float dt) {
+void GLBlendApp::draw(const float dt) {
     ImGui::Begin("OpenGL");
     ImGui::SetNextItemWidth(200);
     ImGui::SliderInt("Grass Count", &_grassCount, 1, 10);
@@ -128,5 +128,4 @@ void GLBlendApp::drawScene(const float dt) {
             renderer()->draw(_planeVertexCount, 0);
         }
     }
-    return GLApp::drawScene(dt);
 }

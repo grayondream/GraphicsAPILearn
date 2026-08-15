@@ -12,7 +12,7 @@ using namespace ErrorHandle;
 GLTriangleApp::~GLTriangleApp() {
 }
 
-bool GLTriangleApp::initApp() {
+bool GLTriangleApp::load(std::shared_ptr<rhi::IRenderer> rhiRenderer) {
 	const auto vfile = join(StaticCollector::getGLShaderPath(), "Base", "triangle.vert");
 	const auto ffile = join(StaticCollector::getGLShaderPath(), "Base", "triangle.frag");
 
@@ -35,10 +35,9 @@ bool GLTriangleApp::initApp() {
 	return true;
 }
 
-void GLTriangleApp::drawScene(const float dt) {
+void GLTriangleApp::draw(const float dt) {
 	renderer()->setPipeline(_pipeline);
 	renderer()->setVertexBuffer(_vb);
 	_uboBuffer->update(&_ubo, sizeof(rhi::UniformBlock), 0);
 	renderer()->draw(_vertexCount, 0);
-	return GLApp::drawScene(dt);
 }

@@ -15,8 +15,8 @@ using namespace ErrorHandle;
 GLSimpleLightDiffuse::~GLSimpleLightDiffuse() {
 }
 
-bool GLSimpleLightDiffuse::initApp() {
-	if (!GLCameraBaseApp::initApp()) {
+bool GLSimpleLightDiffuse::load(std::shared_ptr<rhi::IRenderer> rhiRenderer) {
+	if (!GLCameraBaseApp::load(rhiRenderer)) {
 		return false;
 	}
 
@@ -55,8 +55,7 @@ bool GLSimpleLightDiffuse::initApp() {
 	return true;
 }
 
-void GLSimpleLightDiffuse::drawScene(const float dt) {
-	GLApp::drawScene(dt);
+void GLSimpleLightDiffuse::draw(const float dt) {
 	ImGui::Begin("OpenGL");
 	ImGui::Text("Color Picker with Alpha:");
 	ImGui::ColorEdit4("Color with Alpha", &_lightColor[0]);

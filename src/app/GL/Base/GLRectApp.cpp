@@ -12,7 +12,7 @@ using namespace ErrorHandle;
 GLRectApp::~GLRectApp() {
 }
 
-bool GLRectApp::initApp() {
+bool GLRectApp::load(std::shared_ptr<rhi::IRenderer> rhiRenderer) {
 	const auto vfile = join(StaticCollector::getGLShaderPath(), "Base", "rect.vert");
 	const auto ffile = join(StaticCollector::getGLShaderPath(), "Base", "rect.frag");
 
@@ -36,11 +36,10 @@ bool GLRectApp::initApp() {
 	return true;
 }
 
-void GLRectApp::drawScene(const float dt) {
+void GLRectApp::draw(const float dt) {
 	renderer()->setPipeline(_pipeline);
 	renderer()->setVertexBuffer(_vb);
 	renderer()->setIndexBuffer(_ib);
 	_uboBuffer->update(&_ubo, sizeof(rhi::UniformBlock), 0);
 	renderer()->drawIndexed(_indexCount, 0);
-	return GLApp::drawScene(dt);
 }

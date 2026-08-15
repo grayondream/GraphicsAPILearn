@@ -47,8 +47,8 @@ void GLIBLSpecularApp::initShapes() {
     m_quad = CreateQuadBuffer(renderer().get());
 }
 
-bool GLIBLSpecularApp::initApp() {
-    if (!GLCameraBaseApp::initApp()) return false;
+bool GLIBLSpecularApp::load(std::shared_ptr<rhi::IRenderer> rhiRenderer) {
+    if (!GLCameraBaseApp::load(rhiRenderer)) return false;
     _uboBuffer = renderer()->createUniformBuffer();
     _uboBuffer->init(nullptr, sizeof(rhi::UniformBlock), rhi::BufferType::Uniform);
     _uboBuffer->bindRange(0, 0, sizeof(rhi::UniformBlock));
@@ -176,8 +176,7 @@ void GLIBLSpecularApp::renderToCubemap() {
         renderCube(m_cubeMapProgram, glm::mat4(1.0));
     }
     renderer()->setRenderTarget(nullptr);
-    const auto props = m_window->getProperties();
-    renderer()->setViewport(rhi::Viewport{0, 0, static_cast<int>(props.width), static_cast<int>(props.height)});
+    renderer()->setViewport(rhi::Viewport{0, 0, static_cast<int>(windowWidth()), static_cast<int>(windowHeight())});
 }
 
 void GLIBLSpecularApp::renderIrradianceMap() {
@@ -199,8 +198,7 @@ void GLIBLSpecularApp::renderIrradianceMap() {
         renderCube(m_irradianceProgram, glm::mat4(1.0));
     }
     renderer()->setRenderTarget(nullptr);
-    const auto props = m_window->getProperties();
-    renderer()->setViewport(rhi::Viewport{0, 0, static_cast<int>(props.width), static_cast<int>(props.height)});
+    renderer()->setViewport(rhi::Viewport{0, 0, static_cast<int>(windowWidth()), static_cast<int>(windowHeight())});
 }
 
 void GLIBLSpecularApp::renderPerfilterMap() {
@@ -227,8 +225,7 @@ void GLIBLSpecularApp::renderPerfilterMap() {
         }
     }
     renderer()->setRenderTarget(nullptr);
-    const auto props = m_window->getProperties();
-    renderer()->setViewport(rhi::Viewport{0, 0, static_cast<int>(props.width), static_cast<int>(props.height)});
+    renderer()->setViewport(rhi::Viewport{0, 0, static_cast<int>(windowWidth()), static_cast<int>(windowHeight())});
 }
 
 void GLIBLSpecularApp::createBrdfLUT() {
@@ -251,8 +248,7 @@ void GLIBLSpecularApp::renderBrdfLUT() {
     renderer()->setVertexBuffer(m_quad.vertexBuffer);
     renderer()->draw(m_quad.vertexCount, 0);
     renderer()->setRenderTarget(nullptr);
-    const auto props = m_window->getProperties();
-    renderer()->setViewport(rhi::Viewport{0, 0, static_cast<int>(props.width), static_cast<int>(props.height)});
+    renderer()->setViewport(rhi::Viewport{0, 0, static_cast<int>(windowWidth()), static_cast<int>(windowHeight())});
 }
 
 void GLIBLSpecularApp::renderCube(const std::shared_ptr<rhi::IPipeline>& program, const glm::mat4& model) {
@@ -338,8 +334,7 @@ void GLIBLSpecularApp::renderObjectsAndLights(const std::shared_ptr<rhi::IPipeli
     }
 }
 
-void GLIBLSpecularApp::drawScene(const float dt) {
-    GLCameraBaseApp::drawScene(dt);
+void GLIBLSpecularApp::draw(const float dt) {
     const auto projection = glm::perspective(glm::radians(_camera.zoom()), aspectRatio(), 0.1f, 100.0f);
     const auto view = _camera.getViewMatrix();
     renderObjectsAndLights(m_program, view, projection);

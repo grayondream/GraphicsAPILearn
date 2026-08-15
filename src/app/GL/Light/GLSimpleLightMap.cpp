@@ -16,8 +16,8 @@ using namespace ErrorHandle;
 GLSimpleLightMap::~GLSimpleLightMap() {
 }
 
-bool GLSimpleLightMap::initApp() {
-	if (!GLCameraBaseApp::initApp()) {
+bool GLSimpleLightMap::load(std::shared_ptr<rhi::IRenderer> rhiRenderer) {
+	if (!GLCameraBaseApp::load(rhiRenderer)) {
 		return false;
 	}
 
@@ -70,8 +70,7 @@ bool GLSimpleLightMap::initApp() {
 	return true;
 }
 
-void GLSimpleLightMap::drawScene(const float dt) {
-	GLApp::drawScene(dt);
+void GLSimpleLightMap::draw(const float dt) {
 	ImGui::Begin("OpenGL");
 	ImGui::Text("Color Picker with Alpha:");
 	ImGui::ColorEdit4("Color with Alpha", &_lightColor[0]);

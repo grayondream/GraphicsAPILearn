@@ -15,8 +15,8 @@ using namespace ErrorHandle;
 GLSimpleLightSpecular::~GLSimpleLightSpecular() {
 }
 
-bool GLSimpleLightSpecular::initApp() {
-	if (!GLCameraBaseApp::initApp()) {
+bool GLSimpleLightSpecular::load(std::shared_ptr<rhi::IRenderer> rhiRenderer) {
+	if (!GLCameraBaseApp::load(rhiRenderer)) {
 		return false;
 	}
 
@@ -55,8 +55,7 @@ bool GLSimpleLightSpecular::initApp() {
 	return true;
 }
 
-void GLSimpleLightSpecular::drawScene(const float dt) {
-	GLApp::drawScene(dt);
+void GLSimpleLightSpecular::draw(const float dt) {
 	ImGui::Begin("OpenGL");
 	ImGui::Text("Color Picker with Alpha:");
 	ImGui::ColorEdit4("Color with Alpha", &_lightColor[0]);

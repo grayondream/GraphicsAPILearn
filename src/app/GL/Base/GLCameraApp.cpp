@@ -22,8 +22,8 @@ using namespace Utils::Event;
 GLCameraApp::~GLCameraApp() {
 }
 
-bool GLCameraApp::initApp() {
-	GLCameraBaseApp::initApp();
+bool GLCameraApp::load(std::shared_ptr<rhi::IRenderer> rhiRenderer) {
+	GLCameraBaseApp::load(rhiRenderer);
 	const auto vfile = join(StaticCollector::getGLShaderPath(), "Base", "Cube.vert");
 	const auto ffile = join(StaticCollector::getGLShaderPath(), "Base", "Cube.frag");
 
@@ -53,7 +53,7 @@ bool GLCameraApp::initApp() {
 	return true;
 }
 
-void GLCameraApp::drawScene(const float dt) {
+void GLCameraApp::draw(const float dt) {
 	renderer()->bindTexture(_texture, 0);
 	renderer()->setPipeline(_pipeline);
 	renderer()->setVertexBuffer(_vb);
@@ -94,5 +94,4 @@ void GLCameraApp::drawScene(const float dt) {
 		renderer()->draw(_vertexCount, 0);
 	}
 
-	return GLApp::drawScene(dt);
 }

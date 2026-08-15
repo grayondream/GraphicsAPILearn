@@ -55,8 +55,8 @@ void GLDeferApp::createQuadBuffer() {
 }
 
 void GLDeferApp::createFrameBuffers() {
-	const int w = static_cast<int>(m_window->getProperties().width);
-	const int h = static_cast<int>(m_window->getProperties().height);
+	const int w = static_cast<int>(windowWidth());
+	const int h = static_cast<int>(windowHeight());
 	m_gBuffer = renderer()->createRenderTarget();
 	rhi::FramebufferDesc fbd;
 	fbd.width = w; fbd.height = h;
@@ -74,8 +74,8 @@ void GLDeferApp::createFrameBuffers() {
 	if (!m_gBuffer->create(fbd)) ExitIfFailed(false, "Failed to create GBuffer framebuffer");
 }
 
-bool GLDeferApp::initApp() {
-	if (!GLCameraBaseApp::initApp()) {
+bool GLDeferApp::load(std::shared_ptr<rhi::IRenderer> rhiRenderer) {
+	if (!GLCameraBaseApp::load(rhiRenderer)) {
 		return false;
 	}
 
@@ -275,8 +275,7 @@ void GLDeferApp::renderGBuffer(std::shared_ptr<rhi::IPipeline>& program, const g
 	renderer()->setRenderTarget(nullptr);
 }
 
-void GLDeferApp::drawScene(const float dt) {
-	GLCameraBaseApp::drawScene(dt);
+void GLDeferApp::draw(const float dt) {
 	const auto projection = glm::perspective(glm::radians(_camera.zoom()), aspectRatio(), 0.1f, 100.0f);
 	const auto view = _camera.getViewMatrix();
 	renderGBuffer(m_gBufferProgram, projection, view);

@@ -18,8 +18,8 @@ using namespace ErrorHandle;
 
 GLSkyboxApp::~GLSkyboxApp() {}
 
-bool GLSkyboxApp::initApp() {
-    if (!GLCameraBaseApp::initApp()) return false;
+bool GLSkyboxApp::load(std::shared_ptr<rhi::IRenderer> rhiRenderer) {
+    if (!GLCameraBaseApp::load(rhiRenderer)) return false;
     Cube cubeShape{};
     auto cg = RhiGeometry::Create(renderer().get(), cubeShape, true, true, true,
                                   RhiGeometry::Layout{3, 2});
@@ -97,7 +97,7 @@ void GLSkyboxApp::drawSkybox() {
     _skyboxPipeline->setDepthFunc(rhi::CompareFunc::Less);
 }
 
-void GLSkyboxApp::drawScene(const float dt) {
+void GLSkyboxApp::draw(const float dt) {
 	ImGui::Begin("OpenGL");
 	ImGui::Checkbox("Enable Reflection", &_enableReflect);
 	ImGui::Checkbox("Enable Refraction", &_enableRefraction);
@@ -112,5 +112,4 @@ void GLSkyboxApp::drawScene(const float dt) {
 	drawCube();
 	drawSkybox();
 	
-	return GLApp::drawScene(dt);
 }

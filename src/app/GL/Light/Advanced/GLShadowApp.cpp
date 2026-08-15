@@ -27,8 +27,8 @@ using namespace ErrorHandle;
 GLShadowApp::~GLShadowApp() {
 }
 
-bool GLShadowApp::initApp() {
-	if (!GLCameraBaseApp::initApp()) {
+bool GLShadowApp::load(std::shared_ptr<rhi::IRenderer> rhiRenderer) {
+	if (!GLCameraBaseApp::load(rhiRenderer)) {
 		return false;
 	}
 
@@ -165,8 +165,7 @@ void GLShadowApp::renderScene2FrameBuffer(const glm::mat4& lightSpaceMatrix, con
         renderScene(_depthProgram, lightPos);
     }
     renderer()->setRenderTarget(nullptr);
-    const auto props = m_window->getProperties();
-    renderer()->setViewport(rhi::Viewport{0, 0, props.width, props.height});
+    renderer()->setViewport(rhi::Viewport{0, 0, windowWidth(), windowHeight()});
 }
 
 void GLShadowApp::renderScene2Screen(const glm::mat4& lightSpaceMatrix, const glm::vec3& lightPos) {
@@ -195,8 +194,7 @@ void GLShadowApp::renderDepthDebug() {
     renderer()->draw(_quadVertexCount, 0);
 }
 
-void GLShadowApp::drawScene(const float dt) {
-	GLCameraBaseApp::drawScene(dt);
+void GLShadowApp::draw(const float dt) {
 	ImGui::Begin("OpenGL");
 	ImGui::Checkbox("Enable Debug", &_enableDebug);
 	ImGui::Checkbox("Enable DepthMap", &_enableDepthMap);

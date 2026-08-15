@@ -19,8 +19,8 @@ using namespace ErrorHandle;
 GLNormalLine::~GLNormalLine() {
 }
 
-bool GLNormalLine::initApp() {
-	if (!GLCameraBaseApp::initApp()) {
+bool GLNormalLine::load(std::shared_ptr<rhi::IRenderer> rhiRenderer) {
+	if (!GLCameraBaseApp::load(rhiRenderer)) {
 		return false;
 	}
 	
@@ -60,7 +60,7 @@ bool GLNormalLine::initApp() {
 	return true;
 }
 
-void GLNormalLine::drawScene(const float dt) {
+void GLNormalLine::draw(const float dt) {
 	ImGui::Begin("OpenGL");
 	ImGui::End();
 
@@ -100,5 +100,4 @@ void GLNormalLine::drawScene(const float dt) {
 		_uboBuffer->update(&_ubo, sizeof(rhi::UniformBlock), 0);
 		renderer()->drawIndexed(_indexCount, 0, 0);
 	}
-	return GLApp::drawScene(dt);
 }

@@ -1,4 +1,5 @@
 #include "GLAppFactory.hpp"
+#include "app/AppHost.hpp"
 #include "app/GL/GLApp.hpp"
 #include "app/GL/Base/GLTriangleApp.hpp"
 #include "app/GL/Base/GLRectApp.hpp"
@@ -45,102 +46,107 @@
 #include "app/GL/Advanced/PBR/GLIBLIrradianceConversionApp.hpp"
 #include "app/GL/Advanced/PBR/GLIBLIrradianceApp.hpp"
 #include "app/GL/Advanced/PBR/GLIBLSpecularApp.hpp"
+#include "app/sample/Sample.hpp"
 #include <memory>
+
+static std::shared_ptr<IApplication> MakeHost(std::shared_ptr<Sample> s) {
+	return std::make_shared<AppHost>(std::move(s));
+}
 
 std::shared_ptr<IApplication> GLAppFactory::create(const AppType type){
 	switch(type){
 		case AppType::Base:
 			return std::make_shared<GLApp>();
 		case AppType::Triangle:
-			return std::make_shared<GLTriangleApp>();
+			return MakeHost(std::make_shared<GLTriangleApp>());
 		case AppType::Rect:
-			return std::make_shared<GLRectApp>();
+			return MakeHost(std::make_shared<GLRectApp>());
 		case AppType::SimpleTexture:
-			return std::make_shared<GLSimpleTextureApp>();
+			return MakeHost(std::make_shared<GLSimpleTextureApp>());
 		case AppType::Cube:
-			return std::make_shared<GLCubeApp>();
+			return MakeHost(std::make_shared<GLCubeApp>());
 		case AppType::Camera:
-			return std::make_shared<GLCameraApp>();
+			return MakeHost(std::make_shared<GLCameraApp>());
 		case AppType::SimpleLight_Ambination:
-			return std::make_shared<GLSimpleLightAmbination>();
+			return MakeHost(std::make_shared<GLSimpleLightAmbination>());
 		case AppType::SimpleLight_Diffuse:
-			return std::make_shared<GLSimpleLightDiffuse>();
+			return MakeHost(std::make_shared<GLSimpleLightDiffuse>());
 		case AppType::SimpleLight_Specular:
-			return std::make_shared<GLSimpleLightSpecular>();
+			return MakeHost(std::make_shared<GLSimpleLightSpecular>());
 		case AppType::SimpleLight_Material:
-			return std::make_shared<GLSimpleLightMaterial>();
+			return MakeHost(std::make_shared<GLSimpleLightMaterial>());
 		case AppType::SimpleLight_Map:
-			return std::make_shared<GLSimpleLightMap>();
+			return MakeHost(std::make_shared<GLSimpleLightMap>());
 		case AppType::SimpleLight_Source_Direction:
-			return std::make_shared<GLLightSourceDirection>();
+			return MakeHost(std::make_shared<GLLightSourceDirection>());
 		case AppType::SimpleLight_Source_Point:
-			return std::make_shared<GLLightSourcePoint>();
+			return MakeHost(std::make_shared<GLLightSourcePoint>());
 		case AppType::SimpleLight_Source_Spot:
-			return std::make_shared<GLLightSourceSpot>();
+			return MakeHost(std::make_shared<GLLightSourceSpot>());
 		case AppType::SimpleLight_Source_Mult:
-			return std::make_shared<GLLightSourceMult>();
+			return MakeHost(std::make_shared<GLLightSourceMult>());
 		case AppType::LoadModel:
-			return std::make_shared<GLLoadModelApp>();
+			return MakeHost(std::make_shared<GLLoadModelApp>());
 		case AppType::DepthTest:
-			return std::make_shared<GLDepthTestApp>();
+			return MakeHost(std::make_shared<GLDepthTestApp>());
 		case AppType::TemplateTest:
-			return std::make_shared<GLTemplateTestApp>();
+			return MakeHost(std::make_shared<GLTemplateTestApp>());
 		case AppType::Blend:
-			return std::make_shared<GLBlendApp>();
+			return MakeHost(std::make_shared<GLBlendApp>());
 		case AppType::CullFace:
-			return std::make_shared<GLCullFaceApp>();
+			return MakeHost(std::make_shared<GLCullFaceApp>());
 		case AppType::FrameBuffer:
-			return std::make_shared<GLFrameBufferApp>();
+			return MakeHost(std::make_shared<GLFrameBufferApp>());
 		case AppType::SkyBox:
-			return std::make_shared<GLSkyboxApp>();
+			return MakeHost(std::make_shared<GLSkyboxApp>());
 		case AppType::AdvancedShader:
-			return std::make_shared<GLAdvancedGLSLApp>();
+			return MakeHost(std::make_shared<GLAdvancedGLSLApp>());
 		case AppType::UniformBuffer:
-			return std::make_shared<GLUniformBufferApp>();
+			return MakeHost(std::make_shared<GLUniformBufferApp>());
 		case AppType::SimpleGeometry:
-			return std::make_shared<GLSimpleGemoteryApp>();
+			return MakeHost(std::make_shared<GLSimpleGemoteryApp>());
 		case AppType::Explode:
-			return std::make_shared<GLExplodeApp>();
+			return MakeHost(std::make_shared<GLExplodeApp>());
 		case AppType::NormalLine:
-			return std::make_shared<GLNormalLine>();
+			return MakeHost(std::make_shared<GLNormalLine>());
 		case AppType::MultiInstance:
-			return std::make_shared<GLMultieInstanceApp>();
+			return MakeHost(std::make_shared<GLMultieInstanceApp>());
 		case AppType::MultiInstance_Saturn:
-			return std::make_shared<GLSaturnApp>();
+			return MakeHost(std::make_shared<GLSaturnApp>());
 		case AppType::Msaa:
-			return std::make_shared<GLMsaaApp>();
+			return MakeHost(std::make_shared<GLMsaaApp>());
 		case AppType::BlinnPhong:
-			return std::make_shared<GLBlinnPhongApp>();
+			return MakeHost(std::make_shared<GLBlinnPhongApp>());
 		case AppType::Gamma:
-			return std::make_shared<GLGammaApp>();
+			return MakeHost(std::make_shared<GLGammaApp>());
 		case AppType::Shadow_Map:
-			return std::make_shared<GLShadowMapApp>();
+			return MakeHost(std::make_shared<GLShadowMapApp>());
 		case AppType::Shadow:
-			return std::make_shared<GLShadowApp>();
+			return MakeHost(std::make_shared<GLShadowApp>());
 		case AppType::Shadow_PointLight:
-			return std::make_shared<GLPointLightShadowApp>();
+			return MakeHost(std::make_shared<GLPointLightShadowApp>());
 		case AppType::NormalMap:
-			return std::make_shared<GLNormalMapApp>();
+			return MakeHost(std::make_shared<GLNormalMapApp>());
 		case AppType::ParallaxMap:
-			return std::make_shared<GLParallaxMapApp>();
+			return MakeHost(std::make_shared<GLParallaxMapApp>());
 		case AppType::Hdr:
-			return std::make_shared<GLHdrApp>();
+			return MakeHost(std::make_shared<GLHdrApp>());
 		case AppType::Bloom:
-			return std::make_shared<GLBloomApp>();
+			return MakeHost(std::make_shared<GLBloomApp>());
 		case AppType::Defer:
-			return std::make_shared<GLDeferApp>();			
+			return MakeHost(std::make_shared<GLDeferApp>());
 		case AppType::SSAO:
-			return std::make_shared<GLSSAOApp>();
+			return MakeHost(std::make_shared<GLSSAOApp>());
 		case AppType::PBR_Base:
-			return std::make_shared<GLPBRBaseApp>();
+			return MakeHost(std::make_shared<GLPBRBaseApp>());
 		case AppType::PBR_Texture:
-			return std::make_shared<GLPBRTextureApp>();
+			return MakeHost(std::make_shared<GLPBRTextureApp>());
 		case AppType::PBR_IBL_Irradiance_Conversion:
-			return std::make_shared<GLIBLIrradianceConversionApp>();
+			return MakeHost(std::make_shared<GLIBLIrradianceConversionApp>());
 		case AppType::PBR_IBL_Irradiance:
-			return std::make_shared<GLIBLIrradianceApp>();
+			return MakeHost(std::make_shared<GLIBLIrradianceApp>());
 		case AppType::PBR_IBL_Specular:
-			return std::make_shared<GLIBLSpecularApp>();
+			return MakeHost(std::make_shared<GLIBLSpecularApp>());
 		default:
 			break;	
 	}

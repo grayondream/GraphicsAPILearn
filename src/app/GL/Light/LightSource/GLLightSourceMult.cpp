@@ -18,8 +18,8 @@ using namespace ErrorHandle;
 GLLightSourceMult::~GLLightSourceMult() {
 }
 
-bool GLLightSourceMult::initApp() {
-	if (!GLCameraBaseApp::initApp()) {
+bool GLLightSourceMult::load(std::shared_ptr<rhi::IRenderer> rhiRenderer) {
+	if (!GLCameraBaseApp::load(rhiRenderer)) {
 		return false;
 	}
 
@@ -218,8 +218,7 @@ void GLLightSourceMult::drawObjects(const glm::mat4& proj, const float curTime, 
 	}
 }
 
-void GLLightSourceMult::drawScene(const float dt) {
-	GLApp::drawScene(dt);
+void GLLightSourceMult::draw(const float dt) {
 	drawUI();
 	static float curTime = 0;
 	curTime += dt;

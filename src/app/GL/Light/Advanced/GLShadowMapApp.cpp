@@ -26,8 +26,8 @@ using namespace ErrorHandle;
 GLShadowMapApp::~GLShadowMapApp() {
 }
 
-bool GLShadowMapApp::initApp() {
-	if (!GLCameraBaseApp::initApp()) {
+bool GLShadowMapApp::load(std::shared_ptr<rhi::IRenderer> rhiRenderer) {
+	if (!GLCameraBaseApp::load(rhiRenderer)) {
 		return false;
 	}
 
@@ -132,8 +132,7 @@ void GLShadowMapApp::renderScene2FrameBuffer() {
         renderer()->drawIndexed(_cubeIndexCount, 0, 0);
     }
     renderer()->setRenderTarget(nullptr);
-    const auto props = m_window->getProperties();
-    renderer()->setViewport(rhi::Viewport{0, 0, props.width, props.height});
+    renderer()->setViewport(rhi::Viewport{0, 0, windowWidth(), windowHeight()});
 }
 
 void GLShadowMapApp::reanderFraemBuffer() {
@@ -148,8 +147,7 @@ void GLShadowMapApp::reanderFraemBuffer() {
     renderer()->drawIndexed(_screenIndexCount, 0, 0);
 }
 
-void GLShadowMapApp::drawScene(const float dt) {
-	GLCameraBaseApp::drawScene(dt);
+void GLShadowMapApp::draw(const float dt) {
 	ImGui::Begin("OpenGL");
 	ImGui::End();
 

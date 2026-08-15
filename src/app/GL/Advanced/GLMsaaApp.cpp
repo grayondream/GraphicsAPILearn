@@ -38,8 +38,8 @@ void GLMsaaApp::compileShader(const rhi::VertexLayout& layout) {
 	_postPipeline = compileShader("Post", layout);
 }
 
-bool GLMsaaApp::initApp() {
-	if (!GLCameraBaseApp::initApp()) {
+bool GLMsaaApp::load(std::shared_ptr<rhi::IRenderer> rhiRenderer) {
+	if (!GLCameraBaseApp::load(rhiRenderer)) {
 		return false;
 	}
 
@@ -65,10 +65,9 @@ bool GLMsaaApp::initApp() {
 }
 
 void GLMsaaApp::createFrameBuffer() {
-	const auto prop = m_window->getProperties();
 	_msaaFbo = renderer()->createRenderTarget();
 	rhi::FramebufferDesc fbd;
-	fbd.width = prop.width; fbd.height = prop.height;
+	fbd.width = windowWidth(); fbd.height = windowHeight();
 	fbd.samples = 4;
 	rhi::FramebufferAttachment color;
 	color.type = rhi::AttachmentType::Color;
@@ -84,10 +83,9 @@ void GLMsaaApp::createFrameBuffer() {
 }
 
 void GLMsaaApp::createPostFrameBuffer() {
-	const auto prop = m_window->getProperties();
 	_postFbo = renderer()->createRenderTarget();
 	rhi::FramebufferDesc fbd;
-	fbd.width = prop.width; fbd.height = prop.height;
+	fbd.width = windowWidth(); fbd.height = windowHeight();
 	rhi::FramebufferAttachment color;
 	color.type = rhi::AttachmentType::Color;
 	color.format = rhi::TextureFormat::RGB8;
@@ -118,8 +116,7 @@ void GLMsaaApp::drawFrameBufferMssa() {
 	_uboBuffer->update(&_ubo, sizeof(rhi::UniformBlock), 0);
 	renderer()->drawIndexed(36, 0, 0);
 
-	const auto attr = m_window->getProperties();
-	renderer()->setViewport(rhi::Viewport{0, 0, attr.width, attr.height});
+	renderer()->setViewport(rhi::Viewport{0, 0, windowWidth(), windowHeight()});
 	renderer()->blitFramebuffer(_msaaFbo, _postFbo, rhi::BlitMask::Color);
 	renderer()->setRenderTarget(nullptr);
 	renderer()->clearColor(0.1f, 0.1f, 0.1f, 1.0f);
@@ -156,7 +153,7 @@ void GLMsaaApp::drawGLMssa() {
 	renderer()->drawIndexed(36, 0, 0);
 }
 
-void GLMsaaApp::drawScene(const float dt) {
+void GLMsaaApp::draw(const float dt) {
 	
 	ImGui::Begin("OpenGL");
 	ImGui::SetNextItemWidth(200);
@@ -170,5 +167,4 @@ void GLMsaaApp::drawScene(const float dt) {
 		drawGLMssa();
 	}
 	
-	return GLApp::drawScene(dt);
 }

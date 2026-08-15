@@ -19,8 +19,8 @@ using namespace ErrorHandle;
 GLBlinnPhongApp::~GLBlinnPhongApp() {
 }
 
-bool GLBlinnPhongApp::initApp() {
-	if (!GLCameraBaseApp::initApp()) {
+bool GLBlinnPhongApp::load(std::shared_ptr<rhi::IRenderer> rhiRenderer) {
+	if (!GLCameraBaseApp::load(rhiRenderer)) {
 		return false;
 	}
 
@@ -71,8 +71,7 @@ bool GLBlinnPhongApp::initApp() {
 	return true;
 }
 
-void GLBlinnPhongApp::drawScene(const float dt) {
-	GLApp::drawScene(dt);
+void GLBlinnPhongApp::draw(const float dt) {
 	ImGui::Begin("OpenGL");
 	ImGui::Text("Color Picker with Alpha:");
 	ImGui::ColorEdit4("Color with Alpha", &_lightColor[0]);
@@ -123,5 +122,4 @@ void GLBlinnPhongApp::drawScene(const float dt) {
 		renderer()->drawIndexed(_indexCount, 0, 0);
 	}
 
-	return GLApp::drawScene(dt);
 }

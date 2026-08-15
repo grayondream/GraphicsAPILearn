@@ -19,8 +19,8 @@ using namespace ErrorHandle;
 GLGammaApp::~GLGammaApp() {
 }
 
-bool GLGammaApp::initApp() {
-	if (!GLCameraBaseApp::initApp()) {
+bool GLGammaApp::load(std::shared_ptr<rhi::IRenderer> rhiRenderer) {
+	if (!GLCameraBaseApp::load(rhiRenderer)) {
 		return false;
 	}
 
@@ -71,8 +71,7 @@ bool GLGammaApp::initApp() {
 	return true;
 }
 
-void GLGammaApp::drawScene(const float dt) {
-	GLApp::drawScene(dt);
+void GLGammaApp::draw(const float dt) {
 	ImGui::Begin("OpenGL");
 	ImGui::Text("Color Picker with Alpha:");
 	ImGui::ColorEdit4("Color with Alpha", &_lightColor[0]);

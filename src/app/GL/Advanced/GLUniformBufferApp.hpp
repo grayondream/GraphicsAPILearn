@@ -1,5 +1,6 @@
 #pragma once
 #include "app/GL/Base/GLCameraBaseApp.hpp"
+#include "rhi/core/IRenderer.hpp"
 #include "rhi/core/IPipeline.hpp"
 #include "rhi/core/IBuffer.hpp"
 #include <memory>
@@ -13,8 +14,8 @@ public:
 	virtual ~GLUniformBufferApp();
 
 protected:
-	virtual bool initApp() override;
-	virtual void drawScene(const float dt);
+	virtual bool load(std::shared_ptr<rhi::IRenderer> rhiRenderer) override;
+	virtual void draw(const float dt) override;
 
 private:
 	std::vector<std::shared_ptr<rhi::IPipeline>> _pipelines{};

@@ -81,8 +81,8 @@ static RhiGeometry::Geometry CreateRectBuffer(rhi::IRenderer* renderer) {
 	return RhiGeometry::CreateFromArray(renderer, quadVertices, sizeof(quadVertices), 6, layout);
 }
 
-bool GLNormalMapApp::initApp() {
-	if (!GLCameraBaseApp::initApp()) {
+bool GLNormalMapApp::load(std::shared_ptr<rhi::IRenderer> rhiRenderer) {
+	if (!GLCameraBaseApp::load(rhiRenderer)) {
 		return false;
 	}
 
@@ -124,8 +124,7 @@ void GLNormalMapApp::compileShader() {
 	ExitIfFailed(ok, "Create RHI shader failed: {}", _shader->getLog());
 }
 
-void GLNormalMapApp::drawScene(const float dt) {
-	GLApp::drawScene(dt);
+void GLNormalMapApp::draw(const float dt) {
 	ImGui::Begin("OpenGL");
 	ImGui::Checkbox("Enable Normal Map", &_enableNormalMap);
 	ImGui::End();
@@ -156,5 +155,4 @@ void GLNormalMapApp::drawScene(const float dt) {
 	_uboBuffer->update(&_ubo, sizeof(rhi::UniformBlock), 0);
 	renderer()->draw(_vertexCount, 0);
 
-	return GLApp::drawScene(dt);
 }

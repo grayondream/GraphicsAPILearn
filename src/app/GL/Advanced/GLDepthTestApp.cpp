@@ -18,8 +18,8 @@ using namespace ErrorHandle;
 
 GLDepthTestApp::~GLDepthTestApp() {}
 
-bool GLDepthTestApp::initApp() {
-    if (!GLApp::initApp()) return false;
+bool GLDepthTestApp::load(std::shared_ptr<rhi::IRenderer> rhiRenderer) {
+    if (!Sample::load(rhiRenderer)) return false;
     const auto vfile = join(StaticCollector::getGLShaderPath(), "Advanced", "DepthTest", "Basic.vert");
     const auto ffile = join(StaticCollector::getGLShaderPath(), "Advanced", "DepthTest", "Basic.frag");
     auto shader = renderer()->createShader();
@@ -57,7 +57,7 @@ static std::vector<glm::vec3> initializeCubePositions() {
 	return positions;
 }
 
-void GLDepthTestApp::drawScene(const float dt) {
+void GLDepthTestApp::draw(const float dt) {
     ImGui::Begin("OpenGL"); ImGui::End();
     std::vector<glm::vec3> cubePositions = initializeCubePositions();
     int count = (int)cubePositions.size();
@@ -84,5 +84,4 @@ void GLDepthTestApp::drawScene(const float dt) {
     rhi::SetUniform(_ubo, "model", model);
     _uboBuffer->update(&_ubo, sizeof(rhi::UniformBlock), 0);
     renderer()->draw(_planeVertexCount, 0);
-    return GLApp::drawScene(dt);
 }

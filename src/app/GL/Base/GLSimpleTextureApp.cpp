@@ -14,7 +14,7 @@ using namespace ErrorHandle;
 GLSimpleTextureApp::~GLSimpleTextureApp() {
 }
 
-bool GLSimpleTextureApp::initApp() {
+bool GLSimpleTextureApp::load(std::shared_ptr<rhi::IRenderer> rhiRenderer) {
 	const auto vfile = join(StaticCollector::getGLShaderPath(), "Base", "SimpleTexture.vert");
 	const auto ffile = join(StaticCollector::getGLShaderPath(), "Base", "SimpleTexture.frag");
 
@@ -43,7 +43,7 @@ bool GLSimpleTextureApp::initApp() {
 	return true;
 }
 
-void GLSimpleTextureApp::drawScene(const float dt) {
+void GLSimpleTextureApp::draw(const float dt) {
 	renderer()->bindTexture(_texture, 0);
 	renderer()->setPipeline(_pipeline);
 	renderer()->setVertexBuffer(_vb);
@@ -51,5 +51,4 @@ void GLSimpleTextureApp::drawScene(const float dt) {
 	renderer()->setIndexBuffer(_ib);
 	_uboBuffer->update(&_ubo, sizeof(rhi::UniformBlock), 0);
 	renderer()->drawIndexed(_indexCount, 0);
-	return GLApp::drawScene(dt);
 }

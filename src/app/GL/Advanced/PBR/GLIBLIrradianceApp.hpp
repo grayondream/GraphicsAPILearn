@@ -15,8 +15,8 @@ public:
     virtual ~GLIBLIrradianceApp();
 
 public:
-    virtual bool initApp() override;
-    virtual void drawScene(const float dt) override;
+    virtual bool load(std::shared_ptr<rhi::IRenderer> rhiRenderer) override;
+    virtual void draw(const float dt) override;
 
 private:
     void initShapes();

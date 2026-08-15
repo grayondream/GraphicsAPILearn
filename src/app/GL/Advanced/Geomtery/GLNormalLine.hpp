@@ -1,5 +1,6 @@
 #pragma once
 #include "app/GL/Base/GLCameraBaseApp.hpp"
+#include "rhi/core/IRenderer.hpp"
 #include "rhi/core/IPipeline.hpp"
 #include "rhi/core/IBuffer.hpp"
 #include "rhi/core/UniformBlock.hpp"
@@ -16,8 +17,8 @@ public:
 	virtual ~GLNormalLine();
 
 protected:
-	virtual bool initApp() override;
-	virtual void drawScene(const float dt);
+	virtual bool load(std::shared_ptr<rhi::IRenderer> rhiRenderer) override;
+	virtual void draw(const float dt) override;
 	
 private:
 	Sphere shape{};

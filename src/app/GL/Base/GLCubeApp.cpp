@@ -20,7 +20,7 @@ using namespace ErrorHandle;
 GLCubeApp::~GLCubeApp() {
 }
 
-bool GLCubeApp::initApp() {
+bool GLCubeApp::load(std::shared_ptr<rhi::IRenderer> rhiRenderer) {
 	const auto vfile = join(StaticCollector::getGLShaderPath(), "Base", "Cube.vert");
 	const auto ffile = join(StaticCollector::getGLShaderPath(), "Base", "Cube.frag");
 
@@ -50,7 +50,7 @@ bool GLCubeApp::initApp() {
 	return true;
 }
 
-void GLCubeApp::drawScene(const float dt) {
+void GLCubeApp::draw(const float dt) {
 	renderer()->bindTexture(_texture, 0);
 	renderer()->setPipeline(_pipeline);
 	renderer()->setVertexBuffer(_vb);
@@ -93,5 +93,4 @@ void GLCubeApp::drawScene(const float dt) {
 		renderer()->draw(_vertexCount, 0);
 	}
 
-	return GLApp::drawScene(dt);
 }

@@ -56,8 +56,8 @@ void GLFrameBufferApp::loadTexture() {
 void GLFrameBufferApp::initGLEnv() {
 }
 
-bool GLFrameBufferApp::initApp() {
-	if (!GLApp::initApp()) {
+bool GLFrameBufferApp::load(std::shared_ptr<rhi::IRenderer> rhiRenderer) {
+	if (!Sample::load(rhiRenderer)) {
 		return false;
 	}
 
@@ -88,10 +88,9 @@ bool GLFrameBufferApp::initApp() {
 }
 
 void GLFrameBufferApp::createFrameBuffer() {
-	const auto prop = m_window->getProperties();
 	_screenFbo = renderer()->createRenderTarget();
 	rhi::FramebufferDesc fbd;
-	fbd.width = prop.width; fbd.height = prop.height;
+	fbd.width = windowWidth(); fbd.height = windowHeight();
 	rhi::FramebufferAttachment color;
 	color.type = rhi::AttachmentType::Color;
 	color.format = rhi::TextureFormat::RGB8;
@@ -163,7 +162,7 @@ void GLFrameBufferApp::drawCube() {
 	}
 }
 
-void GLFrameBufferApp::drawScene(const float dt) {
+void GLFrameBufferApp::draw(const float dt) {
 	ImGui::Begin("OpenGL");
 	ImGui::SetNextItemWidth(200);
 	const char* items[4] = { "None", "Inversion", "Gray", "Kernel"};
@@ -191,5 +190,4 @@ void GLFrameBufferApp::drawScene(const float dt) {
 	_uboBuffer->update(&_ubo, sizeof(rhi::UniformBlock), 0);
 	renderer()->drawIndexed(6, 0, 0);
 	_screenPipeline->setDepthTest(true);
-	return GLApp::drawScene(dt);
 }

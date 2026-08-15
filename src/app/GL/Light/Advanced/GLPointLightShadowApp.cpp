@@ -26,8 +26,8 @@ using namespace ErrorHandle;
 GLPointLightShadowApp::~GLPointLightShadowApp() {
 }
 
-bool GLPointLightShadowApp::initApp() {
-	if (!GLCameraBaseApp::initApp()) {
+bool GLPointLightShadowApp::load(std::shared_ptr<rhi::IRenderer> rhiRenderer) {
+	if (!GLCameraBaseApp::load(rhiRenderer)) {
 		return false;
 	}
 
@@ -157,8 +157,7 @@ void GLPointLightShadowApp::renderScene2FrameBuffer(std::shared_ptr<rhi::IPipeli
         renderScene(program, lightPos);
     }
     renderer()->setRenderTarget(nullptr);
-    const auto props = m_window->getProperties();
-    renderer()->setViewport(rhi::Viewport{0, 0, props.width, props.height});
+    renderer()->setViewport(rhi::Viewport{0, 0, windowWidth(), windowHeight()});
     renderer()->clearColor(0.0f, 0.0f, 0.0f, 1.0f);
 }
 
@@ -177,12 +176,11 @@ void GLPointLightShadowApp::renderScene2Screen(std::shared_ptr<rhi::IPipeline>& 
     renderScene(program, lightPos);
 }
 
-void GLPointLightShadowApp::drawScene(const float dt) {
+void GLPointLightShadowApp::draw(const float dt) {
 	static float curTime = 0;
 	curTime += dt;
 	glm::vec3 lightPos = glm::vec3(0.0f, 0.0f, 0.0f);
 	lightPos.z = static_cast<float>(sin(curTime) * 10.0);
-	GLCameraBaseApp::drawScene(dt);
 	auto pos = _camera.getAttr().pos;
 	ImGui::Begin("OpenGL");
 	ImGui::Checkbox("Enable PCF", &_enableSimplePCF);

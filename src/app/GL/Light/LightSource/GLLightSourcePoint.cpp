@@ -16,8 +16,8 @@ using namespace ErrorHandle;
 GLLightSourcePoint::~GLLightSourcePoint() {
 }
 
-bool GLLightSourcePoint::initApp() {
-	if (!GLCameraBaseApp::initApp()) {
+bool GLLightSourcePoint::load(std::shared_ptr<rhi::IRenderer> rhiRenderer) {
+	if (!GLCameraBaseApp::load(rhiRenderer)) {
 		return false;
 	}
 
@@ -70,8 +70,7 @@ bool GLLightSourcePoint::initApp() {
 	return true;
 }
 
-void GLLightSourcePoint::drawScene(const float dt) {
-	GLApp::drawScene(dt);
+void GLLightSourcePoint::draw(const float dt) {
 	ImGui::Begin("OpenGL");
 	ImGui::Text("Color Picker with Alpha:");
 	ImGui::ColorEdit4("Color with Alpha", &_lightColor[0]);

@@ -19,8 +19,8 @@ using namespace ErrorHandle;
 GLExplodeApp::~GLExplodeApp() {
 }
 
-bool GLExplodeApp::initApp(){
-	if (!GLCameraBaseApp::initApp()) {
+bool GLExplodeApp::load(std::shared_ptr<rhi::IRenderer> rhiRenderer){
+	if (!GLCameraBaseApp::load(rhiRenderer)) {
 		return false;
 	}
 	
@@ -45,7 +45,7 @@ bool GLExplodeApp::initApp(){
 	return true;
 }
 
-void GLExplodeApp::drawScene(const float dt) {
+void GLExplodeApp::draw(const float dt) {
 	ImGui::Begin("OpenGL");
 	ImGui::End();
 
@@ -76,5 +76,4 @@ void GLExplodeApp::drawScene(const float dt) {
 		renderer()->drawIndexed(_indexCount, 0, 0);
 	}
 
-	return GLApp::drawScene(dt);
 }

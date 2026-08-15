@@ -71,8 +71,8 @@ static std::vector<glm::vec3> GenerateSSAONoise(int kernelSize = 64) {
 }
 
 void GLSSAOApp::createSSAOFbo() {
-	const int w = static_cast<int>(m_window->getProperties().width);
-	const int h = static_cast<int>(m_window->getProperties().height);
+	const int w = static_cast<int>(windowWidth());
+	const int h = static_cast<int>(windowHeight());
 	m_ssaoBuffer.fbo = renderer()->createRenderTarget();
 	rhi::FramebufferDesc ssaoDesc;
 	ssaoDesc.width = w; ssaoDesc.height = h;
@@ -110,8 +110,8 @@ void GLSSAOApp::createFrameBuffers() {
 }
 
 void GLSSAOApp::createGBufferFbo() {
-	const int w = static_cast<int>(m_window->getProperties().width);
-	const int h = static_cast<int>(m_window->getProperties().height);
+	const int w = static_cast<int>(windowWidth());
+	const int h = static_cast<int>(windowHeight());
 	m_gBuffer.gbuffer = renderer()->createRenderTarget();
 	rhi::FramebufferDesc fbd;
 	fbd.width = w; fbd.height = h;
@@ -149,8 +149,8 @@ void GLSSAOApp::createQuadBuffer() {
 	m_quadLayout = geo.layout;
 }
 
-bool GLSSAOApp::initApp() {
-	if (!GLCameraBaseApp::initApp()) return false;
+bool GLSSAOApp::load(std::shared_ptr<rhi::IRenderer> rhiRenderer) {
+	if (!GLCameraBaseApp::load(rhiRenderer)) return false;
 	loadModel();
 	initShapes();
 	createTextures();
@@ -305,8 +305,7 @@ void GLSSAOApp::renderLightPass(std::shared_ptr<rhi::IPipeline>& program){
 	renderQuad();
 }
 
-void GLSSAOApp::drawScene(const float dt) {
-	GLCameraBaseApp::drawScene(dt);
+void GLSSAOApp::draw(const float dt) {
 	const auto projection = glm::perspective(glm::radians(_camera.zoom()), aspectRatio(), 0.1f, 100.0f);
 	const auto view = _camera.getViewMatrix();
 	renderGBuffer(m_gBufferProgram, projection, view);

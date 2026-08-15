@@ -27,8 +27,8 @@ void GLIBLIrradianceConversionApp::initShapes() {
     m_sphere = RhiGeometry::Create(renderer().get(), sphere, true, true, true);
 }
 
-bool GLIBLIrradianceConversionApp::initApp() {
-    if (!GLCameraBaseApp::initApp()) return false;
+bool GLIBLIrradianceConversionApp::load(std::shared_ptr<rhi::IRenderer> rhiRenderer) {
+    if (!GLCameraBaseApp::load(rhiRenderer)) return false;
     _uboBuffer = renderer()->createUniformBuffer();
     _uboBuffer->init(nullptr, sizeof(rhi::UniformBlock), rhi::BufferType::Uniform);
     _uboBuffer->bindRange(0, 0, sizeof(rhi::UniformBlock));
@@ -128,8 +128,7 @@ void GLIBLIrradianceConversionApp::renderToCubemap() {
         renderCube(m_cubeMapProgram, glm::mat4(1.0));
     }
     renderer()->setRenderTarget(nullptr);
-    const auto props = m_window->getProperties();
-    renderer()->setViewport(rhi::Viewport{0, 0, static_cast<int>(props.width), static_cast<int>(props.height)});
+    renderer()->setViewport(rhi::Viewport{0, 0, static_cast<int>(windowWidth()), static_cast<int>(windowHeight())});
 }
 
 void GLIBLIrradianceConversionApp::renderCube(const std::shared_ptr<rhi::IPipeline>& program, const glm::mat4& model) {
@@ -206,8 +205,7 @@ void GLIBLIrradianceConversionApp::renderObjectsAndLights(const std::shared_ptr<
     }
 }
 
-void GLIBLIrradianceConversionApp::drawScene(const float dt) {
-    GLCameraBaseApp::drawScene(dt);
+void GLIBLIrradianceConversionApp::draw(const float dt) {
     const auto projection = glm::perspective(glm::radians(_camera.zoom()), aspectRatio(), 0.1f, 100.0f);
     const auto view = _camera.getViewMatrix();
     renderObjectsAndLights(m_program, view, projection);

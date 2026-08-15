@@ -15,8 +15,8 @@ using namespace ErrorHandle;
 GLSimpleLightMaterial::~GLSimpleLightMaterial() {
 }
 
-bool GLSimpleLightMaterial::initApp() {
-	if (!GLCameraBaseApp::initApp()) {
+bool GLSimpleLightMaterial::load(std::shared_ptr<rhi::IRenderer> rhiRenderer) {
+	if (!GLCameraBaseApp::load(rhiRenderer)) {
 		return false;
 	}
 
@@ -55,8 +55,7 @@ bool GLSimpleLightMaterial::initApp() {
 	return true;
 }
 
-void GLSimpleLightMaterial::drawScene(const float dt) {
-	GLApp::drawScene(dt);
+void GLSimpleLightMaterial::draw(const float dt) {
 	ImGui::Begin("OpenGL");
 	ImGui::Text("Color Picker with Alpha:");
 	ImGui::ColorEdit4("Color with Alpha", &_lightColor[0]);
