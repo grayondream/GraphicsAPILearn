@@ -30,16 +30,11 @@ run() {
     if [ ! -x "$BIN" ]; then
         echo "ERROR: binary not found: $BIN"; exit 1
     fi
-    echo "==> run $BIN (timeout 15s)"
-    timeout 15 "$BIN"
+    echo "==> run $BIN"
+    "$BIN"
     code=$?
-    if [ "$code" = "124" ]; then
-        echo "==> run OK (进程被 timeout 正常杀掉，说明程序持续运行)"
-        exit 0
-    else
-        echo "==> run exit code: $code"
-        exit "$code"
-    fi
+    echo "==> run exit code: $code"
+    exit "$code"
 }
 
 case "$MODE" in
