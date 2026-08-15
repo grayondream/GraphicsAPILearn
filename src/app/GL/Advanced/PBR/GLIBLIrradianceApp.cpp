@@ -29,6 +29,9 @@ void GLIBLIrradianceApp::initShapes() {
 
 bool GLIBLIrradianceApp::initApp() {
     if (!GLCameraBaseApp::initApp()) return false;
+    _uboBuffer = renderer()->createUniformBuffer();
+    _uboBuffer->init(nullptr, sizeof(rhi::UniformBlock), rhi::BufferType::Uniform);
+    _uboBuffer->bindRange(0, 0, sizeof(rhi::UniformBlock));
     compileShader(m_cube.layout);
     initShapes();
     loadTexture();
@@ -124,8 +127,7 @@ void GLIBLIrradianceApp::renderToCubemap() {
     const auto captureViews = GetCaptureViews();
     renderer()->setPipeline(m_cubeMapProgram);
     renderer()->bindTexture(m_hdrEnvTexture, 0);
-    m_cubeMapProgram->setUniform("equirectangularMap", 0);
-    m_cubeMapProgram->setUniform("projection", glm::value_ptr(captureProjection), 1);
+    rhi::SetUniform(_ubo, "projection", captureProjection);
     renderer()->setRenderTarget(m_captureRT);
     renderer()->setVertexBuffer(m_cube.vertexBuffer);
     renderer()->setVertexBuffer(m_cube.uvBuffer, 1);
@@ -133,14 +135,14 @@ void GLIBLIrradianceApp::renderToCubemap() {
     const int size = 512;
     for (int i = 0; i < 6; ++i) {
         renderer()->setViewport(rhi::Viewport{0, 0, size, size});
-        m_cubeMapProgram->setUniform("view", glm::value_ptr(captureViews[i]), 1);
+        rhi::SetUniform(_ubo, "view", captureViews[i]);
         m_captureRT->attachCubeFace(m_envCubemap.get(), i);
         renderer()->clearColor(0.0f, 0.0f, 0.0f, 1.0f);
         renderCube(m_cubeMapProgram, glm::mat4(1.0));
     }
     renderer()->setRenderTarget(nullptr);
     const auto props = m_window->getProperties();
-    renderer()->setViewport(rhi::Viewport{0, 0, props.width, props.height});
+    renderer()->setViewport(rhi::Viewport{0, 0, static_cast<int>(props.width), static_cast<int>(props.height)});
 }
 
 void GLIBLIrradianceApp::renderIrradianceMap() {
@@ -148,8 +150,7 @@ void GLIBLIrradianceApp::renderIrradianceMap() {
     const auto captureViews = GetCaptureViews();
     renderer()->setPipeline(m_irradianceProgram);
     renderer()->bindTexture(m_envCubemap, 0);
-    m_irradianceProgram->setUniform("environmentMap", 0);
-    m_irradianceProgram->setUniform("projection", glm::value_ptr(captureProjection), 1);
+    rhi::SetUniform(_ubo, "projection", captureProjection);
     renderer()->setRenderTarget(m_captureRT);
     renderer()->setVertexBuffer(m_cube.vertexBuffer);
     renderer()->setVertexBuffer(m_cube.uvBuffer, 1);
@@ -157,14 +158,14 @@ void GLIBLIrradianceApp::renderIrradianceMap() {
     const int size = 32;
     for (int i = 0; i < 6; ++i) {
         renderer()->setViewport(rhi::Viewport{0, 0, size, size});
-        m_irradianceProgram->setUniform("view", glm::value_ptr(captureViews[i]), 1);
+        rhi::SetUniform(_ubo, "view", captureViews[i]);
         m_captureRT->attachCubeFace(m_irradianceMap.get(), i);
         renderer()->clearColor(0.0f, 0.0f, 0.0f, 1.0f);
         renderCube(m_irradianceProgram, glm::mat4(1.0));
     }
     renderer()->setRenderTarget(nullptr);
     const auto props = m_window->getProperties();
-    renderer()->setViewport(rhi::Viewport{0, 0, props.width, props.height});
+    renderer()->setViewport(rhi::Viewport{0, 0, static_cast<int>(props.width), static_cast<int>(props.height)});
 }
 
 void GLIBLIrradianceApp::renderCube(const std::shared_ptr<rhi::IPipeline>& program, const glm::mat4& model) {
@@ -173,7 +174,8 @@ void GLIBLIrradianceApp::renderCube(const std::shared_ptr<rhi::IPipeline>& progr
     renderer()->setVertexBuffer(m_cube.uvBuffer, 1);
     renderer()->setVertexBuffer(m_cube.normalBuffer, 2);
     renderer()->setIndexBuffer(m_cube.indexBuffer);
-    program->setUniform("model", glm::value_ptr(model), 1);
+    rhi::SetUniform(_ubo, "model", model);
+    _uboBuffer->update(&_ubo, sizeof(rhi::UniformBlock), 0);
     renderer()->drawIndexed(m_cube.indexCount, 0, 0);
 }
 
@@ -183,9 +185,10 @@ void GLIBLIrradianceApp::renderSphere(const std::shared_ptr<rhi::IPipeline>& pro
     renderer()->setVertexBuffer(m_sphere.uvBuffer, 1);
     renderer()->setVertexBuffer(m_sphere.normalBuffer, 2);
     renderer()->setIndexBuffer(m_sphere.indexBuffer);
-    program->setUniform("model", glm::value_ptr(model), 1);
+    rhi::SetUniform(_ubo, "model", model);
     const auto normal = glm::transpose(glm::inverse(glm::mat3(model)));
-    program->setUniformMatrix("normalMatrix", glm::value_ptr(normal), 1, 3);
+    rhi::SetUniform(_ubo, "normalMatrix", normal);
+    _uboBuffer->update(&_ubo, sizeof(rhi::UniformBlock), 0);
     renderer()->drawIndexed(m_sphere.indexCount, 0, 0);
 }
 
@@ -207,9 +210,8 @@ void GLIBLIrradianceApp::renderBeforeLoop() {
 void GLIBLIrradianceApp::renderBackground(const std::shared_ptr<rhi::IPipeline>& program, const glm::mat4& view, const glm::mat4& projection) {
     renderer()->setPipeline(program);
     renderer()->bindTexture(m_envCubemap, 0);
-    program->setUniform("view", glm::value_ptr(view), 1);
-    program->setUniform("environmentMap", 0);
-    program->setUniform("projection", glm::value_ptr(projection), 1);
+    rhi::SetUniform(_ubo, "view", view);
+    rhi::SetUniform(_ubo, "projection", projection);
     renderCube(program, glm::mat4(1.0));
 }
 
@@ -218,17 +220,15 @@ void GLIBLIrradianceApp::renderObjectsAndLights(const std::shared_ptr<rhi::IPipe
     auto pos = _camera.getAttr().pos;
     renderer()->setPipeline(program);
     renderer()->bindTexture(m_irradianceMap, 0);
-    program->setUniform("texture", 0);
-    program->setUniform("irradianceMap", 0);
-    program->setUniform("projection", glm::value_ptr(projection), 1);
-    program->setUniform("view", glm::value_ptr(view), 1);
-    program->setUniform("camPos", glm::value_ptr(pos), 1, 3);
-    program->setUniform("roughness", m_roughness);
-    program->setUniform("metallic", m_metallic);
-    program->setUniform("ao", m_ao);
+    rhi::SetUniform(_ubo, "projection", projection);
+    rhi::SetUniform(_ubo, "view", view);
+    rhi::SetUniform(_ubo, "camPos", pos);
+    rhi::SetUniform(_ubo, "roughness", m_roughness);
+    rhi::SetUniform(_ubo, "metallic", m_metallic);
+    rhi::SetUniform(_ubo, "ao", m_ao);
     const int cnt = objPos.size();
     for (int i = 0; i < cnt; ++i) {
-        program->setUniform("albedo", glm::value_ptr(glm::vec3(i * 1.0f / cnt, 0.0f, 0.0f)), 1, 3);
+        rhi::SetUniform(_ubo, "albedo", glm::vec3(i * 1.0f / cnt, 0.0f, 0.0f));
         auto objectPos = glm::mat4(1.0f);
         objectPos = glm::translate(objectPos, objPos[i]);
         objectPos = glm::scale(objectPos, glm::vec3(0.4f));
@@ -239,8 +239,8 @@ void GLIBLIrradianceApp::renderObjectsAndLights(const std::shared_ptr<rhi::IPipe
         auto lightModel = glm::mat4(1.0f);
         lightModel = glm::translate(lightModel, lightPositions[i]);
         lightModel = glm::scale(lightModel, glm::vec3(0.2f));
-        program->setUniform("lightPositions[" + std::to_string(i) + "]", glm::value_ptr(lightPositions[i]), 1, 3);
-        program->setUniform("lightColors[" + std::to_string(i) + "]", glm::value_ptr(lightColors[i]), 1, 3);
+        rhi::SetUniform(_ubo, "lightPositions", i, lightPositions[i]);
+        rhi::SetUniform(_ubo, "lightColors", i, lightColors[i]);
         renderSphere(program, lightModel);
     }
 }

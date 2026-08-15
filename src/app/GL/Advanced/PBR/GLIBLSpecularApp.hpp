@@ -3,6 +3,8 @@
 
 #include "app/GL/Base/GLCameraApp.hpp"
 #include "rhi/core/IRenderer.hpp"
+#include "rhi/core/IBuffer.hpp"
+#include "rhi/core/UniformBlock.hpp"
 #include "app/GL/RhiGeometry.hpp"
 #include <glm/glm.hpp>
 #include <vector>
@@ -53,6 +55,8 @@ private:
     std::shared_ptr<rhi::IRenderTarget> m_captureRT{};
     std::shared_ptr<rhi::IRenderTarget> m_brdfLUTRT{};
     std::shared_ptr<rhi::ITexture2D> m_brdfLUTTexture{};
+    rhi::UniformBlock _ubo{};
+    std::shared_ptr<rhi::IBuffer> _uboBuffer{};
     float m_roughness = 0.5f;
     float m_metallic = 0.0f;
     glm::vec3 m_albedo = glm::vec3(0.5f, 0.5f, 0.5f);

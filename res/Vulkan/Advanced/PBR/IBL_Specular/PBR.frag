@@ -4,22 +4,24 @@ in vec2 TexCoords;
 in vec3 WorldPos;
 in vec3 Normal;
 
-// material parameters
-uniform vec3 albedo;
-uniform float metallic;
-uniform float roughness;
-uniform float ao;
+struct ULight { vec4 position; vec4 direction; vec4 ambient; vec4 diffuse; vec4 specular; vec4 params; };
 
-layout(set=0, binding=1) uniform samplerCube prefilterMap;
-layout(set=0, binding=2) uniform sampler2D brdfLUT;
-// IBL
-layout(set=0, binding=3) uniform samplerCube irradianceMap;
+layout(set=0, binding=0) uniform UniformBlock {
+    mat4 projection;
+    mat4 view;
+    mat4 model;
+    mat4 normalMatrix;
+    mat4 viewModel;
+    mat4 extraMat4[14];
+    vec4 vec4Pool[64];
+    vec4 vec3Pool[64];
+    float floatPool[64];
+    ULight lights[1];
+};
 
-// lights
-uniform vec3 lightPositions[4];
-uniform vec3 lightColors[4];
-
-uniform vec3 camPos;
+layout(set=0, binding=1) uniform samplerCube irradianceMap;
+layout(set=0, binding=2) uniform samplerCube prefilterMap;
+layout(set=0, binding=3) uniform sampler2D brdfLUT;
 
 const float PI = 3.14159265359;
 // ----------------------------------------------------------------------------
@@ -62,18 +64,21 @@ vec3 fresnelSchlick(float cosTheta, vec3 F0)
 {
     return F0 + (1.0 - F0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
 }
-
+// ----------------------------------------------------------------------------
 vec3 fresnelSchlickRoughness(float cosTheta, vec3 F0, float roughness)
 {
     return F0 + (max(vec3(1.0 - roughness), F0) - F0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
 }   
-
 // ----------------------------------------------------------------------------
 void main()
 {		
-    vec3 N = Normal;
-    N = normalize(N);
-    vec3 V = normalize(camPos - WorldPos);
+    vec3 albedo = vec4Pool[10].xyz;      // albedo
+    float metallic = floatPool[7];       // metallic
+    float roughness = floatPool[8];      // roughness
+    float ao = floatPool[9];             // ao
+
+    vec3 N = normalize(Normal);
+    vec3 V = normalize(vec4Pool[1].xyz - WorldPos);   // camPos
     vec3 R = reflect(-V, N); 
 
     // calculate reflectance at normal incidence; if dia-electric (like plastic) use F0 
@@ -86,22 +91,22 @@ void main()
     for(int i = 0; i < 4; ++i) 
     {
         // calculate per-light radiance
-        vec3 L = normalize(lightPositions[i] - WorldPos);
+        vec3 L = normalize(vec4Pool[13 + i].xyz - WorldPos);   // lightPositions[i]
         vec3 H = normalize(V + L);
-        float distance = length(lightPositions[i] - WorldPos);
+        float distance = length(vec4Pool[13 + i].xyz - WorldPos);
         float attenuation = 1.0 / (distance * distance);
-        vec3 radiance = lightColors[i] * attenuation;
+        vec3 radiance = vec4Pool[29 + i].xyz * attenuation;   // lightColors[i]
 
         // Cook-Torrance BRDF
         float NDF = DistributionGGX(N, H, roughness);   
-        float G   = GeometrySmith(N, V, L, roughness);    
-        vec3 F    = fresnelSchlick(max(dot(H, V), 0.0), F0);        
-        
-        vec3 numerator    = NDF * G * F;
+        float G   = GeometrySmith(N, V, L, roughness);      
+        vec3 F    = fresnelSchlick(clamp(dot(H, V), 0.0, 1.0), F0);
+           
+        vec3 numerator    = NDF * G * F; 
         float denominator = 4.0 * max(dot(N, V), 0.0) * max(dot(N, L), 0.0) + 0.0001; // + 0.0001 to prevent divide by zero
         vec3 specular = numerator / denominator;
         
-         // kS is equal to Fresnel
+        // kS is equal to Fresnel
         vec3 kS = F;
         // for energy conservation, the diffuse and specular light can't
         // be above 1.0 (unless the surface emits light); to preserve this
@@ -110,13 +115,13 @@ void main()
         // multiply kD by the inverse metalness such that only non-metals 
         // have diffuse lighting, or a linear blend if partly metal (pure metals
         // have no diffuse light).
-        kD *= 1.0 - metallic;	                
-            
+        kD *= 1.0 - metallic;	  
+
         // scale light by NdotL
         float NdotL = max(dot(N, L), 0.0);        
 
         // add to outgoing radiance Lo
-        Lo += (kD * albedo / PI + specular) * radiance * NdotL; // note that we already multiplied the BRDF by the Fresnel (kS) so we won't multiply by kS again
+        Lo += (kD * albedo / PI + specular) * radiance * NdotL;  // note that we already multiplied the BRDF by the Fresnel (kS) so we won't multiply by kS again
     }   
     
     // ambient lighting (we now use IBL as the ambient term)
@@ -129,13 +134,13 @@ void main()
     vec3 irradiance = texture(irradianceMap, N).rgb;
     vec3 diffuse      = irradiance * albedo;
     
-    // sample both the pre-filter map and the BRDF lut and combine them together as per the Split-Sum approximation to get the IBL specular part.
+    // sample both the pre-filter map and the BRDF lut and combine them together as per the Split-Sum approximation to get the specular part.
     const float MAX_REFLECTION_LOD = 4.0;
-    vec3 prefilteredColor = textureLod(prefilterMap, R,  roughness * MAX_REFLECTION_LOD).rgb;    
+    vec3 prefilteredColor = textureLod(prefilterMap, R, roughness * MAX_REFLECTION_LOD).rgb;    
     vec2 brdf  = texture(brdfLUT, vec2(max(dot(N, V), 0.0), roughness)).rg;
     vec3 specular = prefilteredColor * (F * brdf.x + brdf.y);
 
-    vec3 ambient = (kD * diffuse + specular) * ao;
+    vec3 ambient = (kD * diffuse + specular) * ao; 
     // vec3 ambient = vec3(0.002);
     
     vec3 color = ambient + Lo;

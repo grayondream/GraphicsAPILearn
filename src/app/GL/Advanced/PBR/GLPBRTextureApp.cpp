@@ -44,21 +44,15 @@ void GLPBRTextureApp::drawScene(const float dt) {
     const auto objPos = GenreateObjPos(2, 1.0f, glm::vec3(0.0f));
 
     renderer()->setPipeline(m_program);
-    m_program->setUniform("texture", 0);
-    m_program->setUniform("projection", glm::value_ptr(projection), 1);
-    m_program->setUniform("view", glm::value_ptr(view), 1);
-    m_program->setUniform("camPos", glm::value_ptr(pos), 1, 3);
+    rhi::SetUniform(_ubo, "projection", projection);
+    rhi::SetUniform(_ubo, "view", view);
+    rhi::SetUniform(_ubo, "camPos", pos);
 
     renderer()->bindTexture(m_albedoMap, 1);
     renderer()->bindTexture(m_roughnessMap, 2);
     renderer()->bindTexture(m_metallicMap, 3);
     renderer()->bindTexture(m_aoMap, 4);
     renderer()->bindTexture(m_normalMap, 5);
-    m_program->setUniform("albedoMap", 1);
-    m_program->setUniform("roughnessMap", 2);
-    m_program->setUniform("metallicMap", 3);
-    m_program->setUniform("aoMap", 4);
-    m_program->setUniform("normalMap", 5);
 
     const int cnt = objPos.size();
     for (int i = 0; i < cnt; ++i) {
@@ -73,8 +67,8 @@ void GLPBRTextureApp::drawScene(const float dt) {
         auto lightModel = glm::mat4(1.0f);
         lightModel = glm::translate(lightModel, lightPositions[i]);
         lightModel = glm::scale(lightModel, glm::vec3(0.2f));
-        m_program->setUniform("lightPositions[" + std::to_string(i) + "]", glm::value_ptr(lightPositions[i]), 1, 3);
-        m_program->setUniform("lightColors[" + std::to_string(i) + "]", glm::value_ptr(lightColors[i]), 1, 3);
+        rhi::SetUniform(_ubo, "lightPositions", i, lightPositions[i]);
+        rhi::SetUniform(_ubo, "lightColors", i, lightColors[i]);
         renderSphere(m_program, lightModel);
     }
 

@@ -58,6 +58,7 @@ static const SlotInfo kSlots[] = {
     { "material.ambient",  V4(7), 16, SlotKind::Vec4 },
     { "material.diffuse",  V4(8), 16, SlotKind::Vec4 },   // 颜色变体（采样器变体不进 block）
     { "material.specular", V4(9), 16, SlotKind::Vec4 },
+    { "albedo",            V4(10), 16, SlotKind::Vec4 }, // PBR 材质基础色（vec3 写低 12 字节，10..12 material 自由预留）
     { "radiusPos",         V4(45), 16, SlotKind::Vec4 },  // Saturn 岩石环中心（vec3 写低 12 字节）
     { "lightPositions",    V4(13), 16, SlotKind::Vec4 },  // 数组 [0..15]
     { "lightColors",       V4(29), 16, SlotKind::Vec4 },  // 数组 [0..15]

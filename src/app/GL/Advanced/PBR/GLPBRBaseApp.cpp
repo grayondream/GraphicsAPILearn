@@ -43,6 +43,9 @@ std::pair<std::vector<glm::vec3>, std::vector<glm::vec3>> GLPBRBaseApp::GetLight
 
 bool GLPBRBaseApp::initApp() {
     if (!GLCameraBaseApp::initApp()) return false;
+    _uboBuffer = renderer()->createUniformBuffer();
+    _uboBuffer->init(nullptr, sizeof(rhi::UniformBlock), rhi::BufferType::Uniform);
+    _uboBuffer->bindRange(0, 0, sizeof(rhi::UniformBlock));
     initShapes();
     compileShader(m_sphere.layout);
     return true;
@@ -77,9 +80,10 @@ void GLPBRBaseApp::renderSphere(const std::shared_ptr<rhi::IPipeline>& program, 
     renderer()->setVertexBuffer(_sphereUv, 1);
     renderer()->setVertexBuffer(_sphereNormal, 2);
     renderer()->setIndexBuffer(m_sphere.indexBuffer);
-    program->setUniform("model", glm::value_ptr(model), 1);
+    rhi::SetUniform(_ubo, "model", model);
     const auto normal = glm::transpose(glm::inverse(glm::mat3(model)));
-    program->setUniformMatrix("normalMatrix", glm::value_ptr(normal), 1, 3);
+    rhi::SetUniform(_ubo, "normalMatrix", normal);
+    _uboBuffer->update(&_ubo, sizeof(rhi::UniformBlock), 0);
     renderer()->drawIndexed(_sphereIndexCount, 0, 0);
 }
 
@@ -91,16 +95,15 @@ void GLPBRBaseApp::drawScene(const float dt) {
     const auto objPos = GenreateObjPos(2, 1.0f, glm::vec3(0.0f));
 
     renderer()->setPipeline(m_program);
-    m_program->setUniform("texture", 0);
-    m_program->setUniform("ao", m_ao);
-    m_program->setUniform("projection", glm::value_ptr(projection), 1);
-    m_program->setUniform("view", glm::value_ptr(view), 1);
-    m_program->setUniform("camPos", glm::value_ptr(pos), 1, 3);
-    m_program->setUniform("roughness", m_roughness);
-    m_program->setUniform("metallic", m_metallic);
+    rhi::SetUniform(_ubo, "ao", m_ao);
+    rhi::SetUniform(_ubo, "projection", projection);
+    rhi::SetUniform(_ubo, "view", view);
+    rhi::SetUniform(_ubo, "camPos", pos);
+    rhi::SetUniform(_ubo, "roughness", m_roughness);
+    rhi::SetUniform(_ubo, "metallic", m_metallic);
     const int cnt = objPos.size();
     for (int i = 0; i < cnt; ++i) {
-        m_program->setUniform("albedo", glm::value_ptr(glm::vec3(i * 1.0f / cnt, 0.0f, 0.0f)), 1, 3);
+        rhi::SetUniform(_ubo, "albedo", glm::vec3(i * 1.0f / cnt, 0.0f, 0.0f));
         auto objectPos = glm::mat4(1.0f);
         objectPos = glm::translate(objectPos, objPos[i]);
         objectPos = glm::scale(objectPos, glm::vec3(0.4f));
@@ -112,8 +115,8 @@ void GLPBRBaseApp::drawScene(const float dt) {
         auto lightModel = glm::mat4(1.0f);
         lightModel = glm::translate(lightModel, lightPositions[i]);
         lightModel = glm::scale(lightModel, glm::vec3(0.2f));
-        m_program->setUniform("lightPositions[" + std::to_string(i) + "]", glm::value_ptr(lightPositions[i]), 1, 3);
-        m_program->setUniform("lightColors[" + std::to_string(i) + "]", glm::value_ptr(lightColors[i]), 1, 3);
+        rhi::SetUniform(_ubo, "lightPositions", i, lightPositions[i]);
+        rhi::SetUniform(_ubo, "lightColors", i, lightColors[i]);
         renderSphere(m_program, lightModel);
     }
 

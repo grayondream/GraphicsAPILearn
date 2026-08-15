@@ -4,18 +4,27 @@ in vec2 TexCoords;
 in vec3 WorldPos;
 in vec3 Normal;
 
+struct ULight { vec4 position; vec4 direction; vec4 ambient; vec4 diffuse; vec4 specular; vec4 params; };
+
+layout(set=0, binding=0) uniform UniformBlock {
+    mat4 projection;
+    mat4 view;
+    mat4 model;
+    mat4 normalMatrix;
+    mat4 viewModel;
+    mat4 extraMat4[14];
+    vec4 vec4Pool[64];
+    vec4 vec3Pool[64];
+    float floatPool[64];
+    ULight lights[1];
+};
+
 // material parameters
-layout(set=0, binding=1) uniform sampler2D albedoMap;
-layout(set=0, binding=2) uniform sampler2D normalMap;
-layout(set=0, binding=3) uniform sampler2D metallicMap;
-layout(set=0, binding=4) uniform sampler2D roughnessMap;
+layout(set=0, binding=2) uniform sampler2D albedoMap;
+layout(set=0, binding=3) uniform sampler2D roughnessMap;
+layout(set=0, binding=4) uniform sampler2D metallicMap;
 layout(set=0, binding=5) uniform sampler2D aoMap;
-
-// lights
-uniform vec3 lightPositions[4];
-uniform vec3 lightColors[4];
-
-uniform vec3 camPos;
+layout(set=0, binding=6) uniform sampler2D normalMap;
 
 const float PI = 3.14159265359;
 
@@ -85,7 +94,7 @@ void main()
     float ao = texture(aoMap, TexCoords).r;
 
     vec3 N = getNormalFromMap();
-    vec3 V = normalize(camPos - WorldPos);
+    vec3 V = normalize(vec4Pool[1].xyz - WorldPos);   // camPos
 
     // calculate reflectance at normal incidence; if dia-electric (like plastic) use F0 
     // of 0.04 and if it's a metal, use the albedo color as F0 (metallic workflow)    
@@ -97,11 +106,11 @@ void main()
     for(int i = 0; i < 4; ++i) 
     {
         // calculate per-light radiance
-        vec3 L = normalize(lightPositions[i] - WorldPos);
+        vec3 L = normalize(vec4Pool[13 + i].xyz - WorldPos);   // lightPositions[i]
         vec3 H = normalize(V + L);
-        float distance = length(lightPositions[i] - WorldPos);
+        float distance = length(vec4Pool[13 + i].xyz - WorldPos);
         float attenuation = 1.0 / (distance * distance);
-        vec3 radiance = lightColors[i] * attenuation;
+        vec3 radiance = vec4Pool[29 + i].xyz * attenuation;   // lightColors[i]
 
         // Cook-Torrance BRDF
         float NDF = DistributionGGX(N, H, roughness);   

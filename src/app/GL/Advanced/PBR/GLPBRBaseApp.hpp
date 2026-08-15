@@ -3,6 +3,8 @@
 
 #include "app/GL/Base/GLCameraApp.hpp"
 #include "rhi/core/IRenderer.hpp"
+#include "rhi/core/IBuffer.hpp"
+#include "rhi/core/UniformBlock.hpp"
 #include "app/GL/RhiGeometry.hpp"
 #include <glm/glm.hpp>
 #include <vector>
@@ -33,6 +35,9 @@ protected:
     std::shared_ptr<rhi::IBuffer> _sphereUv{};
     std::shared_ptr<rhi::IBuffer> _sphereNormal{};
     uint32_t _sphereIndexCount{0};
+
+    rhi::UniformBlock _ubo{};
+    std::shared_ptr<rhi::IBuffer> _uboBuffer{};
 
     float m_roughness = 0.5f;
     float m_metallic = 0.0f;
