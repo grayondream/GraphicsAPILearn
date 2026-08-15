@@ -13,9 +13,13 @@
 #endif
 #include "base/ErrorHandle.hpp"
 #include "base/Log.hpp"
+#include "utils/EnumUtil.hpp"
 #include <imgui.h>
 #include <chrono>
+#include <string>
+#include <string_view>
 #include <thread>
+#include <vector>
 
 using namespace ErrorHandle;
 
@@ -155,11 +159,63 @@ float AppHost::aspect() const {
     return p.height != 0 ? static_cast<float>(p.width) / static_cast<float>(p.height) : 1.0f;
 }
 
+namespace {
+
+std::string_view StripEnumPrefix(const std::string_view name) {
+    const auto pos = name.rfind("::");
+    return pos == std::string_view::npos ? name : name.substr(pos + 2);
+}
+
+std::string_view EnumMemberName(const auto v) {
+    return StripEnumPrefix(Utils::Enum::EnumName(v));
+}
+
+} // namespace
+
 void AppHost::renderTotalBar() {
     if (!m_imguiWindow) return;
-    ImGui::Begin("OpenGL");
     ImGuiIO& io = ImGui::GetIO();
-    ImGui::Text("Hello Graphic! %.1f FPS", io.Framerate);
+    ImGui::Begin("Control");
+
+    // 后端 Combo —— 只列编译启用的后端
+    std::vector<const char*> backendNames;
+    std::vector<GraphicsType> backendTypes;
+#if ENABLE_OPENGL
+    backendNames.emplace_back("OpenGL");
+    backendTypes.emplace_back(GraphicsType::GL);
+#endif
+#if ENABLE_VULKAN
+    backendNames.emplace_back("Vulkan");
+    backendTypes.emplace_back(GraphicsType::Vulkan);
+#endif
+    int curBackend = 0;
+    for (int i = 0; i < static_cast<int>(backendTypes.size()); ++i)
+        if (backendTypes[i] == _backend) curBackend = i;
+    if (ImGui::Combo("Backend", &curBackend, backendNames.data(), static_cast<int>(backendNames.size()))) {
+        if (backendTypes[curBackend] != _backend) setBackend(backendTypes[curBackend]);
+    }
+
+    ImGui::Separator();
+
+    // 样例下拉 —— 名称顺序与 AppType.hpp 枚举定义顺序一致（0..Count）
+    std::vector<std::string> sampleNameStorage;
+    std::vector<const char*> sampleNames;
+    for (int i = 0; i < static_cast<int>(AppType::Count); ++i) {
+        sampleNameStorage.emplace_back(EnumMemberName(static_cast<AppType>(i)));
+        sampleNames.emplace_back(sampleNameStorage.back().c_str());
+    }
+    int curSample = static_cast<int>(_sampleType);
+    if (ImGui::Combo("Sample", &curSample, sampleNames.data(), static_cast<int>(sampleNames.size()))) {
+        if (static_cast<AppType>(curSample) != _sampleType) setSample(static_cast<AppType>(curSample));
+    }
+
+    ImGui::Separator();
+
+    // 信息行：当前后端名 + 当前样例名 + FPS
+    ImGui::Text("Backend: %s   Sample: %s   FPS: %.1f",
+                std::string(EnumMemberName(currentBackend())).c_str(),
+                std::string(EnumMemberName(currentSample())).c_str(), io.Framerate);
+
     ImGui::End();
 }
 
