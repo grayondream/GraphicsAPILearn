@@ -462,6 +462,11 @@ bool VKRenderer::present() {
 void VKRenderer::dumpFrame() {
     const char* dumpPath = std::getenv("RHI_DUMP_FRAME");
     if (!dumpPath || _dumpDone || !_swapchain) return;
+    const char* skipEnv = std::getenv("RHI_DUMP_SKIP");
+    if (skipEnv) {
+        static int skipCount = 0;
+        if (skipCount++ < std::atoi(skipEnv)) return;
+    }
     _dumpDone = true;
 
     const vk::Extent2D ext = _swapchain->extent();
