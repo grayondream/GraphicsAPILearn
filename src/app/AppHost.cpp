@@ -57,7 +57,11 @@ bool AppHost::rebuildBackend(const GLFWWindowProperties& props) {
 #else
     (void)props;
 #endif
-    if (!m_window->initGLContext()) { LOGE("Failed to initialize GL Context"); return false; }
+    // 后端切换需按新 client API 重建原生窗口；VK 分支在上面已重建为 NO_API，
+    // GL 分支同样需 shutdown+initialize 以按属性重建为 OPENGL 上下文窗口。
+    if (_backend == GraphicsType::GL) { m_window->shutdown(); m_window->initialize(); }
+    rhi::setBackendKind(rhi::BackendKind::GL);
+    if (!m_window->initGLContext()) { LOGE("Failed to initialize GL Context (backend={})", static_cast<int>(_backend)); return false; }
     auto surface = std::make_shared<rhi::GLFWSurface>(
         m_window->getNativeGLFWWindow(), static_cast<int>(props.width), static_cast<int>(props.height));
     _renderer = rhi::createGLRenderer();
@@ -76,6 +80,7 @@ bool AppHost::reloadSample() {
     s->setWindowSize(props.width, props.height);
     s->setRenderer(_renderer);
     if (!s->load(_renderer)) { LOGE("Sample load failed for type {}", static_cast<int>(_sampleType)); return false; }
+    s->renderBeforeLoop();
         _sample = std::move(s);
         return true;
 }
@@ -170,7 +175,6 @@ static float CalcHostRate() {
 }
 
 int AppHost::run() {
-    if (_sample) _sample->renderBeforeLoop();
     auto lastTime = std::chrono::high_resolution_clock::now();
     while (m_window && !m_window->shouldClose() && !_exitRequested) {
         const auto frate = CalcHostRate();

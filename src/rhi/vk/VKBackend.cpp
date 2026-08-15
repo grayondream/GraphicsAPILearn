@@ -368,16 +368,18 @@ void VKRenderer::shutdown() {
     _imageReady = vk::raii::Semaphore{nullptr};
     _presentQueue = vk::raii::Queue{nullptr};
     _graphicsQueue = vk::raii::Queue{nullptr};
-    _device = vk::raii::Device{nullptr};
-    _surfaceKHR = vk::raii::SurfaceKHR{nullptr};
-    _phys = vk::raii::PhysicalDevice{nullptr};
-    _instance = vk::raii::Instance{nullptr};
-    _surface.reset();
+    // 先释放所有依赖 device dispatcher 的 GPU 对象（VKPipeline/VKBuffer/VKRenderTarget
+    // 的内部 raii 句柄析构时仍需 device 存活），最后才销毁 device 本身。
     _pipeline.reset();
     _indexBuffer.reset();
     _vertexBuffers = {};
     _renderTarget.reset();
     _vkRenderTarget.reset();
+    _device = vk::raii::Device{nullptr};
+    _surfaceKHR = vk::raii::SurfaceKHR{nullptr};
+    _phys = vk::raii::PhysicalDevice{nullptr};
+    _instance = vk::raii::Instance{nullptr};
+    _surface.reset();
     // _uboBuffer is a raw (non-owning) pointer to the App's UBO buffer. The App
     // must keep its _uboBuffer alive for as long as this renderer uses it; VK
     // only registers it (GL mode keeps its own buffer). Clear it here so we

@@ -100,12 +100,10 @@ bool GLFWWindow::initialize() {
         // 配置GLFW窗口 hints（不指定图形API，保持通用）
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+    glfwWindowHint(GLFW_CLIENT_API, m_properties.vulkan ? GLFW_NO_API : GLFW_OPENGL_API);
     glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
     glfwWindowHint(GLFW_VISIBLE, GLFW_TRUE);
     glfwWindowHint(GLFW_DECORATED, GLFW_TRUE);
-    if (m_properties.vulkan) {
-        glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-    }
     if (m_properties.samples > 0) {
         glfwWindowHint(GLFW_SAMPLES, m_properties.samples);
     }
