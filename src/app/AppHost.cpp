@@ -198,8 +198,11 @@ void AppHost::renderTotalBar() {
     ImGui::Separator();
 
     // 样例下拉 —— 名称顺序与 AppType.hpp 枚举定义顺序一致（0..Count）
+    // 预分配容量：避免 vector 扩容使短名称(SSO)的 c_str() 指针悬垂导致乱码
     std::vector<std::string> sampleNameStorage;
     std::vector<const char*> sampleNames;
+    sampleNameStorage.reserve(static_cast<size_t>(AppType::Count));
+    sampleNames.reserve(static_cast<size_t>(AppType::Count));
     for (int i = 0; i < static_cast<int>(AppType::Count); ++i) {
         sampleNameStorage.emplace_back(EnumMemberName(static_cast<AppType>(i)));
         sampleNames.emplace_back(sampleNameStorage.back().c_str());
