@@ -126,6 +126,7 @@ bool GLRenderTarget::attachCubeFace(ITexture3D* cube, int face, int mip) {
     const bool isDepth = (static_cast<GLTexture3D*>(cube)->desc().format == TextureFormat::Depth32F);
     glBindFramebuffer(GL_FRAMEBUFFER, _fbo);
     if (isDepth) {
+        glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, 0);
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT,
                                GL_TEXTURE_CUBE_MAP_POSITIVE_X + face,
                                static_cast<GLuint>(reinterpret_cast<uintptr_t>(cube->handle())), mip);
@@ -143,6 +144,7 @@ bool GLRenderTarget::attachCubeFace(ITexture3D* cube, int face, int mip) {
 bool GLRenderTarget::attachDepthCube(ITexture3D* cube, int mip) {
     if (!cube || mip < 0 || !_fbo) return false;
     glBindFramebuffer(GL_FRAMEBUFFER, _fbo);
+    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, 0);
     glFramebufferTexture(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT,
                          static_cast<GLuint>(reinterpret_cast<uintptr_t>(cube->handle())), mip);
     glDrawBuffer(GL_NONE);

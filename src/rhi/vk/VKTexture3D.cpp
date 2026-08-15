@@ -125,7 +125,7 @@ bool VKTexture3D::createEmpty(const TextureDesc& desc, int width, int height) {
     const vk::ImageAspectFlags aspect = ToVkAspect(desc.format);
 
     vk::ImageUsageFlags usage = _depth
-        ? vk::ImageUsageFlagBits::eDepthStencilAttachment
+        ? (vk::ImageUsageFlagBits::eDepthStencilAttachment | vk::ImageUsageFlagBits::eSampled)
         : (vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled |
            vk::ImageUsageFlagBits::eTransferDst |
            (_mipLevels > 1 ? vk::ImageUsageFlagBits::eTransferSrc : vk::ImageUsageFlagBits{}));
