@@ -29,8 +29,6 @@ void Mesh::draw(rhi::IRenderer* renderer, rhi::IPipeline* pipeline, int count) {
             else if(name == "texture_height")
             number = std::to_string(heightNr++); // transfer unsigned int to string
 
-        // now set the sampler to the correct texture unit
-        pipeline->setUniform(name + number, (int)i);
         // and finally bind the texture
         if (textures[i].texture) {
             renderer->bindTexture(textures[i].texture, i);
