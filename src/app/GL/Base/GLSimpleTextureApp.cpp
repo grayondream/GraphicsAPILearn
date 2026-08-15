@@ -27,7 +27,14 @@ bool GLSimpleTextureApp::load(std::shared_ptr<rhi::IRenderer> rhiRenderer) {
 	_texture = RhiImage::Load2D(renderer().get(), imgFile);
 	ExitIfFailed(_texture != nullptr, "Failed to load texture from file {}", imgFile);
 
-	Rect shape{};
+	// 用白色顶点：shader 中 color = texture * fragColor，若用默认彩色顶点(Rect 四角红/蓝/绿/白)
+	// 插值出的 fragColor 各通道会被调成 0，把纹理乘暗成"隐约可见"。白色顶点不调制纹理。
+	Rect shape{
+		Vertex{ { 0.5f, 0.5f, 0.0f, 1.0f }, { 1.0f, 1.0f, 1.0f, 1.0f } },
+		Vertex{ { 0.5f, -0.5f, 0.0f, 1.0f }, { 1.0f, 1.0f, 1.0f, 1.0f } },
+		Vertex{ { -0.5f, -0.5f, 0.0f, 1.0f }, { 1.0f, 1.0f, 1.0f, 1.0f } },
+		Vertex{ { -0.5f, 0.5f, 0.0f, 1.0f }, { 1.0f, 1.0f, 1.0f, 1.0f } }
+	};
 	auto geo = RhiGeometry::Create(renderer().get(), shape, true, false, true);
 	_layout = geo.layout;
 	_vb = geo.vertexBuffer;
