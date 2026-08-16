@@ -33,7 +33,8 @@ bool GLShadowApp::load(std::shared_ptr<rhi::IRenderer> rhiRenderer) {
 	}
 
 	_camera = Camera(glm::vec3(0.0f, 3.0f, 5.0f), glm::vec3(0.0f, 1.0f, 0.0f), -90);
-	_texture = RhiImage::Load2D(renderer().get(), join(StaticCollector::getImagePath(), "wood.png"));
+	_texture = RhiImage::Load2D(renderer().get(), join(StaticCollector::getImagePath(), "wood.png"),
+	                            rhi::TextureWrap::Repeat);  // 平面 UV 0..5 需平铺
 	initShapes();
 	createShadowDepthBuffer();
 	createQuadBuffer();

@@ -61,7 +61,7 @@ bool GLBlinnPhongApp::load(std::shared_ptr<rhi::IRenderer> rhiRenderer) {
 
 	{
 		const auto imgFile = join(StaticCollector::getImagePath(), "wood.png");
-		_texture = RhiImage::Load2D(renderer().get(), imgFile);
+		_texture = RhiImage::Load2D(renderer().get(), imgFile, rhi::TextureWrap::Repeat);  // 平面 UV 0..5 需平铺
 		ExitIfFailed(_texture != nullptr, "Failed to load texture from file {}", imgFile);
 	}
 

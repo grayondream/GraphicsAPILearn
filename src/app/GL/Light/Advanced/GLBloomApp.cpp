@@ -132,7 +132,7 @@ void GLBloomApp::createTextures() {
 	const auto resDir = StaticCollector::getImagePath();
 	{
 		const auto imgFile = join(resDir, "wood.png");
-		m_woodTexture = RhiImage::Load2D(renderer().get(), imgFile);
+		m_woodTexture = RhiImage::Load2D(renderer().get(), imgFile, rhi::TextureWrap::Repeat);  // 平面 UV 0..5 需平铺
 		ExitIfFailed(m_woodTexture != nullptr, "Failed to load texture from file {}", imgFile);
 	}
 	{
