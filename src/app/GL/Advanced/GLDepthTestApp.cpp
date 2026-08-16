@@ -36,7 +36,8 @@ bool GLDepthTestApp::load(std::shared_ptr<rhi::IRenderer> rhiRenderer) {
     _contentPipeline = renderer()->createPipeline(cg.layout, shader);
     _contentPipeline->setDepthTest(true);
     _cubeTexture = RhiImage::Load2D(renderer().get(), join(StaticCollector::getImagePath(), "marble.jpg"));
-    _planeTexture = RhiImage::Load2D(renderer().get(), join(StaticCollector::getImagePath(), "metal.jpg"));
+    _planeTexture = RhiImage::Load2D(renderer().get(), join(StaticCollector::getImagePath(), "metal.jpg"),
+                                     rhi::TextureWrap::Repeat);  // 平面 UV 0..5 需平铺
     _uboBuffer = renderer()->createUniformBuffer();
     _uboBuffer->init(nullptr, sizeof(rhi::UniformBlock), rhi::BufferType::Uniform);
     _uboBuffer->bindRange(0, 0, sizeof(rhi::UniformBlock));

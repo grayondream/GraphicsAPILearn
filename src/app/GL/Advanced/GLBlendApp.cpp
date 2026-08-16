@@ -38,7 +38,8 @@ bool GLBlendApp::load(std::shared_ptr<rhi::IRenderer> rhiRenderer) {
     _pipeline->setBlend(true);
     _pipeline->setBlendFunc(rhi::BlendFactor::SrcAlpha, rhi::BlendFactor::OneMinusSrcAlpha);
     _cubeTexture = RhiImage::Load2D(renderer().get(), join(StaticCollector::getImagePath(), "marble.jpg"));
-    _planeTexture = RhiImage::Load2D(renderer().get(), join(StaticCollector::getImagePath(), "metal.jpg"));
+    _planeTexture = RhiImage::Load2D(renderer().get(), join(StaticCollector::getImagePath(), "metal.jpg"),
+                                     rhi::TextureWrap::Repeat);  // 平面 UV 0..5 需平铺
     _grassTexture = RhiImage::Load2D(renderer().get(), join(StaticCollector::getImagePath(), "grass.png"));
     _winTexture = RhiImage::Load2D(renderer().get(), join(StaticCollector::getImagePath(), "window.png"));
     _uboBuffer = renderer()->createUniformBuffer();

@@ -37,7 +37,8 @@ bool GLCullFaceApp::load(std::shared_ptr<rhi::IRenderer> rhiRenderer) {
     _pipeline->setCullFace(rhi::CullFace::Back);
     _pipeline->setFrontFace(false);
     _cubeTexture = RhiImage::Load2D(renderer().get(), join(StaticCollector::getImagePath(), "marble.jpg"));
-    _planeTexture = RhiImage::Load2D(renderer().get(), join(StaticCollector::getImagePath(), "metal.jpg"));
+    _planeTexture = RhiImage::Load2D(renderer().get(), join(StaticCollector::getImagePath(), "metal.jpg"),
+                                     rhi::TextureWrap::Repeat);  // 平面 UV 0..5 需平铺
     _grassTexture = RhiImage::Load2D(renderer().get(), join(StaticCollector::getImagePath(), "grass.png"));
     _winTexture = RhiImage::Load2D(renderer().get(), join(StaticCollector::getImagePath(), "window.png"));
     _uboBuffer = renderer()->createUniformBuffer();

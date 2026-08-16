@@ -8,7 +8,8 @@
 
 namespace RhiImage {
 
-std::shared_ptr<rhi::ITexture2D> Load2D(rhi::IRenderer* renderer, const std::string& file) {
+std::shared_ptr<rhi::ITexture2D> Load2D(rhi::IRenderer* renderer, const std::string& file,
+                                        rhi::TextureWrap wrap) {
     Image img(file);
     img.load();
     if (!img.data()) {
@@ -27,8 +28,8 @@ std::shared_ptr<rhi::ITexture2D> Load2D(rhi::IRenderer* renderer, const std::str
     auto tex = renderer->createTexture2D();
     rhi::TextureDesc desc;
     desc.format = rhi::TextureFormat::RGBA8;
-    desc.wrapS = rhi::TextureWrap::ClampToEdge;
-    desc.wrapT = rhi::TextureWrap::ClampToEdge;
+    desc.wrapS = wrap;
+    desc.wrapT = wrap;
     desc.minFilter = rhi::TextureFilter::LinearMipLinear;
     desc.magFilter = rhi::TextureFilter::Linear;
     desc.generateMipmap = true;

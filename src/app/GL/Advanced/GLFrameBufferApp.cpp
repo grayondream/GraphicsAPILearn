@@ -48,7 +48,7 @@ void GLFrameBufferApp::loadTexture() {
 	
 	{
 		const auto imgFile = join(StaticCollector::getImagePath(), "metal.jpg");
-		_planeTexture = RhiImage::Load2D(renderer().get(), imgFile);
+		_planeTexture = RhiImage::Load2D(renderer().get(), imgFile, rhi::TextureWrap::Repeat);  // 平面 UV 0..5 需平铺
 		ExitIfFailed(_planeTexture != nullptr, "Failed to load texture from file {}", imgFile);
 	}
 }
