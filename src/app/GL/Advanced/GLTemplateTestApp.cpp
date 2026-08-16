@@ -52,6 +52,14 @@ bool GLTemplateTestApp::load(std::shared_ptr<rhi::IRenderer> rhiRenderer) {
 		                           {rhi::ShaderStage::Fragment, ffile, "main", false}});
 		ExitIfFailed(ok, "Create RHI shader failed: {}", shader->getLog());
 		_borderPipeline = renderer()->createPipeline(cg.layout, shader);
+		// GL 的 stencil 状态是全局的，border 绘制会继承 _pipeline 设置的全局状态；
+		// 而 VK 的 stencil 状态是每管线的，_borderPipeline 必须显式配置 stencil，
+		// 否则 VK 中 border 无 stencil 测试、会整面画成红色覆盖纹理。
+		_borderPipeline->setDepthTest(false);
+		_borderPipeline->setStencilTest(true);
+		_borderPipeline->setStencilFunc(rhi::CompareFunc::NotEqual, 1, 0xFF);
+		_borderPipeline->setStencilMask(0x00);
+		_borderPipeline->setStencilOp(rhi::StencilOp::Keep, rhi::StencilOp::Keep, rhi::StencilOp::Keep);
 	}
 
 	_pipeline->setDepthTest(true);

@@ -276,11 +276,21 @@ bool VKRenderer::createDescriptors() {
 }
 
 vk::Format pickDepthFormat(vk::raii::PhysicalDevice& pd) {
-    for (const auto f : {vk::Format::eD32Sfloat, vk::Format::eD24UnormS8Uint, vk::Format::eD16Unorm}) {
+    // 优先选择带 stencil 分量的格式：GL 默认 framebuffer 含 stencil buffer，模板测试
+    // （如 TemplateTest 的边框）依赖 stencil 读写。若只用纯深度格式（如 D32_SFLOAT），
+    // stencil 写入被静默丢弃、读取恒 0，导致 border 的 NotEqual(1) 处处通过而整面覆盖。
+    for (const auto f : {vk::Format::eD32SfloatS8Uint, vk::Format::eD24UnormS8Uint,
+                         vk::Format::eD16UnormS8Uint, vk::Format::eD32Sfloat,
+                         vk::Format::eD16Unorm}) {
         const auto p = pd.getFormatProperties(f);
         if (p.optimalTilingFeatures & vk::FormatFeatureFlagBits::eDepthStencilAttachment) return f;
     }
-    return vk::Format::eD32Sfloat;
+    return vk::Format::eD32SfloatS8Uint;
+}
+
+static bool formatHasStencil(vk::Format f) {
+    return f == vk::Format::eD32SfloatS8Uint || f == vk::Format::eD24UnormS8Uint ||
+           f == vk::Format::eD16UnormS8Uint;
 }
 
 bool VKRenderer::createRenderPassAndFramebuffers() {
@@ -331,6 +341,7 @@ bool VKRenderer::createRenderPassAndFramebuffers() {
         vci.viewType = vk::ImageViewType::e2D;
         vci.format = depthFmt;
         vci.subresourceRange.aspectMask = vk::ImageAspectFlagBits::eDepth;
+        if (formatHasStencil(depthFmt)) vci.subresourceRange.aspectMask |= vk::ImageAspectFlagBits::eStencil;
         vci.subresourceRange.baseMipLevel = 0;
         vci.subresourceRange.levelCount = 1;
         vci.subresourceRange.baseArrayLayer = 0;

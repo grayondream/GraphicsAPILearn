@@ -20,9 +20,9 @@ layout(set=0, binding=0, std430) uniform UniformBlock {
     ULight lights[1];
 };
 
-out vec2 textureCoord;
 out vec4 fragColor;
 
+out vec2 textureCoord;
 void main(){
     gl_Position = projection * view * model * pos;
     textureCoord = inTextureCoord;
