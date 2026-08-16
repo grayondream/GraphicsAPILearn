@@ -107,6 +107,12 @@ private:
     vk::raii::DescriptorPool _dsPool{nullptr};
     std::vector<vk::raii::DescriptorSet> _uboDs{};
     vk::raii::PipelineLayout _pipelineLayout{nullptr};
+    struct DepthImage {
+        vk::raii::Image image{nullptr};
+        vk::raii::DeviceMemory memory{nullptr};
+        vk::raii::ImageView view{nullptr};
+    };
+    std::vector<DepthImage> _depthImages{};
     vk::raii::RenderPass _renderPass{nullptr};
     std::vector<vk::raii::Framebuffer> _framebuffers{};
     vk::raii::CommandPool _cmdPool{nullptr};
@@ -265,8 +271,74 @@ bool VKRenderer::createDescriptors() {
     return true;
 }
 
+vk::Format pickDepthFormat(vk::raii::PhysicalDevice& pd) {
+    for (const auto f : {vk::Format::eD32Sfloat, vk::Format::eD24UnormS8Uint, vk::Format::eD16Unorm}) {
+        const auto p = pd.getFormatProperties(f);
+        if (p.optimalTilingFeatures & vk::FormatFeatureFlagBits::eDepthStencilAttachment) return f;
+    }
+    return vk::Format::eD32Sfloat;
+}
+
 bool VKRenderer::createRenderPassAndFramebuffers() {
     const vk::Format fmt = _swapchain->format();
+    const vk::Format depthFmt = pickDepthFormat(_phys);
+    const vk::Extent2D ext = _swapchain->extent();
+
+    // Depth image per swapchain image so in-flight frames don't share/overwrite
+    // each other's depth buffer. The default swapchain render pass previously
+    // had no depth attachment, making setDepthTest() a no-op: back faces of
+    // closed meshes rendered through the front, so e.g. the light sample's
+    // sphere lit both hemispheres and the lighting appeared z-flipped vs GL.
+    _depthImages.clear();
+    _depthImages.resize(_swapchain->imageCount());
+    for (uint32_t i = 0; i < _swapchain->imageCount(); i++) {
+        DepthImage& d = _depthImages[i];
+        vk::ImageCreateInfo ici{};
+        ici.imageType = vk::ImageType::e2D;
+        ici.format = depthFmt;
+        ici.extent = vk::Extent3D(ext.width, ext.height, 1);
+        ici.mipLevels = 1;
+        ici.arrayLayers = 1;
+        ici.samples = vk::SampleCountFlagBits::e1;
+        ici.tiling = vk::ImageTiling::eOptimal;
+        ici.usage = vk::ImageUsageFlagBits::eDepthStencilAttachment;
+        ici.sharingMode = vk::SharingMode::eExclusive;
+        ici.initialLayout = vk::ImageLayout::eUndefined;
+        auto ir = _device.createImage(ici);
+        if (ir.result != vk::Result::eSuccess) {
+            LOGE("VKRenderer: createImage(depth) failed");
+            return false;
+        }
+        d.image = std::move(ir.value);
+
+        const vk::MemoryRequirements req = d.image.getMemoryRequirements();
+        const vk::PhysicalDeviceMemoryProperties props = _phys.getMemoryProperties();
+        const uint32_t memType = findMemoryType(props, req.memoryTypeBits, vk::MemoryPropertyFlagBits::eDeviceLocal);
+        if (memType == UINT32_MAX) return false;
+        vk::MemoryAllocateInfo mai(req.size, memType);
+        auto ar = _device.allocateMemory(mai);
+        if (ar.result != vk::Result::eSuccess) return false;
+        d.memory = std::move(ar.value);
+        vk::BindImageMemoryInfo bimi(*d.image, *d.memory, 0);
+        if (_device.bindImageMemory2({bimi}) != vk::Result::eSuccess) return false;
+
+        vk::ImageViewCreateInfo vci{};
+        vci.image = *d.image;
+        vci.viewType = vk::ImageViewType::e2D;
+        vci.format = depthFmt;
+        vci.subresourceRange.aspectMask = vk::ImageAspectFlagBits::eDepth;
+        vci.subresourceRange.baseMipLevel = 0;
+        vci.subresourceRange.levelCount = 1;
+        vci.subresourceRange.baseArrayLayer = 0;
+        vci.subresourceRange.layerCount = 1;
+        auto vr = _device.createImageView(vci);
+        if (vr.result != vk::Result::eSuccess) {
+            LOGE("VKRenderer: createImageView(depth) failed");
+            return false;
+        }
+        d.view = std::move(vr.value);
+    }
+
     vk::AttachmentDescription color{};
     color.format = fmt;
     color.samples = vk::SampleCountFlagBits::e1;
@@ -276,14 +348,28 @@ bool VKRenderer::createRenderPassAndFramebuffers() {
     color.stencilStoreOp = vk::AttachmentStoreOp::eDontCare;
     color.initialLayout = vk::ImageLayout::eUndefined;
     color.finalLayout = vk::ImageLayout::ePresentSrcKHR;
+
+    vk::AttachmentDescription depth{};
+    depth.format = depthFmt;
+    depth.samples = vk::SampleCountFlagBits::e1;
+    depth.loadOp = vk::AttachmentLoadOp::eClear;
+    depth.storeOp = vk::AttachmentStoreOp::eDontCare;
+    depth.stencilLoadOp = vk::AttachmentLoadOp::eDontCare;
+    depth.stencilStoreOp = vk::AttachmentStoreOp::eDontCare;
+    depth.initialLayout = vk::ImageLayout::eUndefined;
+    depth.finalLayout = vk::ImageLayout::eDepthStencilAttachmentOptimal;
+
+    const std::array<vk::AttachmentDescription, 2> attachments = {color, depth};
     vk::AttachmentReference colorRef(0, vk::ImageLayout::eColorAttachmentOptimal);
+    vk::AttachmentReference depthRef(1, vk::ImageLayout::eDepthStencilAttachmentOptimal);
     vk::SubpassDescription subpass{};
     subpass.pipelineBindPoint = vk::PipelineBindPoint::eGraphics;
     subpass.colorAttachmentCount = 1;
     subpass.pColorAttachments = &colorRef;
+    subpass.pDepthStencilAttachment = &depthRef;
     vk::RenderPassCreateInfo rpci{};
-    rpci.attachmentCount = 1;
-    rpci.pAttachments = &color;
+    rpci.attachmentCount = static_cast<uint32_t>(attachments.size());
+    rpci.pAttachments = attachments.data();
     rpci.subpassCount = 1;
     rpci.pSubpasses = &subpass;
     auto rpr = _device.createRenderPass(rpci);
@@ -294,13 +380,12 @@ bool VKRenderer::createRenderPassAndFramebuffers() {
     _renderPass = std::move(rpr.value);
 
     _framebuffers.clear();
-    const vk::Extent2D ext = _swapchain->extent();
     for (uint32_t i = 0; i < _swapchain->imageCount(); i++) {
-        vk::ImageView view = _swapchain->imageView(i);
+        vk::ImageView views[2] = {_swapchain->imageView(i), *_depthImages[i].view};
         vk::FramebufferCreateInfo fci{};
         fci.renderPass = *_renderPass;
-        fci.attachmentCount = 1;
-        fci.pAttachments = &view;
+        fci.attachmentCount = 2;
+        fci.pAttachments = views;
         fci.width = ext.width;
         fci.height = ext.height;
         fci.layers = 1;
@@ -356,6 +441,7 @@ void VKRenderer::shutdown() {
     }
     _swapchain.reset();
     _framebuffers.clear();
+    _depthImages.clear();
     _renderPass = vk::raii::RenderPass{nullptr};
     _pipelineLayout = vk::raii::PipelineLayout{nullptr};
     _uboDs.clear();
@@ -880,7 +966,8 @@ bool VKRenderer::ensureRenderPass() {
     // attachments use loadOp DontCare so their clear value is ignored, but a
     // VkClearValue must still be supplied for every attachment.
     const bool msaa = vkrt && vkrt->valid() && vkrt->msaa();
-    const bool hasDepth = vkrt && vkrt->valid() && vkrt->hasDepthAttachment();
+    const bool usingDefaultRP = !(vkrt && vkrt->valid());
+    const bool hasDepth = usingDefaultRP ? true : vkrt->hasDepthAttachment();
     std::vector<vk::ClearValue> clears;
     for (uint32_t i = 0; i < colorCount; i++) {
         vk::ClearValue cv;
