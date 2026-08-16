@@ -187,9 +187,15 @@ bool VKPipeline::createGraphicsPipeline(vk::RenderPass rp, vk::SampleCountFlagBi
     multisample.sampleShadingEnable = vk::False;
 
     vk::PipelineDepthStencilStateCreateInfo depthStencil{};
-    depthStencil.depthTestEnable = _depthTest ? vk::True : vk::False;
+    // GL 语义：glDisable(GL_DEPTH_TEST) 与 glDepthMask(true) 相互独立——测试关、
+    // 写开时仍会写深度。Vulkan 中 depthTestEnable=false 会使深度写入失效（即使
+    // depthWriteEnable=true）。为对齐 GL，当需要写深度(_depthMask)时强制开启测试，
+    // 测试原本关闭(_depthTest=false)时用 ALWAYS（恒通过≈测试关），从而仍写入深度，
+    // 避免"先画的无测试物体被后画的物体覆盖"（如 Point 光源立方体跑到物体后面）。
+    const bool depthTestEffective = _depthTest || _depthMask;
+    depthStencil.depthTestEnable = depthTestEffective ? vk::True : vk::False;
     depthStencil.depthWriteEnable = _depthMask ? vk::True : vk::False;
-    depthStencil.depthCompareOp = ToVkCompare(_depthFunc);
+    depthStencil.depthCompareOp = _depthTest ? ToVkCompare(_depthFunc) : vk::CompareOp::eAlways;
     depthStencil.depthBoundsTestEnable = vk::False;
     depthStencil.stencilTestEnable = _stencilTest ? vk::True : vk::False;
     depthStencil.front = vk::StencilOpState(ToVkStencilOp(_stencilFail), ToVkStencilOp(_stencilPass),
@@ -248,9 +254,10 @@ bool VKPipeline::createGraphicsPipeline(vk::RenderPass rp, vk::SampleCountFlagBi
 }
 
 void VKPipeline::applyDynamicState(vk::raii::CommandBuffer& cmd) const {
-    cmd.setDepthTestEnable(_depthTest ? vk::True : vk::False);
+    const bool depthTestEffective = _depthTest || _depthMask;
+    cmd.setDepthTestEnable(depthTestEffective ? vk::True : vk::False);
     cmd.setDepthWriteEnable(_depthMask ? vk::True : vk::False);
-    cmd.setDepthCompareOp(ToVkCompare(_depthFunc));
+    cmd.setDepthCompareOp(_depthTest ? ToVkCompare(_depthFunc) : vk::CompareOp::eAlways);
     cmd.setCullMode(ToVkCullMode(_cullEnable, _cullFace));
     // 与 pipeline 创建一致：负高度 viewport 使 front face winding 反转
     cmd.setFrontFace(_frontFaceCCW ? vk::FrontFace::eClockwise : vk::FrontFace::eCounterClockwise);

@@ -30,7 +30,11 @@ struct QueueFamilies {
 
 class VKRenderer final : public IRenderer, public VKBuffer::Notifier {
 public:
-    static constexpr size_t kUboSlots = 32;
+    // UBO ring 槽数：必须 >= 单次 command buffer submit 内的 UBO update 次数，
+    // 否则 ring 回绕会覆盖尚未被 GPU 读取的槽（LightSource_Direction 等样例在
+    // 一帧内循环 125 个立方体各 update 一次，共 126 次 > 旧的 32）。取 256 留有
+    // 余量，且为 2 的幂便于取模。
+    static constexpr size_t kUboSlots = 256;
     using DescriptorSet = vk::raii::DescriptorSet;
     VKRenderer() = default;
     ~VKRenderer() override { shutdown(); }
@@ -231,11 +235,11 @@ bool VKRenderer::createDescriptors() {
     _dsLayout = std::move(dlr.value);
 
     vk::DescriptorPoolSize sizes[] = {
-        vk::DescriptorPoolSize(vk::DescriptorType::eUniformBuffer, 255),
-        vk::DescriptorPoolSize(vk::DescriptorType::eCombinedImageSampler, 255 * 15),
+        vk::DescriptorPoolSize(vk::DescriptorType::eUniformBuffer, 256),
+        vk::DescriptorPoolSize(vk::DescriptorType::eCombinedImageSampler, 256 * 15),
     };
     vk::DescriptorPoolCreateInfo dpci{};
-    dpci.maxSets = 255;
+    dpci.maxSets = 256;
     dpci.poolSizeCount = 2;
     dpci.pPoolSizes = sizes;
     auto dpr = _device.createDescriptorPool(dpci);
