@@ -10,6 +10,9 @@
 #include "base/Log.hpp"
 #include "GLHeader.hpp"
 #include <glm/glm.hpp>
+#include <fstream>
+#include <vector>
+#include <cstdlib>
 
 namespace rhi {
 
@@ -55,7 +58,10 @@ public:
 
     void beginFrame() override {}
     void endFrame() override {}
-    bool present() override { return _swapchain ? _swapchain->present() : false; }
+    bool present() override {
+        dumpFrame();
+        return _swapchain ? _swapchain->present() : false;
+    }
     void clearColor(float r, float g, float b, float a) override {
         glClearColor(r, g, b, a);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
@@ -160,6 +166,23 @@ private:
     std::shared_ptr<ISwapchain> _swapchain{};
     std::shared_ptr<IPipeline> _pipeline{};
     int _viewportW{0}, _viewportH{0};
+    bool _dumpDone{false};
+
+    void dumpFrame() {
+        const char* dumpPath = std::getenv("RHI_DUMP_FRAME");
+        if (!dumpPath || _dumpDone) return;
+        _dumpDone = true;
+        GLint vp[4]; glGetIntegerv(GL_VIEWPORT, vp);
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        glReadBuffer(GL_BACK);
+        std::vector<unsigned char> px(vp[2]*vp[3]*3);
+        glReadPixels(0,0,vp[2],vp[3],GL_RGB,GL_UNSIGNED_BYTE,px.data());
+        std::ofstream f(dumpPath, std::ios::binary);
+        f << "P6\n" << vp[2] << " " << vp[3] << "\n255\n";
+        f.write((char*)px.data(), px.size());
+        f.close();
+        LOGI("dumpFrame: saved {} ({}x{})", dumpPath, vp[2], vp[3]);
+    }
 };
 
 std::shared_ptr<IRenderer> createGLRenderer() {

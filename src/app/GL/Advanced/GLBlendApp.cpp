@@ -120,7 +120,6 @@ void GLBlendApp::draw(const float dt) {
         for (int i = 0; i < _grassCount; i++) {
             glm::mat4 model = glm::mat4(1.0f);
             model = glm::scale(model, glm::vec3(0.5, 0.5, 0.5));
-            model = glm::rotate(model, glm::radians(90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
             model = glm::translate(model, _winPos + glm::vec3(-0.5 * i, 1 * i, 0));
             renderer()->bindTexture(_winTexture, 0);
             rhi::SetUniform(_ubo, "model", model);

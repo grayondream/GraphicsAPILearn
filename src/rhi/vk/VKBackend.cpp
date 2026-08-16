@@ -90,7 +90,7 @@ private:
     bool createRenderPassAndFramebuffers();
     bool createCommandResources();
     void updateUboDescriptor();
-    void updateSamplerDescriptor(uint32_t binding, vk::Sampler sampler, vk::ImageView view);
+    void bindSamplersToCurrentSet();
     bool ensureRenderPass();
     void applyViewport();
     bool bindPipelineAndState();
@@ -148,6 +148,8 @@ private:
     size_t _uboSlotOffset{0};
     size_t _uboSlotSize{0};
     uint32_t _uboSlotIndex{0};
+    struct BoundTex { vk::Sampler sampler{}; vk::ImageView view{}; };
+    std::array<BoundTex, 15> _boundTextures{};   // unit 0..14 -> binding 1..15
     std::shared_ptr<IRenderTarget> _renderTarget{};
     std::shared_ptr<VKRenderTarget> _vkRenderTarget{};
 };
@@ -469,6 +471,7 @@ void VKRenderer::resetRenderState() {
     _uboSlotSize = 0;
     _renderTarget = nullptr;
     _vkRenderTarget = nullptr;
+    for (auto& t : _boundTextures) { t = BoundTex{}; }
     if (_device != nullptr && *_dsPool && *_dsLayout) {
         // 用 vkFreeDescriptorSets（需池带 eFreeDescriptorSet）释放旧描述符集，再重新分配
         // 全新（未初始化）描述符集。不能用 vkResetDescriptorPool：pool 重置后 raii
@@ -828,35 +831,38 @@ void VKRenderer::bindTexture(const std::shared_ptr<ITexture2D>& texture, unsigne
     if (!texture || unit > 14) return;
     auto vktex = std::dynamic_pointer_cast<VKTexture2D>(texture);
     if (!vktex || !vktex->valid()) return;
-    updateSamplerDescriptor(unit + 1, vktex->sampler(), vktex->view());
+    _boundTextures[unit] = {vktex->sampler(), vktex->view()};
 }
 
 void VKRenderer::bindTexture(const std::shared_ptr<ITexture3D>& texture, unsigned int unit) {
     if (!texture || unit > 14) return;
     auto vktex = std::dynamic_pointer_cast<VKTexture3D>(texture);
     if (!vktex || !vktex->valid()) return;
-    updateSamplerDescriptor(unit + 1, vktex->sampler(),
-                            vktex->isDepth() ? vktex->depthCubeView() : vktex->cubeView());
+    _boundTextures[unit] = {vktex->sampler(),
+                            vktex->isDepth() ? vktex->depthCubeView() : vktex->cubeView()};
 }
 
 void VKRenderer::bindTexture(rhi::ITexture2D* texture, unsigned int unit) {
     if (!texture || unit > 14) return;
     auto vktex = dynamic_cast<VKTexture2D*>(texture);
     if (!vktex || !vktex->valid()) return;
-    updateSamplerDescriptor(unit + 1, vktex->sampler(), vktex->view());
+    _boundTextures[unit] = {vktex->sampler(), vktex->view()};
 }
 
-void VKRenderer::updateSamplerDescriptor(uint32_t binding, vk::Sampler sampler, vk::ImageView view) {
-    if (_uboDs.empty() || !sampler || !view) return;
-    // sampler 写入所有 UBO slot 对应的 set：draw 绑定的 set 可能不同于最后一次
-    // bindTexture 时的 set（slot 由每次 uniform update 推进），因此每个 set 都要
-    // 持有同一 sampler，否则 llvmpipe 读到未绑的 sampler 会崩。
-    vk::DescriptorImageInfo info(sampler, view, vk::ImageLayout::eShaderReadOnlyOptimal);
-    for (auto& set : _uboDs) {
-        if (!*set) continue;
+void VKRenderer::bindSamplersToCurrentSet() {
+    if (_uboDs.empty()) return;
+    DescriptorSet& ds = _uboDs[_uboSlotIndex % _uboDs.size()];
+    if (!*ds) return;
+    // 把当前已绑定纹理（unit 0..14 -> binding 1..15）写入本 draw 将绑定的 set。
+    // 只写本 set，不污染先前 draw 已记录、可能在不同 slot 的 set；否则后续
+    // bindTexture(另一纹理) 会覆盖先前 draw 引用的 set，使先画物体用错纹理。
+    for (uint32_t b = 0; b < _boundTextures.size(); b++) {
+        const BoundTex& t = _boundTextures[b];
+        if (!t.sampler || !t.view) continue;
+        vk::DescriptorImageInfo info(t.sampler, t.view, vk::ImageLayout::eShaderReadOnlyOptimal);
         vk::WriteDescriptorSet wds{};
-        wds.dstSet = *set;
-        wds.dstBinding = binding;
+        wds.dstSet = *ds;
+        wds.dstBinding = b + 1;
         wds.dstArrayElement = 0;
         wds.descriptorCount = 1;
         wds.descriptorType = vk::DescriptorType::eCombinedImageSampler;
@@ -1079,7 +1085,10 @@ bool VKRenderer::bindPipelineAndState() {
     // bind描述符集：每个 draw 绑到当前 UBO slot 对应的 set
     if (!_uboDs.empty()) {
         DescriptorSet& ds = _uboDs[_uboSlotIndex % _uboDs.size()];
-        if (*ds) _cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *_pipelineLayout, 0, {*ds}, {});
+        if (*ds) {
+            bindSamplersToCurrentSet();
+            _cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *_pipelineLayout, 0, {*ds}, {});
+        }
     }
     vkp->applyDynamicState(_cmd);
     return true;

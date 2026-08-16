@@ -32,7 +32,7 @@ private:
 	float _curTime{};
 	glm::vec3 _objectPosition = glm::vec3(0, 0, -4.0f);
 	glm::vec3 _objectScale = glm::vec3(20, 1, 20.0f);
-	glm::vec3 _winPos = glm::vec3(0.5f, 0.5f, 5);
+	glm::vec3 _winPos = glm::vec3(0.5f, 0.5f, -4);
 	int _grassCount = 4;
 	rhi::UniformBlock _ubo{};
 	std::shared_ptr<rhi::IBuffer> _uboBuffer{};
