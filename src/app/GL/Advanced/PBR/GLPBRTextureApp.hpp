@@ -15,6 +15,7 @@ public:
 
 private:
     void loadTexture();
+    void compileShader();
 
 private:
     std::shared_ptr<rhi::ITexture2D> m_albedoMap{};

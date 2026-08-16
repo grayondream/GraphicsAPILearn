@@ -33,7 +33,18 @@ void GLPBRTextureApp::loadTexture() {
 bool GLPBRTextureApp::load(std::shared_ptr<rhi::IRenderer> rhiRenderer) {
     if (!GLPBRBaseApp::load(rhiRenderer)) return false;
     loadTexture();
+    compileShader();
     return true;
+}
+
+void GLPBRTextureApp::compileShader() {
+    const auto shaderDir = join(StaticCollector::getGLShaderPath(), "Advanced", "PBR", "Texture");
+    auto shader = renderer()->createShader();
+    auto ok = shader->compile({ {rhi::ShaderStage::Vertex, join(shaderDir, "PBR.vs"), "main", false},
+                                {rhi::ShaderStage::Fragment, join(shaderDir, "PBR.fs"), "main", false} });
+    ExitIfFailed(ok, "Create RHI shader failed: {}", shader->getLog());
+    m_program = renderer()->createPipeline(m_sphere.layout, shader);
+    m_program->setDepthTest(true);
 }
 
 void GLPBRTextureApp::draw(const float dt) {
