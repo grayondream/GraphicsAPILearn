@@ -72,6 +72,9 @@ public:
     void blitFramebuffer(const std::shared_ptr<IRenderTarget>&, const std::shared_ptr<IRenderTarget>&, BlitMask) override;
     BackendCapabilities backendCapabilities() override;
 
+    void waitIdle() override { if (_device != nullptr) _device.waitIdle(); }
+    void resetRenderState() override;
+
     bool imguiInitInfo(VKImGuiInitInfo& out) override;
     void renderImGuiDrawData(void* drawData) override;
 
@@ -239,6 +242,7 @@ bool VKRenderer::createDescriptors() {
         vk::DescriptorPoolSize(vk::DescriptorType::eCombinedImageSampler, 256 * 15),
     };
     vk::DescriptorPoolCreateInfo dpci{};
+    dpci.flags = vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet;
     dpci.maxSets = 256;
     dpci.poolSizeCount = 2;
     dpci.pPoolSizes = sizes;
@@ -448,6 +452,35 @@ bool VKRenderer::createCommandResources() {
     }
     _frameFence = std::move(fr.value);
     return true;
+}
+
+void VKRenderer::resetRenderState() {
+    // 样例切换时（AppHost::reloadSample 在 waitIdle 之后调用本函数）重置按帧渲染状态。
+    // 共享的 _uboDs 描述符集在旧样例存活期间被写入引用其 UBO/纹理，旧样例销毁后这些
+    // 引用指向已释放的 GPU 内存；若不重置，新样例在重写全部绑定前（如 drawLight 在
+    // bindTexture 之前）绑定到含陈旧引用的描述符集，llvmpipe 工作线程读已释放内存崩溃。
+    // 重置描述符池并重新分配全新（未初始化）描述符集，清除一切对已释放资源的引用。
+    _pipeline = nullptr;
+    _indexBuffer = nullptr;
+    _vertexBuffers = {};
+    _uboBuffer = nullptr;
+    _uboSlotIndex = 0;
+    _uboSlotOffset = 0;
+    _uboSlotSize = 0;
+    _renderTarget = nullptr;
+    _vkRenderTarget = nullptr;
+    if (_device != nullptr && *_dsPool && *_dsLayout) {
+        // 用 vkFreeDescriptorSets（需池带 eFreeDescriptorSet）释放旧描述符集，再重新分配
+        // 全新（未初始化）描述符集。不能用 vkResetDescriptorPool：pool 重置后 raii
+        // DescriptorSet 析构仍会再调 vkFreeDescriptorSets，造成双重释放崩溃。
+        _uboDs.clear();
+        std::vector<vk::DescriptorSetLayout> lay(kUboSlots, *_dsLayout);
+        vk::DescriptorSetAllocateInfo dsai(*_dsPool, static_cast<uint32_t>(lay.size()), lay.data());
+        auto dar = _device.allocateDescriptorSets(dsai);
+        if (dar.result == vk::Result::eSuccess) {
+            for (auto& v : dar.value) _uboDs.emplace_back(std::move(v));
+        }
+    }
 }
 
 void VKRenderer::shutdown() {

@@ -78,6 +78,12 @@ bool AppHost::rebuildBackend(const GLFWWindowProperties& props) {
 }
 
 bool AppHost::reloadSample() {
+    // 切换样例前先等待 GPU 空闲：上一帧的 command buffer 可能仍在执行，其引用的
+    // 旧样例 UBO/纹理/描述符集在下方创建新样例、随后销毁旧样例时会被释放/改写。
+    // 若不等空闲就销毁（Vulkan 需等 fence 后才能释放仍被提交命令引用的资源），
+    // llvmpipe 工作线程会在读取已释放的 buffer/descriptor 内存时崩溃（用户观察到：
+    // 从 Triangle 切到 Mult 不崩、从其他光源样例切到 Mult 必崩——光源样例含纹理/UBO）。
+    if (_renderer) _renderer->waitIdle();
     if (_renderer) _renderer->resetRenderState();  // 清除上一样例残留的全局渲染状态(GL 深度测试等)
     auto s = SampleFactory::create(_sampleType);
     if (!s) { LOGE("SampleFactory::create failed for type {}", static_cast<int>(_sampleType)); return false; }
