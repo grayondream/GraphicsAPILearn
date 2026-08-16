@@ -69,7 +69,7 @@ int main(int argc, char **argv) {
     cxxopts::Options options("renderLearn", "Graphics Learn example runner");
     options.add_options()
         ("b,backend", "graphics backend (default: gl)", cxxopts::value<std::string>()->default_value("gl"))
-        ("a,app", "example app name (default: PBR_IBL_Specular)", cxxopts::value<std::string>()->default_value("PBR_IBL_Specular"))
+        ("a,app", "example app name (default: Triangle)", cxxopts::value<std::string>()->default_value("Triangle"))
         ("h,help", "print usage");
 
     auto result = options.parse(argc, argv);
