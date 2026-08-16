@@ -252,9 +252,9 @@ int AppHost::run() {
             auto now = std::chrono::high_resolution_clock::now();
             auto dt = std::chrono::duration_cast<std::chrono::milliseconds>(now - lastTime).count();
             lastTime = now;
-            // dt 为毫秒，样例里 curTime += dt 累加毫秒，旋转角度按秒设计，直接使用会转得过快；
-            // 统一放慢 1/10，使旋转等时间动画速度合理。
-            _sample->draw(static_cast<float>(dt) * 0.1f);
+            // dt 为毫秒，样例按秒设计(如 angle=20*(i+1)*curTime 期望 20度/秒)。
+            // 统一转为秒后传入，旋转等时间动画速度才合理。
+            _sample->draw(static_cast<float>(dt) / 1000.0f);
         }
         renderTotalBar();
         if (m_imguiWindow) m_imguiWindow->render();
