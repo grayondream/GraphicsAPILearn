@@ -19,6 +19,7 @@ bool GLSimpleLightMaterial::load(std::shared_ptr<rhi::IRenderer> rhiRenderer) {
 	if (!GLCameraBaseApp::load(rhiRenderer)) {
 		return false;
 	}
+	_camera = Camera(glm::vec3(0.0f, 0.0f, 6.0f));  // 默认 (0,0,3) 距离翻倍，避免相机过近
 
 	const auto shaderDir = join(StaticCollector::getGLShaderPath(), "Light");
 	{

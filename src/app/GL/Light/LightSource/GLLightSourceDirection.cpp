@@ -131,7 +131,7 @@ void GLLightSourceDirection::draw(const float dt) {
 		glm::vec4 viewPos(camPos.x, camPos.y, camPos.z, 1.0f);
 		rhi::SetUniform(_ubo, "viewPos", viewPos);
 
-		rhi::SetUniform(_ubo, "material.shininess", 1);
+		rhi::SetUniform(_ubo, "material.shininess", 32);
 
 		renderer()->bindTexture(_diffuseTex, 0);
 		renderer()->bindTexture(_specularTex, 1);
