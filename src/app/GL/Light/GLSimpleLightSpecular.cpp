@@ -101,7 +101,7 @@ void GLSimpleLightSpecular::draw(const float dt) {
 		glm::mat4 model = glm::mat4(1.0f);
 		model = glm::translate(model, glm::vec3(0.0f, 0.0f, 0.0f));
 		model = glm::rotate(model, glm::radians(0.0f), glm::vec3(1.0f, 0.3f, 0.5f));
-		glm::vec4 objectColor(1.0f, 0.5f, 0.31f, 1.0f);
+		glm::vec4 objectColor(213.0f / 255.0f, 14.0f / 255.0f, 86.0f / 255.0f, 1.0f);
 		glm::vec4 lightPos4(lightPos.x, lightPos.y, lightPos.z, 1.0f);
 		const auto camPos = _camera.getAttr().pos;
 		glm::vec4 viewPos4(camPos.x, camPos.y, camPos.z, 1.0f);

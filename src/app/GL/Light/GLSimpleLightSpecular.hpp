@@ -29,10 +29,10 @@ private:
 	uint32_t _indexCount{0};
 
 	glm::vec4 _lightColor{1.0, 1.0, 1.0, 1.0};
-	float _ambientStrength{0.0};
-	float _specularStrength{0.0};
-	float _diffuseStrength{0.0};
-	int _powTimes{1};
+	float _ambientStrength{0.1f};
+	float _specularStrength{0.5f};
+	float _diffuseStrength{1.0f};
+	int _powTimes{32};
 
 	rhi::UniformBlock _ubo{};
 	std::shared_ptr<rhi::IBuffer> _uboBuffer{};
