@@ -175,7 +175,11 @@ std::string_view EnumMemberName(const auto v) {
 void AppHost::renderTotalBar() {
     if (!m_imguiWindow) return;
     ImGuiIO& io = ImGui::GetIO();
-    ImGui::Begin("Control");
+    // 固定到右上角并置顶：样例窗口默认出现在左上角(如 Cube 的 Sample count 面板)，
+    // 若不固定位置，会与总控条重叠并覆盖"后端/样例"选择 UI。
+    ImGui::SetNextWindowPos(ImVec2(io.DisplaySize.x - 360.0f, 10.0f), ImGuiCond_Always);
+    ImGui::SetNextWindowSize(ImVec2(340.0f, 0.0f), ImGuiCond_Always);
+    ImGui::Begin("Control", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
 
     // 后端 Combo —— 只列编译启用的后端
     std::vector<const char*> backendNames;
@@ -248,7 +252,9 @@ int AppHost::run() {
             auto now = std::chrono::high_resolution_clock::now();
             auto dt = std::chrono::duration_cast<std::chrono::milliseconds>(now - lastTime).count();
             lastTime = now;
-            _sample->draw(static_cast<float>(dt));
+            // dt 为毫秒，样例里 curTime += dt 累加毫秒，旋转角度按秒设计，直接使用会转得过快；
+            // 统一放慢 1/10，使旋转等时间动画速度合理。
+            _sample->draw(static_cast<float>(dt) * 0.1f);
         }
         renderTotalBar();
         if (m_imguiWindow) m_imguiWindow->render();
