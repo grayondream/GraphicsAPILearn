@@ -1,9 +1,11 @@
 #version 450 core
+#extension GL_EXT_scalar_block_layout : require
+
 out vec4 FragColor;
   
 struct ULight { vec4 position; vec4 direction; vec4 ambient; vec4 diffuse; vec4 specular; vec4 params; };
 
-layout(set=0, binding=0) uniform UniformBlock {
+layout(set=0, binding=0, std430) uniform UniformBlock {
     mat4 projection;
     mat4 view;
     mat4 model;

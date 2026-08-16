@@ -1,11 +1,13 @@
 #version 450 core
+#extension GL_EXT_scalar_block_layout : require
+
 layout (location = 0) in vec4 pos;
 layout (location = 1) in vec4 inColor;
 layout (location = 2) in vec2 inTextureCoord;
 
 struct ULight { vec4 position; vec4 direction; vec4 ambient; vec4 diffuse; vec4 specular; vec4 params; };
 
-layout(set=0, binding=0) uniform UniformBlock {
+layout(set=0, binding=0, std430) uniform UniformBlock {
     mat4 projection;
     mat4 view;
     mat4 model;

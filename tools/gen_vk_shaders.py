@@ -3,11 +3,14 @@
 
 Transforms per GL->VK mapping rules:
   - #version 330/430 core -> #version 450 core
-  - UniformBlock: layout(binding = 0) uniform UniformBlock -> layout(set=0, binding=0)
+  - UniformBlock: layout(binding = 0) uniform UniformBlock -> layout(set=0, binding=0, std430)
   - samplers: 1st..Nth declaration -> layout(set=0, binding=1..N) (block owns binding 0)
   - gl_Layer assignment in geometry shaders -> commented out (Task 10 handles layered render)
   - .vs/.fs/.gs -> .vert/.frag/.geom
   - Common/UniformBlock.glsl copied+rewritten (not a compile target: no #version)
+
+std430 (scalar_block_layout): 标量数组 stride 按元素(4B)而非对齐 vec4(16B)，与 CPU 端
+紧凑 floatPool[64] 布局完全一致；std140 下 floatPool stride=16 会错位导致 VK 端全黑。
 """
 import os
 import re
@@ -21,18 +24,22 @@ MAX_SAMPLER_BINDINGS = 15
 _UNIFORM_BLOCK_RE = re.compile(
     r'layout\s*\(\s*binding\s*=\s*0\s*\)\s*(uniform\s+UniformBlock\b)'
 )
+_EXT_SCALAR_BLOCK = '#extension GL_EXT_scalar_block_layout : require\n'
 _SAMPLER_RE = re.compile(r'uniform\s+sampler\w+\s+\w+\s*;')
 _SAMPLER_BINDING_RE = re.compile(
     r'(layout\s*\(\s*binding\s*=\s*(\d+)\s*\)\s*)?uniform\s+(sampler\w+)\s+(\w+)\s*;'
 )
 _GL_LAYER_RE = re.compile(r'^\s*(gl_Layer\s*=\s*[^;]+;)', re.MULTILINE)
 _VERSION_RE = re.compile(r'#version\s+(?:330|430)\s+core\b')
+_VERSION_HEADER_RE = re.compile(r'#version\s+450\s+core\b')
 
 
 def convert_src(text, ext):
     text = _VERSION_RE.sub('#version 450 core', text)
     if 'uniform UniformBlock' in text:
-        text = _UNIFORM_BLOCK_RE.sub(r'layout(set=0, binding=0) \1', text)
+        # GL_EXT_scalar_block_layout 须位于 #version 之后；插到版本行后首行
+        text = _VERSION_HEADER_RE.sub('#version 450 core\n' + _EXT_SCALAR_BLOCK, text, count=1)
+        text = _UNIFORM_BLOCK_RE.sub(r'layout(set=0, binding=0, std430) \1', text)
     if _SAMPLER_RE.search(text):
         text = _rewrite_samplers(text)
     if ext == '.geom':
@@ -104,7 +111,7 @@ def main():
     with open(common) as f:
         text = f.read()
     text = text.replace('layout(binding = 0) uniform UniformBlock {',
-                        'layout(set=0, binding=0) uniform UniformBlock {')
+                        'layout(set=0, binding=0, std430) uniform UniformBlock {')
     with open(common, 'w') as f:
         f.write(text)
 

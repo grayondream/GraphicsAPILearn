@@ -1060,7 +1060,14 @@ bool VKRenderer::createDevice(const QueueFamilies& families) {
 
     const char* deviceExts[] = { VK_KHR_SWAPCHAIN_EXTENSION_NAME };
 
+    // 启用 uniformBufferStandardLayout（Vulkan 1.2 core）：允许 UBO 使用 std430 布局。
+    // std430 下标量数组 stride 按元素(4B)，与 CPU 端紧凑 floatPool[64] 匹配；
+    // 否则 Vulkan 默认 std140 会把 floatPool stride 拉成 16B 导致 VK 端数据错位全黑。
+    vk::PhysicalDeviceVulkan12Features vulkan12Features{};
+    vulkan12Features.uniformBufferStandardLayout = true;
+
     vk::DeviceCreateInfo dci{};
+    dci.pNext = &vulkan12Features;
     dci.queueCreateInfoCount = static_cast<uint32_t>(queueInfos.size());
     dci.pQueueCreateInfos = queueInfos.data();
     dci.enabledExtensionCount = 1;

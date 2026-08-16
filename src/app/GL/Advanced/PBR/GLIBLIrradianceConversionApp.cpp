@@ -32,8 +32,8 @@ bool GLIBLIrradianceConversionApp::load(std::shared_ptr<rhi::IRenderer> rhiRende
     _uboBuffer = renderer()->createUniformBuffer();
     _uboBuffer->init(nullptr, sizeof(rhi::UniformBlock), rhi::BufferType::Uniform);
     _uboBuffer->bindRange(0, 0, sizeof(rhi::UniformBlock));
-    compileShader(m_cube.layout);
     initShapes();
+    compileShader(m_cube.layout);
     loadTexture();
     initFramebuffer();
     initCaptureViews();
