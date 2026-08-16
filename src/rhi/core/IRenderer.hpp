@@ -64,6 +64,10 @@ public:
     // ImGui / overlay 扩展钩子（默认 no-op 内联实现；VKRenderer 覆写，GL 后端不受影响）
     virtual bool imguiInitInfo(VKImGuiInitInfo& out) { (void)out; return false; }
     virtual void renderImGuiDrawData(void* drawData) { (void)drawData; }
+
+    // 切换样例前重置全部渲染状态为后端默认值（GL 全局命令式状态会跨样例残留，
+    // 如 GL_DEPTH_TEST；VK 状态绑定在 pipeline 上无此问题，继承默认 no-op）
+    virtual void resetRenderState() {}
 };
 
 } // namespace rhi

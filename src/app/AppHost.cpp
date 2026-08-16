@@ -78,6 +78,7 @@ bool AppHost::rebuildBackend(const GLFWWindowProperties& props) {
 }
 
 bool AppHost::reloadSample() {
+    if (_renderer) _renderer->resetRenderState();  // 清除上一样例残留的全局渲染状态(GL 深度测试等)
     auto s = SampleFactory::create(_sampleType);
     if (!s) { LOGE("SampleFactory::create failed for type {}", static_cast<int>(_sampleType)); return false; }
     const auto props = m_window ? m_window->getProperties() : GLFWWindowProperties();

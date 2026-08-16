@@ -82,6 +82,25 @@ public:
         if (target) target->bind();
         else glBindFramebuffer(GL_FRAMEBUFFER, 0);
     }
+    void resetRenderState() override {
+        // 重置 GL 全局命令式渲染状态为默认值，避免切换样例时残留
+        // （GL_DEPTH_TEST 等由 setXxx 直接 glEnable/glDisable，跨样例泄漏）。
+        glDisable(GL_DEPTH_TEST);
+        glDepthFunc(GL_LESS);
+        glDepthMask(GL_TRUE);
+        glDisable(GL_CULL_FACE);
+        glCullFace(GL_BACK);
+        glFrontFace(GL_CCW);
+        glDisable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        glDisable(GL_STENCIL_TEST);
+        glStencilFunc(GL_ALWAYS, 0, 0xFF);
+        glStencilOp(GL_KEEP, GL_KEEP, GL_KEEP);
+        glStencilMask(0xFF);
+        glDisable(GL_PROGRAM_POINT_SIZE);
+        glDisable(GL_MULTISAMPLE);
+        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+    }
     void bindTexture(const std::shared_ptr<ITexture2D>& texture, unsigned int unit) override {
         if (texture) texture->bind(unit);
     }
