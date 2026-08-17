@@ -176,9 +176,9 @@ bool VKPipeline::createGraphicsPipeline(vk::RenderPass rp, vk::SampleCountFlagBi
     rasterizer.rasterizerDiscardEnable = vk::False;
     rasterizer.polygonMode = ToVkPolygonMode(_polygonMode);
     rasterizer.cullMode = ToVkCullMode(_cullEnable, _cullFace);
-    // VK 后端用负高度 viewport 翻转 NDC y，三角形窗口空间 winding 反转，
-    // 故 GL 语义的 front face(CCW) 映射为 VK eClockwise。
-    rasterizer.frontFace = _frontFaceCCW ? vk::FrontFace::eClockwise : vk::FrontFace::eCounterClockwise;
+    // 负高度 viewport 下 llvmpipe 不翻转 winding，直接用 GL 语义映射 front face
+    //（CCW=true→eCounterClockwise, false→eClockwise），避免剔除判定颠倒成 no-op。
+    rasterizer.frontFace = _frontFaceCCW ? vk::FrontFace::eCounterClockwise : vk::FrontFace::eClockwise;
     rasterizer.depthBiasEnable = vk::False;
     rasterizer.lineWidth = 1.0f;
 
@@ -259,8 +259,8 @@ void VKPipeline::applyDynamicState(vk::raii::CommandBuffer& cmd) const {
     cmd.setDepthWriteEnable(_depthMask ? vk::True : vk::False);
     cmd.setDepthCompareOp(_depthTest ? ToVkCompare(_depthFunc) : vk::CompareOp::eAlways);
     cmd.setCullMode(ToVkCullMode(_cullEnable, _cullFace));
-    // 与 pipeline 创建一致：负高度 viewport 使 front face winding 反转
-    cmd.setFrontFace(_frontFaceCCW ? vk::FrontFace::eClockwise : vk::FrontFace::eCounterClockwise);
+    // 与 pipeline 创建一致（llvmpipe 负高度 viewport 不翻转 winding，直接用 GL 语义）
+    cmd.setFrontFace(_frontFaceCCW ? vk::FrontFace::eCounterClockwise : vk::FrontFace::eClockwise);
     cmd.setStencilTestEnable(_stencilTest ? vk::True : vk::False);
     cmd.setStencilOp(vk::StencilFaceFlagBits::eFrontAndBack, ToVkStencilOp(_stencilFail),
         ToVkStencilOp(_stencilPass), ToVkStencilOp(_stencilDepthFail), ToVkCompare(_stencilFunc));
