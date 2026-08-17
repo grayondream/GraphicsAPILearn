@@ -11,15 +11,41 @@
 #include "base/Log.hpp"
 #include "imgui.h"
 #include "geometry/Cube.hpp"
-#include <geometry/Plane.hpp>
+#include "geometry/Plane.hpp"
+#include "geometry/Shape.hpp"
 #include <utils/FileUtils.hpp>
+#include <algorithm>
 using FileUtils::join;
 using namespace ErrorHandle;
+
+// 竖直透明平面（窗户），1x1 立于 XY 平面，UV 0..1（对应 LearnOpenGL transparentVertices）
+class TransparentPlane : public Shape {
+public:
+	TransparentPlane() {
+		const float v[] = {
+			// x      y      z    u  v
+			0.0f,  0.5f,  0.0f,  0.0f, 0.0f,
+			0.0f, -0.5f,  0.0f,  0.0f, 1.0f,
+			1.0f, -0.5f,  0.0f,  1.0f, 1.0f,
+			0.0f,  0.5f,  0.0f,  0.0f, 0.0f,
+			1.0f, -0.5f,  0.0f,  1.0f, 1.0f,
+			1.0f,  0.5f,  0.0f,  1.0f, 0.0f};
+		for (size_t i = 0; i < sizeof(v) / sizeof(float); i += 5) {
+			Vertex vertex;
+			vertex.pos = {v[i], v[i + 1], v[i + 2], 1.0f};
+			vertex.color = {1.0f, 1.0f, 1.0f, 1.0f};
+			_normal.push_back({0.0f, 0.0f, 1.0f, 0.0f});
+			_pts.push_back(vertex);
+			_uv.push_back({v[i + 3], v[i + 4]});
+		}
+	}
+};
 
 GLBlendApp::~GLBlendApp() {}
 
 bool GLBlendApp::load(std::shared_ptr<rhi::IRenderer> rhiRenderer) {
     if (!Sample::load(rhiRenderer)) return false;
+    _camera.getAttr().pos = glm::vec3(0.0f, 0.0f, 3.0f);
     const auto vfile = join(StaticCollector::getGLShaderPath(), "Advanced", "Blend", "Basic.vert");
     const auto ffile = join(StaticCollector::getGLShaderPath(), "Advanced", "Blend", "Basic.frag");
     auto shader = renderer()->createShader();
@@ -33,14 +59,16 @@ bool GLBlendApp::load(std::shared_ptr<rhi::IRenderer> rhiRenderer) {
     Plane plane{};
     auto pg = RhiGeometry::Create(renderer().get(), plane, true, false, false);
     _planeVb = pg.vertexBuffer; _planeUv = pg.uvBuffer; _planeVertexCount = pg.vertexCount;
+    TransparentPlane win{};
+    auto wg = RhiGeometry::Create(renderer().get(), win, true, false, false);
+    _winVb = wg.vertexBuffer; _winUv = wg.uvBuffer; _winVertexCount = wg.vertexCount;
     _pipeline = renderer()->createPipeline(cg.layout, shader);
     _pipeline->setDepthTest(true);
     _pipeline->setBlend(true);
     _pipeline->setBlendFunc(rhi::BlendFactor::SrcAlpha, rhi::BlendFactor::OneMinusSrcAlpha);
     _cubeTexture = RhiImage::Load2D(renderer().get(), join(StaticCollector::getImagePath(), "marble.jpg"));
-    _planeTexture = RhiImage::Load2D(renderer().get(), join(StaticCollector::getImagePath(), "metal.jpg"),
-                                     rhi::TextureWrap::Repeat);  // 平面 UV 0..5 需平铺
-    _grassTexture = RhiImage::Load2D(renderer().get(), join(StaticCollector::getImagePath(), "grass.png"));
+    _floorTexture = RhiImage::Load2D(renderer().get(), join(StaticCollector::getImagePath(), "metal.jpg"),
+                                     rhi::TextureWrap::Repeat);  // 地面 UV 0..5 需平铺
     _winTexture = RhiImage::Load2D(renderer().get(), join(StaticCollector::getImagePath(), "window.png"));
     _uboBuffer = renderer()->createUniformBuffer();
     _uboBuffer->init(nullptr, sizeof(rhi::UniformBlock), rhi::BufferType::Uniform);
@@ -48,84 +76,69 @@ bool GLBlendApp::load(std::shared_ptr<rhi::IRenderer> rhiRenderer) {
     return true;
 }
 
-static std::vector<glm::vec3> initializeCubePositions() {
-	std::vector<glm::vec3> positions;
-	float spacing = 1.1f;
-
-	for (int x = -2; x < 2; ++x) {
-		for (int y = -2; y < 2; ++y) {
-			for (int z = -2; z < 2; ++z) {
-				positions.push_back(glm::vec3(x * spacing, y * spacing - 2, z * spacing - 5));
-			}
-		}
-	}
-	return positions;
-}
-
 void GLBlendApp::draw(const float dt) {
     ImGui::Begin("OpenGL");
     ImGui::SetNextItemWidth(200);
-    ImGui::SliderInt("Grass Count", &_grassCount, 1, 10);
+    ImGui::SliderInt("Window Count", &_winCount, 1, 5);
     ImGui::DragFloat3("Position", &_objectPosition[0], 0.1f);
-    ImGui::DragFloat3("Scale", &_objectScale[0], 0.1f);
     ImGui::DragFloat3("Windows Pos", &_winPos[0], 0.1f);
     ImGui::End();
-    std::vector<glm::vec3> cubePositions = initializeCubePositions();
-    int count = (int)cubePositions.size();
     const auto projection = glm::perspective(glm::radians(_camera.zoom()), aspectRatio(), 0.1f, 100.0f);
     const auto view = _camera.getViewMatrix();
     rhi::SetUniform(_ubo, "projection", projection);
     rhi::SetUniform(_ubo, "view", view);
     renderer()->setPipeline(_pipeline);
+    // cubes（不透明物体先绘制）
+    static const std::vector<glm::vec3> cubePositions = {
+        glm::vec3(-1.0f, 0.0f, -1.0f),
+        glm::vec3(2.0f, 0.0f, 0.0f)};
     renderer()->setVertexBuffer(_cubeVb);
     renderer()->setVertexBuffer(_cubeUv, 1);
     renderer()->setIndexBuffer(_cubeEbo);
-    static float curTime = 0;
-    curTime += dt;
-    for (int i = 0; i < count; i++) {
+    for (const auto& pos : cubePositions) {
         glm::mat4 model = glm::mat4(1.0f);
-        model = glm::translate(model, cubePositions[i] + _objectPosition);
-        float angle = 0;
-        model = glm::rotate(model, glm::radians(angle), glm::vec3(1.0f, 0.3f, 0.5f));
-        renderer()->bindTexture(_planeTexture, 0);
+        model = glm::translate(model, pos + _objectPosition);
+        renderer()->bindTexture(_cubeTexture, 0);
         rhi::SetUniform(_ubo, "texColor", glm::vec4(1.0f, 1.0f, 1.0f, 0.0f));
         rhi::SetUniform(_ubo, "model", model);
         _uboBuffer->update(&_ubo, sizeof(rhi::UniformBlock), 0);
         renderer()->drawIndexed(_cubeIndexCount, 0, 0);
     }
+    // floor（不透明，Plane 顶点已编码 y=-0.5 与 XZ±5）
     renderer()->setVertexBuffer(_planeVb);
     renderer()->setVertexBuffer(_planeUv, 1);
     {
         glm::mat4 model = glm::mat4(1.0f);
-        model = glm::translate(model, glm::vec3(-1.0, -4.50, -10));
-        model = glm::scale(model, _objectScale);
-        renderer()->bindTexture(_cubeTexture, 0);
+        renderer()->bindTexture(_floorTexture, 0);
         rhi::SetUniform(_ubo, "model", model);
         rhi::SetUniform(_ubo, "texColor", glm::vec4(1.0f, 1.0f, 1.0f, 0.0f));
         _uboBuffer->update(&_ubo, sizeof(rhi::UniformBlock), 0);
         renderer()->draw(_planeVertexCount, 0);
     }
-    {
+    // windows（透明物体最后绘制，按相机距离从远到近）
+    static const std::vector<glm::vec3> winPositions = {
+        glm::vec3(-1.5f, 0.0f, -0.48f),
+        glm::vec3(1.5f, 0.0f, 0.51f),
+        glm::vec3(0.0f, 0.0f, 0.7f),
+        glm::vec3(-0.3f, 0.0f, -2.3f),
+        glm::vec3(0.5f, 0.0f, -0.6f)};
+    std::vector<glm::vec3> sorted;
+    for (const auto& p : winPositions) {
+        glm::vec3 w = p + _winPos;
+        sorted.push_back(w);
+    }
+    std::sort(sorted.begin(), sorted.end(), [this](const glm::vec3& a, const glm::vec3& b) {
+        return glm::length(_camera.getAttr().pos - a) > glm::length(_camera.getAttr().pos - b);
+    });
+    renderer()->setVertexBuffer(_winVb);
+    renderer()->setVertexBuffer(_winUv, 1);
+    for (int i = 0; i < _winCount; i++) {
         glm::mat4 model = glm::mat4(1.0f);
-        model = glm::translate(model, glm::vec3(0.5f, 0.5f, 0.5f));
-        model = glm::scale(model, glm::vec3(0.5, 0.5, 0.5));
-        model = glm::rotate(model, glm::radians(90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
-        renderer()->bindTexture(_grassTexture, 0);
+        model = glm::translate(model, sorted[i]);
+        renderer()->bindTexture(_winTexture, 0);
         rhi::SetUniform(_ubo, "model", model);
         rhi::SetUniform(_ubo, "texColor", glm::vec4(1.0f, 1.0f, 1.0f, 0.0f));
         _uboBuffer->update(&_ubo, sizeof(rhi::UniformBlock), 0);
-        renderer()->draw(_planeVertexCount, 0);
-    }
-    {
-        for (int i = 0; i < _grassCount; i++) {
-            glm::mat4 model = glm::mat4(1.0f);
-            model = glm::scale(model, glm::vec3(0.5, 0.5, 0.5));
-            model = glm::translate(model, _winPos + glm::vec3(-0.5 * i, 1 * i, 0));
-            renderer()->bindTexture(_winTexture, 0);
-            rhi::SetUniform(_ubo, "model", model);
-            rhi::SetUniform(_ubo, "texColor", glm::vec4(1.0f, 1.0f, 1.0f, 0.0f));
-            _uboBuffer->update(&_ubo, sizeof(rhi::UniformBlock), 0);
-            renderer()->draw(_planeVertexCount, 0);
-        }
+        renderer()->draw(_winVertexCount, 0);
     }
 }

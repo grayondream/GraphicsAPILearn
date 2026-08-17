@@ -21,19 +21,19 @@ protected:
 
 private:
 	std::shared_ptr<rhi::ITexture2D> _cubeTexture{};
-	std::shared_ptr<rhi::ITexture2D> _planeTexture{};
-	std::shared_ptr<rhi::ITexture2D> _grassTexture{};
+	std::shared_ptr<rhi::ITexture2D> _floorTexture{};
 	std::shared_ptr<rhi::ITexture2D> _winTexture{};
 	std::shared_ptr<rhi::IPipeline> _pipeline{};
 	std::shared_ptr<rhi::IBuffer> _cubeVb{}, _cubeUv{}, _cubeEbo{};
 	std::shared_ptr<rhi::IBuffer> _planeVb{}, _planeUv{};
+	std::shared_ptr<rhi::IBuffer> _winVb{}, _winUv{};
 	uint32_t _cubeIndexCount{};
 	uint32_t _planeVertexCount{};
+	uint32_t _winVertexCount{};
 	float _curTime{};
-	glm::vec3 _objectPosition = glm::vec3(0, 0, -4.0f);
-	glm::vec3 _objectScale = glm::vec3(20, 1, 20.0f);
-	glm::vec3 _winPos = glm::vec3(0.5f, 0.5f, -4);
-	int _grassCount = 4;
+	glm::vec3 _objectPosition = glm::vec3(0, 0, 0.0f);
+	glm::vec3 _winPos = glm::vec3(0.0f, 0.0f, 0.0f);
+	int _winCount = 5;
 	rhi::UniformBlock _ubo{};
 	std::shared_ptr<rhi::IBuffer> _uboBuffer{};
 };
