@@ -1055,9 +1055,14 @@ void VKRenderer::applyViewport() {
     float y = _viewportSet ? static_cast<float>(_viewport.y) : 0.0f;
     float w = _viewportSet ? static_cast<float>(_viewport.width) : static_cast<float>(ext.width);
     float h = _viewportSet ? static_cast<float>(_viewport.height) : static_cast<float>(ext.height);
-    // VK NDC y 向下，App 投影矩阵为 GL 语义（y 向上）：用负高度 viewport 翻转 y 轴。
-    // 深度：GL 投影 z 属 [-1,1]，负高度 viewport 的深度变换 z_ndc/2+0.5 恰好映射到 VK [0,1]。
-    vk::Viewport vp(x, y + h, w, -h, 0.0f, 1.0f);
+    // swapchain 显示用负高度 viewport：VK NDC y 向下而 App 投影矩阵为 GL 语义
+    // （y 向上），翻转 y 轴使场景直立；深度 z_ndc/2+0.5 恰映射 VK [0,1]。
+    // 离屏 RT 则用正高度 viewport：让 RT 纹理行 0 = 场景底部（与 GL framebuffer
+    // 一致），否则 RT 颜色纹理被后处理 quad 采样时上下颠倒、深度 RT 采样与
+    // light-space NDC 坐标错位、cubemap 捕获方向翻转。
+    const bool offscreen = _vkRenderTarget && _vkRenderTarget->valid();
+    vk::Viewport vp = offscreen ? vk::Viewport(x, y, w, h, 0.0f, 1.0f)
+                                : vk::Viewport(x, y + h, w, -h, 0.0f, 1.0f);
     vk::Rect2D sc({static_cast<int32_t>(x), static_cast<int32_t>(y)},
                   {static_cast<uint32_t>(w), static_cast<uint32_t>(h)});
     _cmd.setViewport(0, {vp});
