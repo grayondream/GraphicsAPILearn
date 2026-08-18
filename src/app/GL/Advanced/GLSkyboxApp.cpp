@@ -82,6 +82,9 @@ void GLSkyboxApp::drawCube() {
 }
 
 void GLSkyboxApp::drawSkybox() {
+    // GL 端深度测试是全局状态（继承 cube 开启），VK 端是 per-pipeline 状态，
+    // 必须显式开启，否则 skybox 深度测试关闭会覆盖前面画的 cube。
+    _skyboxPipeline->setDepthTest(true);
     _skyboxPipeline->setDepthFunc(rhi::CompareFunc::LessEqual);
     _skyboxPipeline->setDepthMask(false);
     renderer()->setPipeline(_skyboxPipeline);
