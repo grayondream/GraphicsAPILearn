@@ -96,6 +96,8 @@ private:
     bool bindPipelineAndState();
     bool bindVertexBuffers();
     void dumpFrame();
+    void ensureWinMsaaRT();
+    std::shared_ptr<VKRenderTarget> effectiveRT();
     vk::Extent2D extent() const { return _swapchain ? _swapchain->extent() : vk::Extent2D{}; }
 
     std::shared_ptr<ISurface> _surface{};
@@ -152,6 +154,12 @@ private:
     std::array<BoundTex, 15> _boundTextures{};   // unit 0..14 -> binding 1..15
     std::shared_ptr<IRenderTarget> _renderTarget{};
     std::shared_ptr<VKRenderTarget> _vkRenderTarget{};
+    // Window MSAA: when a pipeline requests multisampling while rendering to the
+    // swapchain (Vulkan forces swapchain images to 1 sample), scene draws are
+    // routed to this internal MSAA render target and resolved to the current
+    // swapchain image at end of frame.
+    std::shared_ptr<VKRenderTarget> _winMsaaRT{};
+    bool _winMsaaUsed{false};
 };
 
 bool VKRenderer::init(const std::shared_ptr<ISurface>& surface) {
@@ -512,6 +520,8 @@ void VKRenderer::shutdown() {
     _vertexBuffers = {};
     _renderTarget.reset();
     _vkRenderTarget.reset();
+    _winMsaaRT.reset();
+    _winMsaaUsed = false;
     _device = vk::raii::Device{nullptr};
     _surfaceKHR = vk::raii::SurfaceKHR{nullptr};
     _phys = vk::raii::PhysicalDevice{nullptr};
@@ -567,11 +577,77 @@ void VKRenderer::beginFrame() {
     if (br != vk::Result::eSuccess) return;
     _recording = true;
     _rpActive = false;
+    _winMsaaUsed = false;
 }
 
 void VKRenderer::endFrame() {
     if (!_recording) return;
     if (_rpActive) _cmd.endRenderPass();
+    // Window MSAA: resolve the internal MSAA RT to the current swapchain image.
+    // The MSAA pass renders with the swapchain-style (flipped-y) viewport so the
+    // RT content already matches the display order; a straight copy suffices.
+    if (_winMsaaUsed && _winMsaaRT && _winMsaaRT->valid()) {
+        const uint32_t idx = _swapchain->currentImage();
+        if (idx < _swapchain->imageCount()) {
+            const vk::Image src = _winMsaaRT->colorImage(0);
+            const vk::Image dst = _swapchain->image(idx);
+            const auto aspect = vk::ImageAspectFlagBits::eColor;
+            const auto sub = vk::ImageSubresourceRange(aspect, 0, 1, 0, 1);
+            vk::ImageMemoryBarrier toSrc{};
+            toSrc.oldLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
+            toSrc.newLayout = vk::ImageLayout::eTransferSrcOptimal;
+            toSrc.srcQueueFamilyIndex = vk::QueueFamilyIgnored;
+            toSrc.dstQueueFamilyIndex = vk::QueueFamilyIgnored;
+            toSrc.image = src;
+            toSrc.subresourceRange = sub;
+            toSrc.srcAccessMask = vk::AccessFlagBits::eColorAttachmentWrite;
+            toSrc.dstAccessMask = vk::AccessFlagBits::eTransferRead;
+            vk::ImageMemoryBarrier toDst{};
+            toDst.oldLayout = vk::ImageLayout::eUndefined;
+            toDst.newLayout = vk::ImageLayout::eTransferDstOptimal;
+            toDst.srcQueueFamilyIndex = vk::QueueFamilyIgnored;
+            toDst.dstQueueFamilyIndex = vk::QueueFamilyIgnored;
+            toDst.image = dst;
+            toDst.subresourceRange = sub;
+            toDst.dstAccessMask = vk::AccessFlagBits::eTransferWrite;
+            _cmd.pipelineBarrier(vk::PipelineStageFlagBits::eColorAttachmentOutput,
+                                 vk::PipelineStageFlagBits::eTransfer, {}, {}, {}, {toSrc, toDst});
+
+            vk::ImageBlit region{};
+            region.srcSubresource.aspectMask = aspect;
+            region.srcSubresource.layerCount = 1;
+            region.srcOffsets[1] = vk::Offset3D(_winMsaaRT->extent2d().width,
+                                                _winMsaaRT->extent2d().height, 1);
+            region.dstSubresource.aspectMask = aspect;
+            region.dstSubresource.layerCount = 1;
+            region.dstOffsets[1] = vk::Offset3D(_swapchain->extent().width,
+                                                _swapchain->extent().height, 1);
+            _cmd.blitImage(src, vk::ImageLayout::eTransferSrcOptimal,
+                           dst, vk::ImageLayout::eTransferDstOptimal, {region}, vk::Filter::eLinear);
+
+            vk::ImageMemoryBarrier backSrc{};
+            backSrc.oldLayout = vk::ImageLayout::eTransferSrcOptimal;
+            backSrc.newLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
+            backSrc.srcQueueFamilyIndex = vk::QueueFamilyIgnored;
+            backSrc.dstQueueFamilyIndex = vk::QueueFamilyIgnored;
+            backSrc.image = src;
+            backSrc.subresourceRange = sub;
+            backSrc.srcAccessMask = vk::AccessFlagBits::eTransferRead;
+            backSrc.dstAccessMask = vk::AccessFlagBits::eColorAttachmentWrite;
+            vk::ImageMemoryBarrier toPresent{};
+            toPresent.oldLayout = vk::ImageLayout::eTransferDstOptimal;
+            toPresent.newLayout = vk::ImageLayout::ePresentSrcKHR;
+            toPresent.srcQueueFamilyIndex = vk::QueueFamilyIgnored;
+            toPresent.dstQueueFamilyIndex = vk::QueueFamilyIgnored;
+            toPresent.image = dst;
+            toPresent.subresourceRange = sub;
+            toPresent.srcAccessMask = vk::AccessFlagBits::eTransferWrite;
+            toPresent.dstAccessMask = vk::AccessFlagBits::eMemoryRead;
+            _cmd.pipelineBarrier(vk::PipelineStageFlagBits::eTransfer,
+                                 vk::PipelineStageFlagBits::eBottomOfPipe, {}, {}, {}, {backSrc, toPresent});
+        }
+    }
+    _winMsaaUsed = false;
     vk::Result er = _cmd.end();
     _recording = false;
     if (er != vk::Result::eSuccess) return;
@@ -995,9 +1071,49 @@ void VKRenderer::drawInstanced(uint32_t vertexCount, uint32_t instanceCount, uin
     _cmd.draw(vertexCount, instanceCount, firstVertex, 0);
 }
 
+void VKRenderer::ensureWinMsaaRT() {
+    const vk::Extent2D ext = extent();
+    if (_winMsaaRT && _winMsaaRT->valid() &&
+        _winMsaaRT->extent2d().width == ext.width && _winMsaaRT->extent2d().height == ext.height) {
+        return;
+    }
+    _winMsaaRT = std::dynamic_pointer_cast<VKRenderTarget>(createRenderTarget());
+    if (!_winMsaaRT) return;
+    FramebufferDesc desc;
+    desc.width = static_cast<int>(ext.width);
+    desc.height = static_cast<int>(ext.height);
+    desc.samples = 4;
+    FramebufferAttachment color;
+    color.type = AttachmentType::Color;
+    color.format = TextureFormat::RGBA8;
+    color.samples = 4;
+    desc.attachments.push_back(color);
+    FramebufferAttachment depth;
+    depth.type = AttachmentType::DepthStencil;
+    depth.format = TextureFormat::Depth24Stencil8;
+    depth.samples = 4;
+    desc.attachments.push_back(depth);
+    _winMsaaRT->create(desc);
+}
+
+std::shared_ptr<VKRenderTarget> VKRenderer::effectiveRT() {
+    if (_vkRenderTarget && _vkRenderTarget->valid()) return _vkRenderTarget;
+    // 渲染到窗口但 pipeline 请求 multisample：swapchain 强制单采样，路由到内部
+    // MSAA RT（ensureRenderPass 负责本帧 beginRenderPass，endFrame 负责 resolve）。
+    auto vkp = std::dynamic_pointer_cast<VKPipeline>(_pipeline);
+    if (vkp && vkp->multisample()) {
+        ensureWinMsaaRT();
+        if (_winMsaaRT && _winMsaaRT->valid()) {
+            _winMsaaUsed = true;
+            return _winMsaaRT;
+        }
+    }
+    return nullptr;
+}
+
 bool VKRenderer::ensureRenderPass() {
     if (_rpActive) return true;
-    std::shared_ptr<VKRenderTarget> vkrt = _vkRenderTarget;
+    std::shared_ptr<VKRenderTarget> vkrt = effectiveRT();
     vk::RenderPass rp;
     vk::Framebuffer fb;
     vk::Extent2D ext;
@@ -1076,10 +1192,10 @@ bool VKRenderer::bindPipelineAndState() {
     // offscreen RT or the swapchain), with the correct attachment sample count.
     vk::RenderPass rp;
     vk::SampleCountFlagBits samples = vk::SampleCountFlagBits::e1;
-    if (_vkRenderTarget && _vkRenderTarget->valid()) {
-        rp = _vkRenderTarget->renderPass();
-        samples = _vkRenderTarget->msaa()
-            ? ToVkSamples(static_cast<int>(_vkRenderTarget->samples()))
+    if (std::shared_ptr<VKRenderTarget> effRT = effectiveRT()) {
+        rp = effRT->renderPass();
+        samples = effRT->msaa()
+            ? ToVkSamples(static_cast<int>(effRT->samples()))
             : vk::SampleCountFlagBits::e1;
     } else {
         rp = *_renderPass;

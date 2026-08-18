@@ -46,6 +46,7 @@ public:
     void setMultisample(bool) override;
     void setPrimitiveType(PrimitiveType) override;
     PrimitiveType primitiveType() const override { return _primitive; }
+    bool multisample() const { return _multisample; }
     void setVertexBuffer(const std::shared_ptr<IBuffer>&, uint32_t) override {}
     void setIndexBuffer(const std::shared_ptr<IBuffer>&) override {}
 
