@@ -74,9 +74,15 @@ bool VKRenderTarget::makeImage(Image& img, TextureFormat format, vk::ImageUsageF
     if (_floatRtFallback &&
         (format == TextureFormat::RGBA16F || format == TextureFormat::RGB16F ||
          format == TextureFormat::RGBA32F || format == TextureFormat::RG16F ||
-         format == TextureFormat::R32F || format == TextureFormat::RGB8)) {
-        LOGI("VKRenderTarget: float RT {} -> RGB8 (llvmpipe fallback)", static_cast<int>(format));
-        format = TextureFormat::RGB8;
+         format == TextureFormat::R32F)) {
+        LOGI("VKRenderTarget: float RT {} -> RGBA8 (llvmpipe fallback)", static_cast<int>(format));
+        format = TextureFormat::RGBA8;
+    }
+    // R8G8B8_UNORM 不是 Vulkan 强制支持的颜色附件格式，llvmpipe 上
+    // 渲染/采样异常（内容全白/错乱），统一回退为 RGBA8。
+    if (format == TextureFormat::RGB8) {
+        LOGI("VKRenderTarget: RGB8 -> RGBA8 (R8G8B8_UNORM 非强制颜色附件格式)");
+        format = TextureFormat::RGBA8;
     }
     img.format = format;
     const vk::Format vkFormat = ToVkTextureFormat(format);
