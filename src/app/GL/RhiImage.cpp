@@ -74,7 +74,9 @@ std::shared_ptr<rhi::ITexture3D> LoadCube(rhi::IRenderer* renderer, const std::s
     bool ok = true;
     for (int i = 0; i < 6; ++i) {
         imgs[i] = Image((std::filesystem::path(dir) / faces[i]).string());
-        imgs[i].load(false);
+        // 强制 4 通道：Vulkan 端 UploadStagingToImage 假定数据字节 = w*h*texelSize(RGBA8)，
+        // 3 通道（RGB）数据按 RGBA8 size 上传会越界读（Load2D 已转，此处同样处理）。
+        imgs[i].load(false, 4);
         if (!imgs[i].data()) {
             ok = false;
             break;
