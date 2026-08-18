@@ -20,12 +20,17 @@ layout(set=0, binding=0, std430) uniform UniformBlock {
     ULight lights[1];
 };
 
+const float MAGNITUDE = 0.4;
+
 out VS_OUT {
     vec3 normal;
+    vec3 clipOffset;
 } vs_out;
 
 void main(){
-    gl_Position = view * model * pos;
+    gl_Position = projection * view * model * pos;
     mat3 normalMatrix = mat3(transpose(inverse(mat3(view) * mat3(model))));
-    vs_out.normal = normalize(vec3(vec4(normalMatrix * aNormal.rgb, 0.0)));
+    vec3 n = normalize(vec3(vec4(normalMatrix * aNormal.rgb, 0.0)));
+    vs_out.normal = n;
+    vs_out.clipOffset = vec3(projection * vec4(n * MAGNITUDE, 0.0));
 }

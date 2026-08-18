@@ -53,6 +53,8 @@ bool GLNormalLine::load(std::shared_ptr<rhi::IRenderer> rhiRenderer) {
 	}
 	
 	_pipeline->setPolygonMode(rhi::PolygonMode::Line);
+	_normalPipeline->setDepthTest(true);
+	_pipeline->setDepthTest(true);
 
 	_uboBuffer = renderer()->createUniformBuffer();
 	_uboBuffer->init(nullptr, sizeof(rhi::UniformBlock), rhi::BufferType::Uniform);

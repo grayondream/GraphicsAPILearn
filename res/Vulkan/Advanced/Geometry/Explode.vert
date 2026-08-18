@@ -21,9 +21,11 @@ layout(set=0, binding=0, std430) uniform UniformBlock {
 
 out VS_OUT {
     vec4 color;
+    float time;
 } vs_out;
 
 void main(){
     vs_out.color = inColor;
+    vs_out.time = floatPool[10];
     gl_Position = projection * view * model * pos;
 }
