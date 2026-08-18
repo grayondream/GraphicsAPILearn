@@ -3,6 +3,7 @@
 #include "rhi/core/IRenderer.hpp"
 #include "rhi/core/IPipeline.hpp"
 #include "rhi/core/IBuffer.hpp"
+#include "rhi/core/UniformBlock.hpp"
 #include <memory>
 #include <vector>
 #include "geometry/Camera.hpp"
@@ -19,7 +20,8 @@ protected:
 
 private:
 	std::vector<std::shared_ptr<rhi::IPipeline>> _pipelines{};
-	std::shared_ptr<rhi::IBuffer> _ubo{};
+	std::shared_ptr<rhi::IBuffer> _uboBuffer{};
+	rhi::UniformBlock _ubo{};
 	std::shared_ptr<rhi::IBuffer> _vb{}, _uv{}, _ebo{};
 	uint32_t _indexCount{};
 	float _curTime{};

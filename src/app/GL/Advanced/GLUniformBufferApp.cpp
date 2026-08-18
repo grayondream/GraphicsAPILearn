@@ -5,6 +5,7 @@
 #include "rhi/core/IPipeline.hpp"
 #include "rhi/core/Common.hpp"
 #include "app/GL/RhiGeometry.hpp"
+#include "rhi/core/UniformBlock.hpp"
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
@@ -41,13 +42,9 @@ bool GLUniformBufferApp::load(std::shared_ptr<rhi::IRenderer> rhiRenderer) {
 		_pipelines.push_back(pipeline);
 	}
 
-	_ubo = renderer()->createUniformBuffer();
-	_ubo->init(nullptr, sizeof(glm::mat4) * 2, rhi::BufferType::Uniform);
-	_ubo->bindRange(0, 0, sizeof(glm::mat4) * 2);
-	const auto projection = glm::perspective(glm::radians(_camera.zoom()), aspectRatio(), 0.1f, 100.0f);
-	const auto view = _camera.getViewMatrix();
-	_ubo->update(glm::value_ptr(projection), sizeof(glm::mat4), 0);
-	_ubo->update(glm::value_ptr(view), sizeof(glm::mat4), sizeof(glm::mat4));
+	_uboBuffer = renderer()->createUniformBuffer();
+	_uboBuffer->init(nullptr, sizeof(rhi::UniformBlock), rhi::BufferType::Uniform);
+	_uboBuffer->bindRange(0, 0, sizeof(rhi::UniformBlock));
 	return true;
 }
 
@@ -72,6 +69,11 @@ void GLUniformBufferApp::draw(const float dt) {
 	static float curTime = 0;
 	curTime += dt;
 
+	const auto projection = glm::perspective(glm::radians(_camera.zoom()), aspectRatio(), 0.1f, 100.0f);
+	const auto view = _camera.getViewMatrix();
+	rhi::SetUniform(_ubo, "projection", projection);
+	rhi::SetUniform(_ubo, "view", view);
+
 	for (int i = 0; i < 4; i++) {
 		renderer()->setPipeline(_pipelines[i]);
 		renderer()->setVertexBuffer(_vb);
@@ -81,8 +83,9 @@ void GLUniformBufferApp::draw(const float dt) {
 		model = glm::translate(model, cubePositions[i]);
 		float angle = 20.0f * (i + 1) * curTime;
 		model = glm::rotate(model, glm::radians(angle), glm::vec3(1.0f, 0.3f, 0.5f));
-		_pipelines[i]->setUniform("model", glm::value_ptr(model), 1);
-		_pipelines[i]->setUniform("cubeColor", glm::value_ptr(colors[i]), 1, 4);
+		rhi::SetUniform(_ubo, "model", model);
+		rhi::SetUniform(_ubo, "cubeColor", colors[i]);
+		_uboBuffer->update(&_ubo, sizeof(rhi::UniformBlock), 0);
 		renderer()->drawIndexed(_indexCount, 0, 0);
 	}
 
