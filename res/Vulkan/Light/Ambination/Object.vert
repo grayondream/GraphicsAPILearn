@@ -20,8 +20,8 @@ layout(set=0, binding=0, std430) uniform UniformBlock {
     ULight lights[256];
 };
 
-out vec4 normal;
 out vec4 outColor;
+out vec4 normal;
 
 void main(){
     gl_Position = projection * view * model * pos;

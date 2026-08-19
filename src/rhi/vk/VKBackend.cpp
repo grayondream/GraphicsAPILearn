@@ -18,6 +18,7 @@
 #include <cstdlib>
 #include <array>
 #include <vector>
+#include <map>
 #include <memory>
 
 namespace rhi {
@@ -143,6 +144,10 @@ private:
     bool _floatRtFallback{false};
     Viewport _viewport{};
     float _clearColor[4]{0.0f, 0.0f, 0.0f, 1.0f};
+    // clear 色按 render target 分别记录（key = VKRenderTarget*，swapchain 用 nullptr），
+    // 对齐 GL 语义：clearColor() 只影响"调用时绑定"的目标，而不是之后所有 renderpass。
+    // 否则多 pass App 里 FBO pass 设置的 clear 色会污染 swapchain pass 的窗口清屏。
+    std::map<void*, std::array<float, 4>> _clearColors{};
     std::shared_ptr<IPipeline> _pipeline{};
     std::array<std::shared_ptr<IBuffer>, 16> _vertexBuffers{};
     std::shared_ptr<IBuffer> _indexBuffer{};
@@ -479,6 +484,8 @@ void VKRenderer::resetRenderState() {
     _uboSlotSize = 0;
     _renderTarget = nullptr;
     _vkRenderTarget = nullptr;
+    _clearColors.clear();
+    _clearColor[0] = 0.0f; _clearColor[1] = 0.0f; _clearColor[2] = 0.0f; _clearColor[3] = 1.0f;
     for (auto& t : _boundTextures) { t = BoundTex{}; }
     if (_device != nullptr && *_dsPool && *_dsLayout) {
         // 用 vkFreeDescriptorSets（需池带 eFreeDescriptorSet）释放旧描述符集，再重新分配
@@ -879,6 +886,8 @@ void VKRenderer::clearColor(float r, float g, float b, float a) {
     _clearColor[1] = g;
     _clearColor[2] = b;
     _clearColor[3] = a;
+    _clearColors[_vkRenderTarget ? static_cast<void*>(_vkRenderTarget.get()) : nullptr] =
+        {r, g, b, a};
 }
 
 void VKRenderer::setViewport(const Viewport& vp) {
@@ -1138,10 +1147,18 @@ bool VKRenderer::ensureRenderPass() {
     const bool msaa = vkrt && vkrt->valid() && vkrt->msaa();
     const bool usingDefaultRP = !(vkrt && vkrt->valid());
     const bool hasDepth = usingDefaultRP ? true : vkrt->hasDepthAttachment();
+    // 每个 target 用其自己的 clear 色（swapchain 用 nullptr key）。未记录过
+    // 的目标默认黑色，避免多 pass 交叉污染。
+    const auto it = _clearColors.find(vkrt ? static_cast<void*>(vkrt.get()) : nullptr);
+    const float* cc = it != _clearColors.end() ? it->second.data() : nullptr;
+    const float cr = cc ? cc[0] : 0.0f;
+    const float cg = cc ? cc[1] : 0.0f;
+    const float cb = cc ? cc[2] : 0.0f;
+    const float ca = cc ? cc[3] : 1.0f;
     std::vector<vk::ClearValue> clears;
     for (uint32_t i = 0; i < colorCount; i++) {
         vk::ClearValue cv;
-        cv.color = vk::ClearColorValue(_clearColor[0], _clearColor[1], _clearColor[2], _clearColor[3]);
+        cv.color = vk::ClearColorValue(cr, cg, cb, ca);
         clears.push_back(cv);
     }
     if (msaa) {

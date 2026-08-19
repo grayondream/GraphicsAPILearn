@@ -23,7 +23,7 @@ layout(set=0, binding=0, std430) uniform UniformBlock {
 
 out vec2 TexCoords;
 
-out VS_OUT {
+layout(location = 1) out VS_OUT {
     vec3 FragPos;
     vec3 Normal;
     vec2 TexCoords;

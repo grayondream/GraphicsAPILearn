@@ -25,7 +25,7 @@ out vec2 TexCoord;
 out vec4 opos;
 out vec4 Normal;
 
-out VS_OUT {
+layout(location = 3) out VS_OUT {
     vec3 FragPos;
     vec3 Normal;
     vec2 TexCoords;

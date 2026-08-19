@@ -20,8 +20,8 @@ layout(set=0, binding=0, std430) uniform UniformBlock {
     ULight lights[2];
 };
 
-out vec3 FragPos;
 out vec2 TexCoords;
+out vec3 FragPos;
 out vec3 Normal;
 
 void main()
