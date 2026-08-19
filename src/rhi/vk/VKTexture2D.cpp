@@ -66,7 +66,7 @@ bool VKTexture2D::createEmpty(const TextureDesc& desc, int width, int height) {
     return true;
 }
 
-bool VKTexture2D::adopt(vk::ImageView view, vk::Format format, vk::Extent2D ext) {
+bool VKTexture2D::adopt(vk::ImageView view, vk::Format format, vk::Extent2D ext, const TextureDesc& desc) {
     release();
     _format = format;
     _extent = ext;
@@ -75,14 +75,20 @@ bool VKTexture2D::adopt(vk::ImageView view, vk::Format format, vk::Extent2D ext)
     _adoptedView = view;
 
     vk::SamplerCreateInfo sci{};
-    sci.magFilter = vk::Filter::eLinear;
-    sci.minFilter = vk::Filter::eLinear;
-    sci.mipmapMode = vk::SamplerMipmapMode::eLinear;
-    sci.addressModeU = vk::SamplerAddressMode::eClampToEdge;
-    sci.addressModeV = vk::SamplerAddressMode::eClampToEdge;
-    sci.addressModeW = vk::SamplerAddressMode::eClampToEdge;
+    sci.magFilter = ToVkFilter(desc.magFilter);
+    sci.minFilter = ToVkFilter(desc.minFilter);
+    sci.mipmapMode = vk::SamplerMipmapMode::eNearest;
+    sci.addressModeU = ToVkWrap(desc.wrapS);
+    sci.addressModeV = ToVkWrap(desc.wrapT);
+    sci.addressModeW = ToVkWrap(desc.wrapR);
     sci.minLod = 0.0f;
     sci.maxLod = 1.0f;
+    if (desc.wrapS == TextureWrap::ClampToBorder || desc.wrapT == TextureWrap::ClampToBorder ||
+        desc.wrapR == TextureWrap::ClampToBorder) {
+        // 深度纹理（如 shadow map）用 CLAMP_TO_BORDER，边框色=far（1.0）时超范围
+        // 采样不产生阴影；默认黑色边框会把超范围判成近深度导致大片假阴影。
+        sci.borderColor = vk::BorderColor::eFloatOpaqueWhite;
+    }
     auto sr = _dev.createSampler(sci);
     if (sr.result != vk::Result::eSuccess) return false;
     _sampler = std::move(sr.value);

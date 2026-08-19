@@ -55,6 +55,11 @@ private:
         vk::raii::DeviceMemory memory{nullptr};
         vk::raii::ImageView view{nullptr};
         TextureFormat format{TextureFormat::RGBA8};
+        TextureFilter minFilter{TextureFilter::Linear};
+        TextureFilter magFilter{TextureFilter::Linear};
+        TextureWrap wrapS{TextureWrap::ClampToEdge};
+        TextureWrap wrapT{TextureWrap::ClampToEdge};
+        TextureWrap wrapR{TextureWrap::ClampToEdge};
     };
 
     bool buildFromDesc(const FramebufferDesc& desc);

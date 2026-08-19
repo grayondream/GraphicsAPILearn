@@ -165,6 +165,12 @@ private:
     // swapchain image at end of frame.
     std::shared_ptr<VKRenderTarget> _winMsaaRT{};
     bool _winMsaaUsed{false};
+    // 深度 blit（Defer lightbox 等）：blitFramebuffer(dst=nullptr, Depth) 把离屏
+    // RT 深度拷到 swapchain 深度图，随后本帧的 swapchain 渲染用深度 load 版 RP
+    // 保留该深度（GL 语义：blit 到 default FBO 后深度测试直接用 blit 的内容）。
+    vk::raii::RenderPass _loadDepthRP{nullptr};
+    std::vector<vk::raii::Framebuffer> _loadDepthFbs{};
+    bool _depthLoaded{false};
 };
 
 bool VKRenderer::init(const std::shared_ptr<ISurface>& surface) {
@@ -208,10 +214,10 @@ bool VKRenderer::init(const std::shared_ptr<ISurface>& surface) {
     _surfaceKHR = vk::raii::SurfaceKHR(_instance, rawSurface);
 
     if (!pickPhysicalDevice()) return false;
-    // llvmpipe(软件渲染) 下 float 离屏 RT 无法可靠写入(HDR 场景整帧黑屏/崩溃)，
-    // 降级为 RGBA8 保证画面；真机 GPU 不受影响。
+    // llvmpipe(软件渲染) 下曾把 float 离屏 RT 降级为 RGBA8(HDR/Bloom/SSAO/Defer
+    // 全黑) —— 根因是 MRT pipeline 附件数 bug(VKPipeline.cpp colorBlend attachmentCount)，
+    // 现已修复，float RT 在 llvmpipe 可正常渲染，取消该回退。
     const std::string devName = _phys.getProperties().deviceName;
-    if (devName.find("llvmpipe") != std::string::npos) _floatRtFallback = true;
     LOGI("VKRenderer: device={} floatRtFallback={}", devName, _floatRtFallback);
     QueueFamilies families = findQueueFamilies(_phys);
     if (!families.found) {
@@ -298,7 +304,9 @@ vk::Format pickDepthFormat(vk::raii::PhysicalDevice& pd) {
     // 优先选择带 stencil 分量的格式：GL 默认 framebuffer 含 stencil buffer，模板测试
     // （如 TemplateTest 的边框）依赖 stencil 读写。若只用纯深度格式（如 D32_SFLOAT），
     // stencil 写入被静默丢弃、读取恒 0，导致 border 的 NotEqual(1) 处处通过而整面覆盖。
-    for (const auto f : {vk::Format::eD32SfloatS8Uint, vk::Format::eD24UnormS8Uint,
+    // D24S8 优先于 D32S8：App 的离屏 RT 深度用 Depth24Stencil8(D24S8)，swapchain 深度
+    // 与其同格式才能直接 vkCmdBlitImage 深度拷贝（blit 要求格式同兼容类）。
+    for (const auto f : {vk::Format::eD24UnormS8Uint, vk::Format::eD32SfloatS8Uint,
                          vk::Format::eD16UnormS8Uint, vk::Format::eD32Sfloat,
                          vk::Format::eD16Unorm}) {
         const auto p = pd.getFormatProperties(f);
@@ -413,7 +421,33 @@ bool VKRenderer::createRenderPassAndFramebuffers() {
     }
     _renderPass = std::move(rpr.value);
 
+    // 深度 load 版 RP（loadOp=eLoad，保留 blit 进来的深度）：创建时深度 initialLayout
+    // 用 eDepthStencilAttachmentOptimal（transfer 后回退到此布局，无需再转换）。
+    // color 附件必须 loadOp=eLoad（保留 light pass 已画内容），否则 lightbox 前
+    // 的 swapchain 内容会被 clear 覆盖成清屏色。
+    vk::AttachmentDescription clLoad = color;
+    clLoad.loadOp = vk::AttachmentLoadOp::eLoad;
+    // 前一个 swapchain pass（light pass）结束时 color 已是 present 布局
+    clLoad.initialLayout = vk::ImageLayout::ePresentSrcKHR;
+    clLoad.finalLayout = vk::ImageLayout::ePresentSrcKHR;
+    vk::AttachmentDescription dld = depth;
+    dld.loadOp = vk::AttachmentLoadOp::eLoad;
+    dld.initialLayout = vk::ImageLayout::eDepthStencilAttachmentOptimal;
+    const std::array<vk::AttachmentDescription, 2> attsLoad = {clLoad, dld};
+    vk::RenderPassCreateInfo rpciLoad{};
+    rpciLoad.attachmentCount = static_cast<uint32_t>(attsLoad.size());
+    rpciLoad.pAttachments = attsLoad.data();
+    rpciLoad.subpassCount = 1;
+    rpciLoad.pSubpasses = &subpass;
+    auto lpr = _device.createRenderPass(rpciLoad);
+    if (lpr.result != vk::Result::eSuccess) {
+        LOGE("VKRenderer: createRenderPass(loadDepth) failed");
+        return false;
+    }
+    _loadDepthRP = std::move(lpr.value);
+
     _framebuffers.clear();
+    _loadDepthFbs.clear();
     for (uint32_t i = 0; i < _swapchain->imageCount(); i++) {
         vk::ImageView views[2] = {_swapchain->imageView(i), *_depthImages[i].view};
         vk::FramebufferCreateInfo fci{};
@@ -429,6 +463,20 @@ bool VKRenderer::createRenderPassAndFramebuffers() {
             return false;
         }
         _framebuffers.push_back(std::move(fr.value));
+
+        vk::FramebufferCreateInfo fcLoad{};
+        fcLoad.renderPass = *_loadDepthRP;
+        fcLoad.attachmentCount = 2;
+        fcLoad.pAttachments = views;
+        fcLoad.width = ext.width;
+        fcLoad.height = ext.height;
+        fcLoad.layers = 1;
+        auto lfr = _device.createFramebuffer(fcLoad);
+        if (lfr.result != vk::Result::eSuccess) {
+            LOGE("VKRenderer: createFramebuffer(loadDepth) failed");
+            return false;
+        }
+        _loadDepthFbs.push_back(std::move(lfr.value));
     }
     return true;
 }
@@ -507,8 +555,11 @@ void VKRenderer::shutdown() {
     }
     _swapchain.reset();
     _framebuffers.clear();
+    _loadDepthFbs.clear();
     _depthImages.clear();
     _renderPass = vk::raii::RenderPass{nullptr};
+    _loadDepthRP = vk::raii::RenderPass{nullptr};
+    _depthLoaded = false;
     _pipelineLayout = vk::raii::PipelineLayout{nullptr};
     _uboDs.clear();
     _dsPool = vk::raii::DescriptorPool{nullptr};
@@ -655,6 +706,7 @@ void VKRenderer::endFrame() {
         }
     }
     _winMsaaUsed = false;
+    _depthLoaded = false;
     vk::Result er = _cmd.end();
     _recording = false;
     if (er != vk::Result::eSuccess) return;
@@ -958,10 +1010,10 @@ void VKRenderer::bindSamplersToCurrentSet() {
 
 void VKRenderer::blitFramebuffer(const std::shared_ptr<IRenderTarget>& src,
                                  const std::shared_ptr<IRenderTarget>& dst, BlitMask mask) {
-    if (!_recording || !src || !dst) return;
+    if (!_recording || !src) return;
     auto s = std::dynamic_pointer_cast<VKRenderTarget>(src);
-    auto d = std::dynamic_pointer_cast<VKRenderTarget>(dst);
-    if (!s || !d || s->colorCount() == 0 || d->colorCount() == 0) return;
+    auto d = dst ? std::dynamic_pointer_cast<VKRenderTarget>(dst) : nullptr;
+    if (!s) return;
     if (_rpActive) {
         _cmd.endRenderPass();
         _rpActive = false;
@@ -970,7 +1022,156 @@ void VKRenderer::blitFramebuffer(const std::shared_ptr<IRenderTarget>& src,
     const bool doColor = (static_cast<uint8_t>(mask) & static_cast<uint8_t>(BlitMask::Color)) != 0;
     const bool doDepth = (static_cast<uint8_t>(mask) & static_cast<uint8_t>(BlitMask::Depth)) != 0;
 
-    if (doColor) {
+    if (doDepth) {
+        if (!d) {
+            // 深度 blit 到 swapchain（dst=nullptr，GL 语义：blit 到 default FBO）。
+            // 将 GBuffer 深度拷入当前 swapchain 深度图并标记本帧用 load 深度 RP。
+            const uint32_t idx = _swapchain->currentImage();
+            LOGI("VK blitDepthToSwapchain idx={} depthLoaded={}", idx, _depthLoaded);
+            if (idx >= _depthImages.size()) return;
+            const vk::Image dstImg = static_cast<VkImage>(*_depthImages[idx].image);
+            if (!dstImg) return;
+            vk::Image srcImg = s->depthImage();
+            if (!srcImg) return;
+            const vk::ImageAspectFlags aspect = vk::ImageAspectFlagBits::eDepth;
+            vk::ImageMemoryBarrier toSrc{};
+            toSrc.oldLayout = vk::ImageLayout::eDepthStencilAttachmentOptimal;
+            toSrc.newLayout = vk::ImageLayout::eTransferSrcOptimal;
+            toSrc.srcQueueFamilyIndex = vk::QueueFamilyIgnored;
+            toSrc.dstQueueFamilyIndex = vk::QueueFamilyIgnored;
+            toSrc.image = srcImg;
+            toSrc.subresourceRange.aspectMask = aspect;
+            toSrc.subresourceRange.levelCount = 1;
+            toSrc.subresourceRange.layerCount = 1;
+            toSrc.srcAccessMask = vk::AccessFlagBits::eDepthStencilAttachmentWrite;
+            toSrc.dstAccessMask = vk::AccessFlagBits::eTransferRead;
+            vk::ImageMemoryBarrier toDst{};
+            toDst.oldLayout = vk::ImageLayout::eDepthStencilAttachmentOptimal;
+            toDst.newLayout = vk::ImageLayout::eTransferDstOptimal;
+            toDst.srcQueueFamilyIndex = vk::QueueFamilyIgnored;
+            toDst.dstQueueFamilyIndex = vk::QueueFamilyIgnored;
+            toDst.image = dstImg;
+            toDst.subresourceRange.aspectMask = aspect;
+            toDst.subresourceRange.levelCount = 1;
+            toDst.subresourceRange.layerCount = 1;
+            toDst.srcAccessMask = vk::AccessFlagBits::eDepthStencilAttachmentRead;
+            toDst.dstAccessMask = vk::AccessFlagBits::eTransferWrite;
+            _cmd.pipelineBarrier(vk::PipelineStageFlagBits::eEarlyFragmentTests | vk::PipelineStageFlagBits::eLateFragmentTests,
+                                 vk::PipelineStageFlagBits::eTransfer, {}, {}, {}, {toSrc, toDst});
+
+            vk::ImageBlit region{};
+            region.srcSubresource.aspectMask = aspect;
+            region.srcSubresource.layerCount = 1;
+            // y 镜像：GBuffer 深度图与 swapchain 深度图的 y 轴相反（VK RT 与窗口
+            // 视图方向不同），blit 时翻转保证 lightbox 深度测试方向正确。
+            region.srcOffsets[0] = vk::Offset3D(0, static_cast<int32_t>(s->extent2d().height), 0);
+            region.srcOffsets[1] = vk::Offset3D(static_cast<int32_t>(s->extent2d().width), 0, 1);
+            region.dstSubresource.aspectMask = aspect;
+            region.dstSubresource.layerCount = 1;
+            region.dstOffsets[0] = vk::Offset3D(0, 0, 0);
+            region.dstOffsets[1] = vk::Offset3D(static_cast<int32_t>(extent().width),
+                                                static_cast<int32_t>(extent().height), 1);
+            _cmd.blitImage(srcImg, vk::ImageLayout::eTransferSrcOptimal,
+                           dstImg, vk::ImageLayout::eTransferDstOptimal, {region}, vk::Filter::eNearest);
+
+            vk::ImageMemoryBarrier backSrc{};
+            backSrc.oldLayout = vk::ImageLayout::eTransferSrcOptimal;
+            backSrc.newLayout = vk::ImageLayout::eDepthStencilAttachmentOptimal;
+            backSrc.srcQueueFamilyIndex = vk::QueueFamilyIgnored;
+            backSrc.dstQueueFamilyIndex = vk::QueueFamilyIgnored;
+            backSrc.image = srcImg;
+            backSrc.subresourceRange.aspectMask = aspect;
+            backSrc.subresourceRange.levelCount = 1;
+            backSrc.subresourceRange.layerCount = 1;
+            backSrc.srcAccessMask = vk::AccessFlagBits::eTransferRead;
+            backSrc.dstAccessMask = vk::AccessFlagBits::eDepthStencilAttachmentWrite;
+            vk::ImageMemoryBarrier backDst{};
+            backDst.oldLayout = vk::ImageLayout::eTransferDstOptimal;
+            backDst.newLayout = vk::ImageLayout::eDepthStencilAttachmentOptimal;
+            backDst.srcQueueFamilyIndex = vk::QueueFamilyIgnored;
+            backDst.dstQueueFamilyIndex = vk::QueueFamilyIgnored;
+            backDst.image = dstImg;
+            backDst.subresourceRange.aspectMask = aspect;
+            backDst.subresourceRange.levelCount = 1;
+            backDst.subresourceRange.layerCount = 1;
+            backDst.srcAccessMask = vk::AccessFlagBits::eTransferWrite;
+            backDst.dstAccessMask = vk::AccessFlagBits::eDepthStencilAttachmentRead;
+            _cmd.pipelineBarrier(vk::PipelineStageFlagBits::eTransfer,
+                                 vk::PipelineStageFlagBits::eEarlyFragmentTests | vk::PipelineStageFlagBits::eLateFragmentTests,
+                                 {}, {}, {}, {backSrc, backDst});
+            _depthLoaded = true;
+        } else if (s->colorCount() == 0 || d->colorCount() == 0) {
+            return;
+        } else {
+            // 离屏 RT -> RT 深度 blit
+            vk::Image srcImg = s->depthImage();
+            vk::Image dstImg = d->depthImage();
+            if (!srcImg || !dstImg) return;
+            const vk::ImageAspectFlags aspect = vk::ImageAspectFlagBits::eDepth;
+            vk::ImageMemoryBarrier toSrc{};
+            toSrc.oldLayout = vk::ImageLayout::eDepthStencilAttachmentOptimal;
+            toSrc.newLayout = vk::ImageLayout::eTransferSrcOptimal;
+            toSrc.srcQueueFamilyIndex = vk::QueueFamilyIgnored;
+            toSrc.dstQueueFamilyIndex = vk::QueueFamilyIgnored;
+            toSrc.image = srcImg;
+            toSrc.subresourceRange.aspectMask = aspect;
+            toSrc.subresourceRange.levelCount = 1;
+            toSrc.subresourceRange.layerCount = 1;
+            toSrc.srcAccessMask = vk::AccessFlagBits::eDepthStencilAttachmentWrite;
+            toSrc.dstAccessMask = vk::AccessFlagBits::eTransferRead;
+            vk::ImageMemoryBarrier toDst{};
+            toDst.oldLayout = vk::ImageLayout::eDepthStencilAttachmentOptimal;
+            toDst.newLayout = vk::ImageLayout::eTransferDstOptimal;
+            toDst.srcQueueFamilyIndex = vk::QueueFamilyIgnored;
+            toDst.dstQueueFamilyIndex = vk::QueueFamilyIgnored;
+            toDst.image = dstImg;
+            toDst.subresourceRange.aspectMask = aspect;
+            toDst.subresourceRange.levelCount = 1;
+            toDst.subresourceRange.layerCount = 1;
+            toDst.srcAccessMask = vk::AccessFlagBits::eDepthStencilAttachmentRead;
+            toDst.dstAccessMask = vk::AccessFlagBits::eTransferWrite;
+            _cmd.pipelineBarrier(vk::PipelineStageFlagBits::eEarlyFragmentTests | vk::PipelineStageFlagBits::eLateFragmentTests,
+                                 vk::PipelineStageFlagBits::eTransfer, {}, {}, {}, {toSrc, toDst});
+            vk::ImageBlit region{};
+            region.srcSubresource.aspectMask = aspect;
+            region.srcSubresource.layerCount = 1;
+            region.srcOffsets[1] = vk::Offset3D(static_cast<int32_t>(s->extent2d().width),
+                                                static_cast<int32_t>(s->extent2d().height), 1);
+            region.dstSubresource.aspectMask = aspect;
+            region.dstSubresource.layerCount = 1;
+            region.dstOffsets[1] = vk::Offset3D(static_cast<int32_t>(d->extent2d().width),
+                                                static_cast<int32_t>(d->extent2d().height), 1);
+            _cmd.blitImage(srcImg, vk::ImageLayout::eTransferSrcOptimal,
+                           dstImg, vk::ImageLayout::eTransferDstOptimal, {region}, vk::Filter::eNearest);
+            vk::ImageMemoryBarrier backSrc{};
+            backSrc.oldLayout = vk::ImageLayout::eTransferSrcOptimal;
+            backSrc.newLayout = vk::ImageLayout::eDepthStencilAttachmentOptimal;
+            backSrc.srcQueueFamilyIndex = vk::QueueFamilyIgnored;
+            backSrc.dstQueueFamilyIndex = vk::QueueFamilyIgnored;
+            backSrc.image = srcImg;
+            backSrc.subresourceRange.aspectMask = aspect;
+            backSrc.subresourceRange.levelCount = 1;
+            backSrc.subresourceRange.layerCount = 1;
+            backSrc.srcAccessMask = vk::AccessFlagBits::eTransferRead;
+            backSrc.dstAccessMask = vk::AccessFlagBits::eDepthStencilAttachmentWrite;
+            vk::ImageMemoryBarrier backDst{};
+            backDst.oldLayout = vk::ImageLayout::eTransferDstOptimal;
+            backDst.newLayout = vk::ImageLayout::eDepthStencilAttachmentOptimal;
+            backDst.srcQueueFamilyIndex = vk::QueueFamilyIgnored;
+            backDst.dstQueueFamilyIndex = vk::QueueFamilyIgnored;
+            backDst.image = dstImg;
+            backDst.subresourceRange.aspectMask = aspect;
+            backDst.subresourceRange.levelCount = 1;
+            backDst.subresourceRange.layerCount = 1;
+            backDst.srcAccessMask = vk::AccessFlagBits::eTransferWrite;
+            backDst.dstAccessMask = vk::AccessFlagBits::eDepthStencilAttachmentRead;
+            _cmd.pipelineBarrier(vk::PipelineStageFlagBits::eTransfer,
+                                 vk::PipelineStageFlagBits::eEarlyFragmentTests | vk::PipelineStageFlagBits::eLateFragmentTests,
+                                 {}, {}, {}, {backSrc, backDst});
+        }
+    }
+
+    if (doColor && d && s->colorCount() != 0 && d->colorCount() != 0) {
         vk::Image srcImg = s->colorImage(0);
         vk::Image dstImg = d->colorImage(0);
         const vk::ImageAspectFlags aspect = vk::ImageAspectFlagBits::eColor;
@@ -1039,7 +1240,6 @@ void VKRenderer::blitFramebuffer(const std::shared_ptr<IRenderTarget>& src,
         _cmd.pipelineBarrier(vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eFragmentShader,
                              {}, {}, {}, {backSrc, backDst});
     }
-    (void)doDepth;
 }
 
 void VKRenderer::draw(uint32_t vertexCount, uint32_t firstVertex) {
@@ -1135,8 +1335,15 @@ bool VKRenderer::ensureRenderPass() {
     } else {
         const uint32_t idx = _swapchain->currentImage();
         if (idx >= _framebuffers.size()) return false;
-        rp = *_renderPass;
-        fb = *_framebuffers[idx];
+        // 深度已从离屏 RT blit 到 swapchain 深度图：用 load 版 RP 保留深度，
+        // 否则 RP 开始会 clear 掉它（lightbox 等后续 pass 的深度测试失效）。
+        if (_depthLoaded) {
+            rp = *_loadDepthRP;
+            fb = *_loadDepthFbs[idx];
+        } else {
+            rp = *_renderPass;
+            fb = *_framebuffers[idx];
+        }
         ext = extent();
     }
 
@@ -1209,15 +1416,17 @@ bool VKRenderer::bindPipelineAndState() {
     // offscreen RT or the swapchain), with the correct attachment sample count.
     vk::RenderPass rp;
     vk::SampleCountFlagBits samples = vk::SampleCountFlagBits::e1;
+    uint32_t colorCount = 1;
     if (std::shared_ptr<VKRenderTarget> effRT = effectiveRT()) {
         rp = effRT->renderPass();
         samples = effRT->msaa()
             ? ToVkSamples(static_cast<int>(effRT->samples()))
             : vk::SampleCountFlagBits::e1;
+        colorCount = effRT->colorCount();
     } else {
         rp = *_renderPass;
     }
-    vk::Pipeline p = vkp->pipelineFor(rp, samples);
+    vk::Pipeline p = vkp->pipelineFor(rp, samples, colorCount);
     if (!p) return false;
     _cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, p);
     // bind描述符集：每个 draw 绑到当前 UBO slot 对应的 set

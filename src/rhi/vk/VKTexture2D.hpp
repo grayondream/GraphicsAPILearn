@@ -18,7 +18,7 @@ public:
     bool valid() const override { return _valid; }
     void release() override;
 
-    bool adopt(vk::ImageView view, vk::Format format, vk::Extent2D ext);
+    bool adopt(vk::ImageView view, vk::Format format, vk::Extent2D ext, const TextureDesc& desc);
 
     vk::Sampler sampler() const { return _sampler != nullptr ? *_sampler : vk::Sampler{nullptr}; }
     vk::ImageView view() const { return _adoptedView ? _adoptedView : (_view != nullptr ? *_view : vk::ImageView{nullptr}); }

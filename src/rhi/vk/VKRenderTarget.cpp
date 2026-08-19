@@ -40,6 +40,11 @@ bool VKRenderTarget::buildFromDesc(const FramebufferDesc& desc) {
                            samples)) {
                 return false;
             }
+            img.minFilter = att.minFilter;
+            img.magFilter = att.magFilter;
+            img.wrapS = att.wrapS;
+            img.wrapT = att.wrapT;
+            img.wrapR = att.wrapS;
             _colors.push_back(std::move(img));
             if (msaa) {
                 Image res;
@@ -47,6 +52,11 @@ bool VKRenderTarget::buildFromDesc(const FramebufferDesc& desc) {
                                vk::SampleCountFlagBits::e1)) {
                     return false;
                 }
+                res.minFilter = att.minFilter;
+                res.magFilter = att.magFilter;
+                res.wrapS = att.wrapS;
+                res.wrapT = att.wrapT;
+                res.wrapR = att.wrapS;
                 _resolved.push_back(std::move(res));
             }
         } else {
@@ -55,6 +65,11 @@ bool VKRenderTarget::buildFromDesc(const FramebufferDesc& desc) {
                             vk::ImageUsageFlagBits::eSampled, samples)) {
                 return false;
             }
+            _depth.minFilter = att.minFilter;
+            _depth.magFilter = att.magFilter;
+            _depth.wrapS = att.wrapS;
+            _depth.wrapT = att.wrapT;
+            _depth.wrapR = att.wrapS;
             _depthAttachment = true;
         }
     }
@@ -251,12 +266,23 @@ void VKRenderTarget::createWrappers() {
     for (size_t i = 0; i < _colors.size(); i++) {
         vk::ImageView view = this->msaa() ? *_resolved[i].view : *_colors[i].view;
         auto wrap = std::make_shared<VKTexture2D>(_dev, _phys, _queue, _graphicsFamily);
-        wrap->adopt(view, ToVkTextureFormat(_colors[i].format), _extent);
+        const Image& a = _colors[i];
+        TextureDesc td;
+        td.minFilter = a.minFilter;
+        td.magFilter = a.magFilter;
+        td.wrapS = a.wrapS;
+        td.wrapT = a.wrapT;
+        wrap->adopt(view, ToVkTextureFormat(a.format), _extent, td);
         _colorWrappers.push_back(std::move(wrap));
     }
     if (_depthAttachment) {
         _depthWrapper = std::make_shared<VKTexture2D>(_dev, _phys, _queue, _graphicsFamily);
-        _depthWrapper->adopt(*_depth.view, ToVkTextureFormat(_depth.format), _extent);
+        TextureDesc td;
+        td.minFilter = _depth.minFilter;
+        td.magFilter = _depth.magFilter;
+        td.wrapS = _depth.wrapS;
+        td.wrapT = _depth.wrapT;
+        _depthWrapper->adopt(*_depth.view, ToVkTextureFormat(_depth.format), _extent, td);
     }
 }
 

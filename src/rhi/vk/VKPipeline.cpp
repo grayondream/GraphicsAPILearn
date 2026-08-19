@@ -120,7 +120,7 @@ void VKPipeline::setPrimitiveType(PrimitiveType type) {
     if (_primitive != type) { _primitive = type; _needsRecreate = true; }
 }
 
-vk::Pipeline VKPipeline::pipelineFor(vk::RenderPass rp, vk::SampleCountFlagBits samples) {
+vk::Pipeline VKPipeline::pipelineFor(vk::RenderPass rp, vk::SampleCountFlagBits samples, uint32_t colorCount) {
     if (_needsRecreate) {
         _cache.clear();
         _needsRecreate = false;
@@ -128,7 +128,7 @@ vk::Pipeline VKPipeline::pipelineFor(vk::RenderPass rp, vk::SampleCountFlagBits 
     auto it = _cache.find(rp);
     if (it == _cache.end()) {
         vk::raii::Pipeline pipe{nullptr};
-        if (!createGraphicsPipeline(rp, samples, pipe)) {
+        if (!createGraphicsPipeline(rp, samples, colorCount, pipe)) {
             LOGE("VKPipeline: createGraphicsPipeline failed");
             return vk::Pipeline{};
         }
@@ -137,7 +137,7 @@ vk::Pipeline VKPipeline::pipelineFor(vk::RenderPass rp, vk::SampleCountFlagBits 
     return *it->second;
 }
 
-bool VKPipeline::createGraphicsPipeline(vk::RenderPass rp, vk::SampleCountFlagBits samples, vk::raii::Pipeline& out) {
+bool VKPipeline::createGraphicsPipeline(vk::RenderPass rp, vk::SampleCountFlagBits samples, uint32_t colorCount, vk::raii::Pipeline& out) {
     const std::vector<vk::PipelineShaderStageCreateInfo> stages = _shader ? _shader->stageInfos() : std::vector<vk::PipelineShaderStageCreateInfo>{};
     if (stages.empty()) {
         LOGE("VKPipeline: no shader stages");
@@ -203,20 +203,27 @@ bool VKPipeline::createGraphicsPipeline(vk::RenderPass rp, vk::SampleCountFlagBi
         _stencilWriteMask, static_cast<uint32_t>(_stencilRef));
     depthStencil.back = depthStencil.front;
 
-    vk::PipelineColorBlendAttachmentState blendAttach{};
-    blendAttach.colorWriteMask = vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG
-        | vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA;
-    blendAttach.blendEnable = _blend ? vk::True : vk::False;
-    blendAttach.srcColorBlendFactor = ToVkBlendFactor(_blendSrc);
-    blendAttach.dstColorBlendFactor = ToVkBlendFactor(_blendDst);
-    blendAttach.colorBlendOp = vk::BlendOp::eAdd;
-    blendAttach.srcAlphaBlendFactor = ToVkBlendFactor(_blendSrc);
-    blendAttach.dstAlphaBlendFactor = ToVkBlendFactor(_blendDst);
-    blendAttach.alphaBlendOp = vk::BlendOp::eAdd;
+    // One blend state per color attachment (MRT). Vulkan requires the pipeline's
+    // attachment count to cover every color attachment of the subpass, otherwise
+    // fragment outputs beyond attachmentCount-1 are dropped (e.g. Defer GBuffer
+    // attachment 1/2 never written → black lighting pass).
+    const uint32_t attachmentCount = std::max<uint32_t>(colorCount, 1u);
+    std::vector<vk::PipelineColorBlendAttachmentState> blendAttachments(attachmentCount);
+    for (auto& blendAttach : blendAttachments) {
+        blendAttach.colorWriteMask = vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG
+            | vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA;
+        blendAttach.blendEnable = _blend ? vk::True : vk::False;
+        blendAttach.srcColorBlendFactor = ToVkBlendFactor(_blendSrc);
+        blendAttach.dstColorBlendFactor = ToVkBlendFactor(_blendDst);
+        blendAttach.colorBlendOp = vk::BlendOp::eAdd;
+        blendAttach.srcAlphaBlendFactor = ToVkBlendFactor(_blendSrc);
+        blendAttach.dstAlphaBlendFactor = ToVkBlendFactor(_blendDst);
+        blendAttach.alphaBlendOp = vk::BlendOp::eAdd;
+    }
     vk::PipelineColorBlendStateCreateInfo colorBlend{};
     colorBlend.logicOpEnable = vk::False;
-    colorBlend.attachmentCount = 1;
-    colorBlend.pAttachments = &blendAttach;
+    colorBlend.attachmentCount = attachmentCount;
+    colorBlend.pAttachments = blendAttachments.data();
 
     const std::vector<vk::DynamicState> dyn = {
         vk::DynamicState::eViewport, vk::DynamicState::eScissor,

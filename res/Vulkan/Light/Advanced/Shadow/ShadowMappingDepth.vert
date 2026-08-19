@@ -24,4 +24,9 @@ layout(set=0, binding=0, std430) uniform UniformBlock {
 void main()
 {
     gl_Position = extraMat4[0] * model * aPos;
+    // VK 深度缓冲范围 [0,1]：把 GL 风格投影矩阵（clip z ∈ [-1,1]）的 z 映射到
+    // [0,1]（GL 由硬件自动做此映射，VK 必须手动）。否则 depth pass 写入的深度
+    // 与主 pass ShadowCalculation 的 currentDepth(projCoords.z) 值域不一致，
+    // 阴影比较错位（阴影左移/错乱）。
+    gl_Position.z = gl_Position.z * 0.5 + 0.5 * gl_Position.w;
 }

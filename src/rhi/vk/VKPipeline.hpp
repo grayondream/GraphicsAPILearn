@@ -51,13 +51,13 @@ public:
     void setIndexBuffer(const std::shared_ptr<IBuffer>&) override {}
 
     // Build (if not cached) and return the VkPipeline bound for the given
-    // render pass. samples must match the render pass attachment sample count.
-    vk::Pipeline pipelineFor(vk::RenderPass rp, vk::SampleCountFlagBits samples);
+    // render pass. samples/colorCount must match the render pass attachments.
+    vk::Pipeline pipelineFor(vk::RenderPass rp, vk::SampleCountFlagBits samples, uint32_t colorCount);
     void applyDynamicState(vk::raii::CommandBuffer& cmd) const;
     vk::PipelineLayout layout() const { return _pipelineLayout; }
 
 private:
-    bool createGraphicsPipeline(vk::RenderPass rp, vk::SampleCountFlagBits samples, vk::raii::Pipeline& out);
+    bool createGraphicsPipeline(vk::RenderPass rp, vk::SampleCountFlagBits samples, uint32_t colorCount, vk::raii::Pipeline& out);
 
     vk::raii::Device& _dev;
     vk::PipelineLayout _pipelineLayout{};
