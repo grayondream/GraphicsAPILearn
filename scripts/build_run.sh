@@ -6,7 +6,7 @@ set -e
 
 GIT_ROOT=$(git rev-parse --show-toplevel)
 BUILD_DIR="$GIT_ROOT/build"
-VCPKG_TOOLCHAIN="/home/ares/apps/vcpkg/scripts/buildsystems/vcpkg.cmake"
+VCPKG_TOOLCHAIN="${VCPKG_ROOT:-$HOME/apps/vcpkg}/scripts/buildsystems/vcpkg.cmake"
 VCPKG_TRIPLET="x64-linux"
 
 MODE="${1:-all}"
