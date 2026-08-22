@@ -1,0 +1,6 @@
+// 对应 res/GL/Light/Diffuse/Light.frag：直接输出 lightColor（vec4Pool[3]）。
+#include "../../_uniform_block.hlsli"
+
+float4 PSMain() : SV_Target {
+    return gVec4Pool[3];
+}
