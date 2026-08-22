@@ -161,6 +161,7 @@ bool DXTexture2D::init(const TextureDesc& desc, const TextureDataView2D& data) {
     _srvFormat = _format;
     _width = data.width;
     _height = data.height;
+    _params = desc;
 
     // generateMipmap=true 才分配 mip 链并降采样（同 VKTexture2D）
     _mipLevels = desc.generateMipmap ? ComputeMipLevels(_width, _height) : 1;
@@ -181,6 +182,7 @@ bool DXTexture2D::createEmpty(const TextureDesc& desc, int width, int height) {
     _width = width;
     _height = height;
     _mipLevels = 1;   // 与 VKTexture2D::createEmpty 一致：不生成 mip 链
+    _params = desc;
 
     const bool depth = desc.format == TextureFormat::Depth32F ||
                        desc.format == TextureFormat::Depth24Stencil8;
@@ -470,6 +472,11 @@ bool DXTexture2D::executeOneShot(const std::function<void(ID3D12GraphicsCommandL
         WaitForSingleObject(_fenceEvent, INFINITE);
     }
     return true;
+}
+
+void DXTexture2D::setBorderColor(const float bc[4]) {
+    if (!bc) return;
+    _borderColor = {bc[0], bc[1], bc[2], bc[3]};
 }
 
 void DXTexture2D::bind(unsigned int) {

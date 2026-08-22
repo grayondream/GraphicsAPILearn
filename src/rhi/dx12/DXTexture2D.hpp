@@ -2,6 +2,7 @@
 #include "rhi/dx12/DXHeader.hpp"
 #include "rhi/core/ITexture2D.hpp"
 #include <functional>
+#include <array>
 
 namespace rhi {
 
@@ -46,9 +47,15 @@ public:
     // ---- Renderer 访问器 ----
     void setBlitContext(IDXBlitContext* ctx) { _blitCtx = ctx; }        // init 前注入
     ID3D12Resource* resource() const { return _resource.Get(); }
+    DXGI_FORMAT storageFormat() const { return _format; }               // 资源存储格式（深度为 TYPELESS）
     DXGI_FORMAT srvFormat() const { return _srvFormat; }                // SRV/RTV 视图 typed 格式
     UINT mipLevels() const { return _mipLevels; }
     bool isMsaa() const { return _msaa; }                               // RTV-only，不可建 SRV
+    // 采样语义（bind 路径决定是否需要动态采样器堆槽位；RT 内部纹理由
+    // DXRenderTarget 按 FramebufferAttachment 回填）
+    const TextureDesc& samplerParams() const { return _params; }
+    const std::array<float, 4>& borderColor() const { return _borderColor; }
+    void setBorderColor(const float bc[4]);
 
 private:
     bool createResource(UINT width, UINT height, D3D12_RESOURCE_FLAGS flags, UINT sampleCount);
@@ -73,6 +80,9 @@ private:
     int _height{0};
     bool _msaa{false};
     bool _valid{false};
+
+    TextureDesc _params{};                      // 创建时的采样语义（filter/wrap）
+    std::array<float, 4> _borderColor{{1.0f, 1.0f, 1.0f, 1.0f}};  // ClampToBorder 边框色
 };
 
 } // namespace rhi

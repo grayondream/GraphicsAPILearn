@@ -8,7 +8,7 @@ namespace rhi {
 
 namespace {
 
-D3D12_FILTER ToDxFilter(TextureFilter filter) {
+D3D12_FILTER DxFilterOf(TextureFilter filter) {
     switch (filter) {
         case TextureFilter::Linear:          return D3D12_FILTER_MIN_MAG_LINEAR_MIP_POINT;
         case TextureFilter::Nearest:         return D3D12_FILTER_MIN_MAG_MIP_POINT;
@@ -17,7 +17,7 @@ D3D12_FILTER ToDxFilter(TextureFilter filter) {
     return D3D12_FILTER_MIN_MAG_LINEAR_MIP_POINT;
 }
 
-D3D12_TEXTURE_ADDRESS_MODE ToDxAddress(TextureWrap wrap) {
+D3D12_TEXTURE_ADDRESS_MODE DxAddressOf(TextureWrap wrap) {
     switch (wrap) {
         case TextureWrap::Repeat:         return D3D12_TEXTURE_ADDRESS_MODE_WRAP;
         case TextureWrap::ClampToEdge:    return D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
@@ -166,18 +166,21 @@ int SamplerSlot(TextureFilter filter, TextureWrap wrap) {
 }
 
 const D3D12_STATIC_SAMPLER_DESC* StaticSamplers(size_t& count) {
-    // 槽位布局 f*3+w：0..2 Linear(Repeat/Clamp/Border)、3..5 Nearest、6..8 LinearMipLinear；
-    // 槽 6 即默认 minFilter(LinearMipLinear)+Repeat
-    static const std::array<D3D12_STATIC_SAMPLER_DESC, 9> table = [] {
+    // 槽位布局 f*3+w（寄存器编号与 _samplers.hlsli 别名一致）：
+    //   0..2 Linear(Repeat/Clamp/Border)、3..5 Nearest、6..8 LinearMipLinear；
+    // 槽 6 即默认 minFilter(LinearMipLinear)+Repeat。
+    // w=ClampToBorder 的三个槽位（2/5/8）不进静态表：静态采样器边框色只有黑/白，
+    // 任意 borderColor 由 DXRenderer 动态 SAMPLER 堆在 bind 路径按槽位写入
+    // （未覆盖时堆内预填 OPAQUE_WHITE，行为与旧静态表一致）。非 border 组合继续走根签名静态表。
+    static const std::array<D3D12_STATIC_SAMPLER_DESC, 6> table = [] {
         constexpr TextureFilter filters[3] = {TextureFilter::Linear, TextureFilter::Nearest,
                                               TextureFilter::LinearMipLinear};
-        constexpr TextureWrap wraps[3] = {TextureWrap::Repeat, TextureWrap::ClampToEdge,
-                                          TextureWrap::ClampToBorder};
-        std::array<D3D12_STATIC_SAMPLER_DESC, 9> t{};
+        constexpr TextureWrap wraps[2] = {TextureWrap::Repeat, TextureWrap::ClampToEdge};
+        std::array<D3D12_STATIC_SAMPLER_DESC, 6> t{};
         for (int f = 0; f < 3; ++f)
-            for (int w = 0; w < 3; ++w)
+            for (int w = 0; w < 2; ++w)
                 t[static_cast<size_t>(f) * 3 + w] =
-                    MakeSampler(ToDxFilter(filters[f]), ToDxAddress(wraps[w]),
+                    MakeSampler(DxFilterOf(filters[f]), DxAddressOf(wraps[w]),
                                 static_cast<UINT>(f * 3 + w));
         return t;
     }();

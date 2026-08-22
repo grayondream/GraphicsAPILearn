@@ -1,9 +1,11 @@
 #include "rhi/dx12/DXBackend.hpp"
 #include "rhi/dx12/DXBuffer.hpp"
 #include "rhi/dx12/DXPipeline.hpp"
+#include "rhi/dx12/DXRenderTarget.hpp"
 #include "rhi/dx12/DXShader.hpp"
 #include "rhi/dx12/DXSwapchain.hpp"
 #include "rhi/dx12/DXTexture2D.hpp"
+#include "rhi/dx12/DXTexture3D.hpp"
 #include "rhi/core/ISurface.hpp"
 #include "rhi/core/IShader.hpp"
 #include "rhi/core/IPipeline.hpp"
@@ -29,8 +31,8 @@ namespace rhi {
 
 namespace {
 
-// 离屏 RT 工厂暂返回 no-op 对象而非 nullptr：其 create()==false 使样例在
-// 加载期经 ExitIfFailed 干净退出，避免空指针解引用段错误。Task 8 以同名真实类替换。
+// Null 桩仅作 init 前兜底（create()==false 使样例在加载期经 ExitIfFailed 干净
+// 退出，避免空指针解引用段错误）；真实工厂在 device 就绪后返回 DX 实现类。
 
 class DXNullPipeline : public IPipeline {
 public:
@@ -261,8 +263,20 @@ public:
         tex->setBlitContext(&_blitCtx);
         return tex;
     }
-    std::shared_ptr<ITexture3D> createTexture3D() override { return std::make_shared<DXNullTexture3D>(); }
-    std::shared_ptr<IRenderTarget> createRenderTarget() override { return std::make_shared<DXNullRenderTarget>(); }
+    std::shared_ptr<ITexture3D> createTexture3D() override {
+        if (!_device.ptr) { LOGE("[DX12] createTexture3D before init"); return std::make_shared<DXNullTexture3D>(); }
+        auto tex = std::make_shared<DXTexture3D>(_device.ptr, _queue.ptr,
+                                                 _uploadAllocator.ptr, _frameFence.ptr,
+                                                 _fenceEvent);
+        tex->setBlitContext(&_blitCtx);
+        return tex;
+    }
+    std::shared_ptr<IRenderTarget> createRenderTarget() override {
+        if (!_device.ptr) { LOGE("[DX12] createRenderTarget before init, null fallback"); return std::make_shared<DXNullRenderTarget>(); }
+        return std::make_shared<DXRenderTarget>(_device.ptr, _queue.ptr,
+                                                _uploadAllocator.ptr, _frameFence.ptr,
+                                                _fenceEvent);
+    }
     std::shared_ptr<ISwapchain> getSwapchain() override { return _swapchain; }
 
     // ---- 帧控制 ----
@@ -312,8 +326,8 @@ public:
     void bindTexture(const std::shared_ptr<ITexture2D>& texture, unsigned int unit) override {
         BindTexture2D(texture.get(), unit);
     }
-    void bindTexture(const std::shared_ptr<ITexture3D>&, unsigned int) override {
-        WarnOnce("bindTexture(ITexture3D) is a stub until Task 8 (cubemap)");
+    void bindTexture(const std::shared_ptr<ITexture3D>& texture, unsigned int unit) override {
+        BindTexture3D(texture.get(), unit);
     }
     void bindTexture(rhi::ITexture2D* texture, unsigned int unit) override {
         BindTexture2D(texture, unit);
@@ -338,11 +352,11 @@ public:
     // BlitMask 语义对照 VKRenderer::blitFramebuffer：
     // - Depth+dst==nullptr：src 离屏深度 CopyTextureRegion 拷入窗口深度（Defer lightbox）；
     // - Depth+dst!=nullptr：离屏 RT→RT 深度拷贝；
-    // - Color：仅 dst!=nullptr 时执行 RT→RT 全屏三角形 blit（VK 不做 color→swapchain，
-    //   对齐其行为）；MSAA src 的 resolve 场景由 Task 8 的 resolve 附件承担。
+    // - Color：src MSAA 时 ResolveSubresource（Msaa 样例）；否则仅 dst!=nullptr 执行
+    //   RT→RT 全屏三角形 blit（VK 不做 color→swapchain，对齐其行为）。
     // 资源经 IRenderTarget 接口取（colorTexture2D(0)/depthTexture2D()->handle() 返回
-    // ID3D12Resource*，Task 8 的 DXRenderTarget 按此契约实现）；Task 7 期真实 RT 缺位
-    // 时命中 WarnOnce 早退。
+    // ID3D12Resource*，Task 8 契约）；执行前 UnbindAllOm 解绑全部 OM 目标
+    // （Task 7 契约：blit 时不得有活动离屏 OM 指向 src/dst）。
     void blitFramebuffer(const std::shared_ptr<IRenderTarget>& src,
                          const std::shared_ptr<IRenderTarget>& dst, BlitMask mask) override {
         if (!src || !_recording || !_cmdList.ptr) return;
@@ -380,6 +394,7 @@ public:
         _vertexBuffers = {};
         _uniformBuffer = nullptr;
         _renderTarget = nullptr;
+        _activeOffscreen.reset();
         _clearColors.clear();
         _clearColor[0] = 0.0f; _clearColor[1] = 0.0f; _clearColor[2] = 0.0f; _clearColor[3] = 1.0f;
         _rtActive = false;
@@ -387,6 +402,9 @@ public:
         _backBufferBound = false;
         _viewportSet = false;
         _viewport = {};
+        // border 采样器槽位恢复预填白边框：上一样例的 borderColor 不残留到新样例
+        _heapSamplerColors.clear();
+        PrefillBorderSamplers();
         // 上一样例写过的 SRV 槽全部置空描述符：旧样例纹理已销毁，
         // 悬垂 SRV 被新样例 draw 读到是未定义行为（对齐 VK 描述符集重建教训）
         if (_device.ptr && _srvHeap.ptr) {
@@ -467,6 +485,86 @@ private:
         dst.ptr += (unit + 1) * static_cast<SIZE_T>(_srvDescSize);
         _device->CreateShaderResourceView(dx->resource(), &sd, dst);
         _boundUnits.insert(unit);
+        TouchHeapSampler(dx->samplerParams(), dx->borderColor().data());
+    }
+
+    // cubemap/3D 纹理绑定：TEXTURECUBE/TEXTURE3D SRV 写同一共享堆槽（寄存器
+    // t<unit+1>，HLSL TextureCube 声明同槽即可采样）
+    void BindTexture3D(rhi::ITexture3D* texture, unsigned int unit) {
+        if (!texture || !_srvHeap.ptr) return;
+        if (unit + 1 >= kSrvHeapSlots) {
+            WarnOnce("bindTexture3D unit out of SRV heap range; ignored");
+            return;
+        }
+        auto* dx = dynamic_cast<DXTexture3D*>(texture);
+        if (!dx || !dx->valid()) return;
+        D3D12_CPU_DESCRIPTOR_HANDLE dst{_srvHeap->GetCPUDescriptorHandleForHeapStart()};
+        dst.ptr += (unit + 1) * static_cast<SIZE_T>(_srvDescSize);
+        if (!dx->WriteSrv(dst)) {
+            WarnOnce("bindTexture3D: SRV write failed");
+            return;
+        }
+        _boundUnits.insert(unit);
+        TouchHeapSampler(dx->samplerParams(), nullptr);
+    }
+
+    // ---- 动态采样器堆（borderColor）----
+    // 静态采样器边框色只有黑/白：ClampToBorder 组合（槽 2/5/8，沿用 f*3+w 编号，
+    // 寄存器与 _samplers.hlsli 别名一致）在 bind 路径按纹理实际 borderColor 动态
+    // 写入本堆；非 border 组合继续走根签名静态表。draw 时与 SRV 堆同绑。
+    bool NeedsBorderSampler(const TextureWrap w, const TextureWrap u,
+                            const TextureWrap v) {
+        return u == TextureWrap::ClampToBorder || v == TextureWrap::ClampToBorder ||
+               w == TextureWrap::ClampToBorder;
+    }
+
+    void TouchHeapSampler(const TextureDesc& params, const float* borderColor) {
+        static const std::array<float, 4> kWhite{{1.0f, 1.0f, 1.0f, 1.0f}};
+        if (!NeedsBorderSampler(params.wrapS, params.wrapT, params.wrapR)) return;
+        const UINT slot = static_cast<UINT>(SamplerSlot(params.minFilter, params.wrapS));
+        if (slot >= kSamplerHeapSlots || !_samplerHeap.ptr) return;
+        const float* bc = borderColor ? borderColor : kWhite.data();
+        auto it = _heapSamplerColors.find(slot);
+        if (it != _heapSamplerColors.end() &&
+            std::memcmp(it->second.data(), bc, sizeof(float) * 4) == 0) {
+            return;   // 槽位已带相同边框色，免重写
+        }
+        D3D12_SAMPLER_DESC sd{};
+        sd.Filter = DxFilterOf(params.minFilter);
+        sd.AddressU = DxAddressOf(params.wrapS);
+        sd.AddressV = DxAddressOf(params.wrapT);
+        sd.AddressW = DxAddressOf(params.wrapR);
+        sd.MipLODBias = 0;
+        sd.MaxAnisotropy = 1;
+        sd.ComparisonFunc = D3D12_COMPARISON_FUNC_NEVER;
+        sd.BorderColor[0] = bc[0];
+        sd.BorderColor[1] = bc[1];
+        sd.BorderColor[2] = bc[2];
+        sd.BorderColor[3] = bc[3];
+        sd.MinLOD = 0;
+        sd.MaxLOD = D3D12_FLOAT32_MAX;
+        D3D12_CPU_DESCRIPTOR_HANDLE dst{_samplerHeap->GetCPUDescriptorHandleForHeapStart()};
+        dst.ptr += static_cast<SIZE_T>(slot) * static_cast<SIZE_T>(_samplerDescSize);
+        _device->CreateSampler(&sd, dst);
+        _heapSamplerColors[slot] = {bc[0], bc[1], bc[2], bc[3]};
+    }
+
+    // 三个 border 槽位（2/5/8）预填 OPAQUE_WHITE：未发生 ClampToBorder 绑定时
+    // 引用 border 寄存器的 shader 与旧"静态表全白边框"行为逐字节一致
+    void PrefillBorderSamplers() {
+        if (!_samplerHeap.ptr) return;
+        const std::array<std::pair<TextureFilter, UINT>, 3> combos{
+            std::pair<TextureFilter, UINT>{TextureFilter::Linear, 2},
+            std::pair<TextureFilter, UINT>{TextureFilter::Nearest, 5},
+            std::pair<TextureFilter, UINT>{TextureFilter::LinearMipLinear, 8}};
+        for (const auto& [filter, slot] : combos) {
+            TextureDesc td;
+            td.minFilter = filter;
+            td.wrapS = TextureWrap::ClampToBorder;
+            td.wrapT = TextureWrap::ClampToBorder;
+            td.wrapR = TextureWrap::ClampToBorder;
+            TouchHeapSampler(td, nullptr);
+        }
     }
 
     // blit PSO 缓存（键=目标 RTV 格式）：全屏三角形、无深度、无混合、无输入布局
@@ -515,16 +613,35 @@ private:
         return _scratchSrvHeap.ptr && _scratchRtvHeap.ptr;
     }
 
-    // 深度路径：src 深度 CopyTextureRegion 到 dst RT 或窗口深度（dst==nullptr）
+    // blit 前置契约（Task 7）：src/dst 不得处于活动 OM。解绑全部 OM 目标
+    // （离屏目标先 EndPass 回常驻态）并标记 pending，后续 draw 经 flushOmTargets
+    // 重新激活；窗口绑定由各 blit 路径按语义恢复
+    void UnbindAllOm() {
+        if (_activeOffscreen) {
+            _activeOffscreen->EndPass(_cmdList.ptr);
+            _activeOffscreen.reset();
+        }
+        if (_backBufferBound) {
+            _cmdList.ptr->OMSetRenderTargets(0, nullptr, FALSE, nullptr);
+        }
+        _rtActive = false;
+        _omPending = true;
+    }
+
+    // 深度路径：src 深度 CopyTextureRegion 到 dst RT 或窗口深度（dst==nullptr）。
+    // 状态感知转移：深度常驻态可能是 PSHR（pass 间已 EndPass）或 DEPTH_WRITE，
+    // 从 RT 状态机读取实际当前态而非假设
     bool DoBlitDepth(const std::shared_ptr<IRenderTarget>& src,
                      const std::shared_ptr<IRenderTarget>& dst) {
+        auto* srcRT = dynamic_cast<DXRenderTarget*>(src.get());
         auto* srcDepthTex = dynamic_cast<DXTexture2D*>(src->depthTexture2D());
         ID3D12Resource* srcDepth = srcDepthTex ? srcDepthTex->resource() : nullptr;
         if (!srcDepth) {
-            WarnOnce("blit depth: source has no depth texture yet (real RT lands in Task 8)");
+            WarnOnce("blit depth: source has no depth texture");
             return false;
         }
         ID3D12Resource* dstDepth = nullptr;
+        auto* dstRT = dst ? dynamic_cast<DXRenderTarget*>(dst.get()) : nullptr;
         if (dst && dst->depthTexture2D()) {
             auto* dstDepthTex = dynamic_cast<DXTexture2D*>(dst->depthTexture2D());
             dstDepth = dstDepthTex ? dstDepthTex->resource() : nullptr;
@@ -532,7 +649,7 @@ private:
             dstDepth = _swapchain->depthResource();
         }
         if (!dstDepth) {
-            WarnOnce("blit depth: destination has no depth target yet");
+            WarnOnce("blit depth: destination has no depth target");
             return false;
         }
         // CopyTextureRegion 要求两端同格式（或同 TYPELESS family）：归一化为
@@ -547,22 +664,16 @@ private:
             return false;
         }
 
-        // 窗口深度当前若作为 DSV 绑定在 OM 上，状态切换前先解绑 DSV（保留颜色 RTV）；
-        // GLBackend blit 后把 FBO 绑回默认帧缓冲 → 拷贝完成后恢复窗口 OM 绑定
-        const bool windowBound = _rtActive && !_renderTarget && !_omPending;
-        if (windowBound) {
-            const uint32_t idx = _swapchain ? _swapchain->currentIndex() : 0;
-            if (_swapchain && _swapchain->backBuffer(idx)) {
-                auto rtvHandle = _swapchain->rtv(idx);
-                _cmdList.ptr->OMSetRenderTargets(1, &rtvHandle, FALSE, nullptr);
-            }
-        }
+        UnbindAllOm();
+
+        const D3D12_RESOURCE_STATES srcBefore =
+            srcRT ? srcRT->currentDepthState() : D3D12_RESOURCE_STATE_DEPTH_WRITE;
+        const D3D12_RESOURCE_STATES dstBefore =
+            dstRT ? dstRT->currentDepthState() : D3D12_RESOURCE_STATE_DEPTH_WRITE;
 
         D3D12_RESOURCE_BARRIER toCopy[2] = {
-            MakeTransition(srcDepth, D3D12_RESOURCE_STATE_DEPTH_WRITE,
-                           D3D12_RESOURCE_STATE_COPY_SOURCE),
-            MakeTransition(dstDepth, D3D12_RESOURCE_STATE_DEPTH_WRITE,
-                           D3D12_RESOURCE_STATE_COPY_DEST),
+            MakeTransition(srcDepth, srcBefore, D3D12_RESOURCE_STATE_COPY_SOURCE),
+            MakeTransition(dstDepth, dstBefore, D3D12_RESOURCE_STATE_COPY_DEST),
         };
         _cmdList.ptr->ResourceBarrier(2, toCopy);
 
@@ -578,27 +689,36 @@ private:
         _cmdList.ptr->CopyTextureRegion(&dstLoc, 0, 0, 0, &srcLoc, nullptr);
 
         D3D12_RESOURCE_BARRIER toBack[2] = {
-            MakeTransition(srcDepth, D3D12_RESOURCE_STATE_COPY_SOURCE,
-                           D3D12_RESOURCE_STATE_DEPTH_WRITE),
-            MakeTransition(dstDepth, D3D12_RESOURCE_STATE_COPY_DEST,
-                           D3D12_RESOURCE_STATE_DEPTH_WRITE),
+            MakeTransition(srcDepth, D3D12_RESOURCE_STATE_COPY_SOURCE, srcBefore),
+            MakeTransition(dstDepth, D3D12_RESOURCE_STATE_COPY_DEST, dstBefore),
         };
         _cmdList.ptr->ResourceBarrier(2, toBack);
 
         // 对齐 GL 语义（blitFramebuffer 结尾 glBindFramebuffer(GL_FRAMEBUFFER, 0)）：
         // 深度拷入窗口后恢复窗口 OM 绑定（不清屏），后续 draw 直接可用
-        if (!dst && windowBound) activateWindowTargets(false);
+        if (!dst && _swapchain && _swapchain->initialized()) {
+            activateWindowTargets(false);
+            _omPending = false;
+        }
         return true;
     }
 
-    // 颜色路径：全屏三角形把 src 颜色附件采样绘制到 dst 颜色附件（正高度视口，
-    // 恒等方向对齐 VK vkCmdBlitImage 行为）
+    // 颜色路径：MSAA src 走 ResolveSubresource（Msaa 样例 resolve）；否则全屏
+    // 三角形把 src 颜色附件采样绘制到 dst 颜色附件（正高度视口，恒等方向对齐
+    // VK vkCmdBlitImage 行为）
     void DoBlitColor(const std::shared_ptr<IRenderTarget>& src,
                      const std::shared_ptr<IRenderTarget>& dst) {
         auto* srcTex = dynamic_cast<DXTexture2D*>(src->colorTexture2D(0));
         auto* dstTex = dynamic_cast<DXTexture2D*>(dst->colorTexture2D(0));
         if (!srcTex || !dstTex || !srcTex->valid() || !dstTex->valid()) {
-            WarnOnce("blit color: RT attachments unavailable until Task 8");
+            WarnOnce("blit color: RT attachments unavailable");
+            return;
+        }
+        // 契约：blit 时不得有活动离屏 OM 指向 src/dst——统一先解绑再操作
+        UnbindAllOm();
+
+        if (srcTex->isMsaa()) {
+            DoResolveColor(srcTex, dstTex);
             return;
         }
         if (!EnsureScratchHeaps()) return;
@@ -652,6 +772,34 @@ private:
         applyViewport();   // 主路径负高度视口恢复，防后续 draw 沿用 blit 视口
     }
 
+    // MSAA resolve：src（RTV-only，DENY_SHADER_RESOURCE，常驻 RENDER_TARGET）经
+    // ResolveSubresource 写入 dst 颜色附件；两端格式必须一致
+    void DoResolveColor(DXTexture2D* srcTex, DXTexture2D* dstTex) {
+        ID3D12Resource* srcRes = srcTex->resource();
+        ID3D12Resource* dstRes = dstTex->resource();
+        const DXGI_FORMAT fmt = srcTex->storageFormat();
+        if (dstTex->storageFormat() != fmt) {
+            LOGW("[DX12] msaa resolve: format mismatch {} vs {} rejected",
+                 static_cast<int>(fmt), static_cast<int>(dstTex->storageFormat()));
+            return;
+        }
+        D3D12_RESOURCE_BARRIER bars[2] = {
+            MakeTransition(srcRes, D3D12_RESOURCE_STATE_RENDER_TARGET,
+                           D3D12_RESOURCE_STATE_RESOLVE_SOURCE),
+            MakeTransition(dstRes, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
+                           D3D12_RESOURCE_STATE_RESOLVE_DEST),
+        };
+        _cmdList.ptr->ResourceBarrier(2, bars);
+        _cmdList.ptr->ResolveSubresource(dstRes, 0, srcRes, 0, fmt);
+        D3D12_RESOURCE_BARRIER back[2] = {
+            MakeTransition(srcRes, D3D12_RESOURCE_STATE_RESOLVE_SOURCE,
+                           D3D12_RESOURCE_STATE_RENDER_TARGET),
+            MakeTransition(dstRes, D3D12_RESOURCE_STATE_RESOLVE_DEST,
+                           D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE),
+        };
+        _cmdList.ptr->ResourceBarrier(2, back);
+    }
+
     static D3D12_RESOURCE_BARRIER MakeTransition(ID3D12Resource* res,
                                                  D3D12_RESOURCE_STATES before,
                                                  D3D12_RESOURCE_STATES after) {
@@ -674,16 +822,42 @@ private:
         _rtActive = false;
     }
 
-    // pending RT 变更落地：null=窗口路径（屏障+OMSetRenderTargets+Clear）；
-    // 离屏 RT 为 Task 8 范围，命中时警告一次并回落窗口目标
+    // pending RT 变更落地：null=窗口路径；离屏 RT 走 MRT OMSetRenderTargets
+    // （CPU 句柄数组）+ 按目标清屏。BeginPass 幂等，重复切到同一目标同样重绑+清屏
+    // （对齐 VK 每次 RP 重开 loadOp=Clear 的语义）
     void flushOmTargets() {
         if (!_omPending || !_recording || !_cmdList.ptr) return;
         _omPending = false;
-        if (_renderTarget) {
-            WarnOnce("offscreen render targets land in Task 8; routing to window for now");
+        auto next = std::dynamic_pointer_cast<DXRenderTarget>(_renderTarget);
+        if (_renderTarget && (!next || !next->valid())) {
+            WarnOnce("offscreen render target invalid; routing to window");
+            next = nullptr;
             _renderTarget = nullptr;
         }
-        activateWindowTargets(true);
+        if (!next) {
+            if (_activeOffscreen) {
+                _activeOffscreen->EndPass(_cmdList.ptr);   // 旧目标回常驻可采样态
+                _activeOffscreen.reset();
+            }
+            activateWindowTargets(true);
+            return;
+        }
+        // 同一目标重复激活也走完整 EndPass→BeginPass 往返：attachCubeFace 逐面
+        // 挂接时旧面子资源须先回常驻态，新面才能安全转 RENDER_TARGET/DEPTH_WRITE
+        if (_activeOffscreen) {
+            _activeOffscreen->EndPass(_cmdList.ptr);
+        }
+        _activeOffscreen = next;
+        next->BeginPass(_cmdList.ptr);
+        std::vector<D3D12_CPU_DESCRIPTOR_HANDLE> rtvs;
+        D3D12_CPU_DESCRIPTOR_HANDLE dsv{};
+        bool hasDsv = false;
+        next->GetOmTargets(rtvs, dsv, hasDsv);
+        _cmdList.ptr->OMSetRenderTargets(static_cast<UINT>(rtvs.size()),
+                                         rtvs.empty() ? nullptr : rtvs.data(), FALSE,
+                                         hasDsv ? &dsv : nullptr);
+        next->ClearAll(_cmdList.ptr, clearColorFor(next.get()));
+        applyViewport();
     }
 
     // 窗口目标激活：PRESENT→RENDER_TARGET 屏障（每帧一次，flip 模型要求呈现前
@@ -725,19 +899,32 @@ private:
                                         : std::array<float, 4>{0.0f, 0.0f, 0.0f, 1.0f};
     }
 
-    // GL 投影矩阵 y-up 而 D3D12 NDC y-down：负高度 viewport 翻转显示（同 VK 方案），
-    // MinDepth/MaxDepth=[0,1] 顺带把 GL z∈[-1,1] 线性映射进 D3D12 深度域
+    // GL 投影矩阵 y-up 而 D3D12 NDC y-down：窗口路径负高度 viewport 翻转显示
+    // （同 VK 方案），MinDepth/MaxDepth=[0,1] 顺带把 GL z∈[-1,1] 线性映射进深度域；
+    // 离屏 RT 用正高度视口：RT 行 0=场景底部对齐 GL framebuffer 语义，否则后处理
+    // quad 采样上下颠倒、深度采样与 light-space NDC 错位、cubemap 捕获方向翻转
+    // （同 VK applyViewport 的 offscreen 分支）
     void applyViewport() {
-        if (!_cmdList.ptr || !_swapchain) return;
+        if (!_cmdList.ptr) return;
+        int fbW = _swapchain ? _swapchain->width() : 0;
+        int fbH = _swapchain ? _swapchain->height() : 0;
+        const bool offscreen = _activeOffscreen != nullptr;
+        if (offscreen) {
+            int rw = 0, rh = 0;
+            _activeOffscreen->renderDims(rw, rh);
+            if (rw > 0) fbW = rw;
+            if (rh > 0) fbH = rh;
+        }
         const float x = _viewportSet ? static_cast<float>(_viewport.x) : 0.0f;
         const float y = _viewportSet ? static_cast<float>(_viewport.y) : 0.0f;
         const float w = (_viewportSet && _viewport.width > 0)
                             ? static_cast<float>(_viewport.width)
-                            : static_cast<float>(_swapchain->width());
+                            : static_cast<float>(fbW);
         const float h = (_viewportSet && _viewport.height > 0)
                             ? static_cast<float>(_viewport.height)
-                            : static_cast<float>(_swapchain->height());
-        D3D12_VIEWPORT vp{x, y + h, w, -h, 0.0f, 1.0f};
+                            : static_cast<float>(fbH);
+        D3D12_VIEWPORT vp = offscreen ? D3D12_VIEWPORT{x, y, w, h, 0.0f, 1.0f}
+                                      : D3D12_VIEWPORT{x, y + h, w, -h, 0.0f, 1.0f};
         D3D12_RECT scissor{static_cast<LONG>(x), static_cast<LONG>(y),
                            static_cast<LONG>(x + w), static_cast<LONG>(y + h)};
         _cmdList.ptr->RSSetViewports(1, &vp);
@@ -776,6 +963,13 @@ private:
     ComPtr<ID3D12DescriptorHeap> _srvHeap;
     UINT _srvDescSize{0};
     std::set<unsigned> _boundUnits{};                // resetRenderState 时置空防悬垂描述符
+    // 动态采样器堆（Task 8 borderColor）：ClampToBorder 组合按槽位 2/5/8 动态写入，
+    // 预填 OPAQUE_WHITE 与旧"静态表全白边框"行为一致；_heapSamplerColors 记录
+    // 槽位→已写边框色避免重复写（同一 draw 内同组合异色多纹理为已知限制）
+    static constexpr unsigned kSamplerHeapSlots = 16;
+    ComPtr<ID3D12DescriptorHeap> _samplerHeap;
+    UINT _samplerDescSize{0};
+    std::map<UINT, std::array<float, 4>> _heapSamplerColors{};
     // 内部 blit（mip 降采样 + RT↔RT 颜色拷贝）：专用根签名 + 按目标格式缓存的 PSO
     ComPtr<ID3D12RootSignature> _blitRootSig;
     std::map<DXGI_FORMAT, ComPtr<ID3D12PipelineState>> _blitPsos{};
@@ -793,6 +987,8 @@ private:
     bool _rtActive{false};        // 当前 OM 目标已激活（endFrame 显式清零）
     bool _omPending{false};       // RT 变更待落地（OMSetRenderTargets+Clear）
     bool _backBufferBound{false}; // 当前 backbuffer 已转 RENDER_TARGET（防重复屏障）
+    // 当前已激活的离屏目标（BeginPass/EndPass 状态机归属；blit 前置解绑用）
+    std::shared_ptr<DXRenderTarget> _activeOffscreen{};
 
     // 渲染状态
     std::shared_ptr<IPipeline> _pipeline{};
@@ -832,6 +1028,20 @@ bool DXRenderer::init(const std::shared_ptr<ISurface>& surface) {
     if (!_srvHeap.ptr) return false;
     _srvDescSize = _device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
+    // 动态采样器堆（borderColor）：预填 border 槽位后行为与旧静态表一致
+    D3D12_DESCRIPTOR_HEAP_DESC smd{};
+    smd.Type = D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER;
+    smd.NumDescriptors = kSamplerHeapSlots;
+    smd.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+    DX_CHECK(_device->CreateDescriptorHeap(&smd, IID_PPV_ARGS(&_samplerHeap)), "create sampler heap");
+    if (_samplerHeap.ptr) {
+        _samplerDescSize =
+            _device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER);
+        PrefillBorderSamplers();
+    } else {
+        LOGW("[DX12] sampler heap unavailable; ClampToBorder borderColor falls back to white");
+    }
+
     // 帧录制资源。CreateCommandList 返回即处于录制态，须先 Close 才能走统一的 Reset 流程
     DX_CHECK(_device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT,
                                              IID_PPV_ARGS(&_frameAllocator)),
@@ -869,6 +1079,8 @@ void DXRenderer::shutdown() {
     if (_blitRootSig.Get()) { _blitRootSig->Release(); _blitRootSig.ptr = nullptr; }
     if (_scratchRtvHeap.Get()) { _scratchRtvHeap->Release(); _scratchRtvHeap.ptr = nullptr; }
     if (_scratchSrvHeap.Get()) { _scratchSrvHeap->Release(); _scratchSrvHeap.ptr = nullptr; }
+    if (_samplerHeap.Get()) { _samplerHeap->Release(); _samplerHeap.ptr = nullptr; }
+    _heapSamplerColors.clear();
     if (_srvHeap.Get()) { _srvHeap->Release(); _srvHeap.ptr = nullptr; }
     _boundUnits.clear();
     if (_rootSignature.Get()) { _rootSignature->Release(); _rootSignature.ptr = nullptr; }
@@ -914,31 +1126,52 @@ bool DXRenderer::present() {
 }
 
 bool DXRenderer::prepareDraw(bool needsIndex) {
-    if (!_device.ptr || !_recording || !_cmdList.ptr) return false;
+    if (!_device.ptr) return false;
+    // 懒启动录制（同 VK ensureRecording）：IBL renderBeforeLoop 等帧外预计算
+    // 先于首个 beginFrame 执行，无此则离屏捕获命令被静默丢弃（5046bc4 教训）
+    ensureRecording();
+    if (!_recording || !_cmdList.ptr) return false;
     auto dxp = std::dynamic_pointer_cast<DXPipeline>(_pipeline);
     if (!dxp) return false;
     flushOmTargets();
 
-    // PSO 取用：key 含当前 RT 格式布局/采样数（Task 6 仅窗口路径）
+    // PSO 取用：key 含当前 RT 的格式布局/采样数（MRT GBuffer 组、深度-only pass、
+    // MSAA 各自成键；窗口路径沿用 swapchain 格式）
     PSOKey key{};
     key.stateHash = dxp->stateHash();
-    key.colorCount = 1;
-    key.color[0] = _swapchain ? _swapchain->colorFormat() : DXGI_FORMAT_R8G8B8A8_UNORM;
-    key.depth = DXGI_FORMAT_D24_UNORM_S8_UINT;
-    key.samples = 1;
+    if (_activeOffscreen) {
+        key.colorCount = _activeOffscreen->colorCount();
+        for (uint32_t i = 0; i < key.colorCount && i < 8; ++i) {
+            key.color[i] = _activeOffscreen->colorFormat(i);
+        }
+        key.depth = _activeOffscreen->depthFormat();
+        key.samples = _activeOffscreen->sampleCount();
+    } else {
+        key.colorCount = 1;
+        key.color[0] = _swapchain ? _swapchain->colorFormat() : DXGI_FORMAT_R8G8B8A8_UNORM;
+        key.depth = DXGI_FORMAT_D24_UNORM_S8_UINT;
+        key.samples = 1;
+    }
     ID3D12PipelineState* pso = dxp->pipelineFor(key);
     if (!pso) return false;
 
     _cmdList.ptr->SetGraphicsRootSignature(_rootSignature.ptr);
     _cmdList.ptr->SetPipelineState(pso);
-    // SRV 描述符堆 + 根表（param1，t0..t127 ↔ 堆槽 0..127）：静态采样器已烘焙进
-    // 根签名随 SetGraphicsRootSignature 生效，无需每 draw 额外采样器绑定。
-    // 每次 draw 重设堆：mipgen/blit 可能中途切换过堆，此处自愈
-    if (_srvHeap.ptr) {
-        ID3D12DescriptorHeap* heaps[] = {_srvHeap.ptr};
-        _cmdList.ptr->SetDescriptorHeaps(1, heaps);
-        _cmdList.ptr->SetGraphicsRootDescriptorTable(
-            1, _srvHeap->GetGPUDescriptorHandleForHeapStart());
+    // SRV 描述符堆 + 根表（param1，t0..t127 ↔ 堆槽 0..127）。border 寄存器
+    // s2/s5/s8 不在静态表内、由采样器堆提供 → 两堆同绑；静态采样器随根签名
+    // 生效不受 SetDescriptorHeaps 影响。每次 draw 重设堆：mipgen/blit 可能中途
+    // 切换过堆，此处自愈。
+    // （注：blit/mipgen 专用 PSO 走 blit 根签名+自有静态 s0，与本处无关。）
+    ID3D12DescriptorHeap* heaps[2] = {};
+    UINT heapCount = 0;
+    if (_srvHeap.ptr) heaps[heapCount++] = _srvHeap.ptr;
+    if (_samplerHeap.ptr) heaps[heapCount++] = _samplerHeap.ptr;
+    if (heapCount > 0) {
+        _cmdList.ptr->SetDescriptorHeaps(heapCount, heaps);
+        if (_srvHeap.ptr) {
+            _cmdList.ptr->SetGraphicsRootDescriptorTable(
+                1, _srvHeap->GetGPUDescriptorHandleForHeapStart());
+        }
     }
 
     // param0 根 CBV：直挂当前 UBO ring 槽 GPU VA。App 在 draw 前调 update() 推进

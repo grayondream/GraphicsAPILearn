@@ -24,10 +24,15 @@ struct PSOKeyHash {
     size_t operator()(const PSOKey& k) const;
 };
 
-// TextureFilter(3) × TextureWrap(3) 全组合 → 静态采样器槽位（0..8）
+// TextureFilter(3) × TextureWrap(3) 全组合 → 采样器槽位（0..8）
 int SamplerSlot(TextureFilter filter, TextureWrap wrap);
-// 静态采样器表与条目数（挂在 root signature 尾部；borderColor 动态需求留 Task 8）
+// 静态采样器表与条目数（挂在 root signature 尾部）。ClampToBorder 组合不在静态表：
+// 静态采样器只有黑/白边框色，任意 borderColor 由 DXRenderer 的动态 SAMPLER 堆
+// （槽位沿用 f*3+w 编号）在 bind 路径写入。
 const D3D12_STATIC_SAMPLER_DESC* StaticSamplers(size_t& count);
+// 动态采样器堆构建辅助（DXBackend 用）：filter/wrap → D3D12 描述
+D3D12_FILTER DxFilterOf(TextureFilter filter);
+D3D12_TEXTURE_ADDRESS_MODE DxAddressOf(TextureWrap wrap);
 // 全局单例 root signature：param0 = 根 CBV(b0, ALL)，param1 = 表 SRV t0..127(PIXEL)
 bool CreateSharedRootSignature(ID3D12Device* device, ComPtr<ID3D12RootSignature>& out);
 
