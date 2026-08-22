@@ -2,7 +2,7 @@
 // 纹理寄存器约定 t<unit+1>：bindTexture(_texture,0)→t1、bindTexture(_skyBoxTexture,1)→t2；
 // 槽位照抄：cameraPos=vec4Pool[1]、enableReflection=floatPool[36]、enableRefraction=floatPool[37]；
 // 折射率 1.00/1.52（玻璃）照抄。
-#include "../../../_uniform_block.hlsli"
+#include "../../_uniform_block.hlsli"
 
 Texture2D gTextureSampler : register(t1);
 TextureCube gSkyBoxSampler : register(t2);

@@ -1,7 +1,7 @@
 // 对应 res/GL/Advanced/FrameBuffer/Screen.frag：四效果分支（effectType=floatPool[15]）：
 // 原色/反相/灰度/锐化卷积核；textureSampler 由 bindTexture(screenFbo->colorTexture2D(0), 0)→t1。
 // GLSL 局部数组 offsets/kernel 改 static const（kernel 与函数同名做词法避让改 k）。
-#include "../../../_uniform_block.hlsli"
+#include "../../_uniform_block.hlsli"
 
 Texture2D gTextureSampler : register(t1);
 

@@ -1,6 +1,6 @@
 // 对应 res/GL/Advanced/Blend/Basic.frag：texColor（vec4Pool[6]）alpha<0.1 走贴图否则纯色。
 // textureSampler 由 bindTexture(…, 0) 绑定 → t1。
-#include "../../../_uniform_block.hlsli"
+#include "../../_uniform_block.hlsli"
 
 Texture2D gTextureSampler : register(t1);
 

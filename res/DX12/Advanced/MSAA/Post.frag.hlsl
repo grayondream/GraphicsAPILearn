@@ -1,6 +1,6 @@
 // 对应 res/GL/Advanced/MSAA/Post.fs：灰度后处理。
 // textureSampler 由 bindTexture(postFbo->colorTexture2D(0), 0) 绑定 → t1。
-#include "../../../_uniform_block.hlsli"
+#include "../../_uniform_block.hlsli"
 
 Texture2D gTextureSampler : register(t1);
 

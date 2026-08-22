@@ -1,5 +1,5 @@
 // 对应 res/GL/Advanced/TemplateTest/Border.vert（与 Basic.vert 同构：模板描边放大盒）。
-#include "../../../_uniform_block.hlsli"
+#include "../../_uniform_block.hlsli"
 
 struct VSIn {
     float4 pos : TEXCOORD0;

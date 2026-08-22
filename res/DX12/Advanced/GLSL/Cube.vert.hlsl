@@ -1,6 +1,6 @@
 // 对应 res/GL/Advanced/GLSL/Cube.vert：gl_VertexID→SV_VertexID（uint）。
 // gl_PointSize 为 GL 专有点精灵尺寸（D3D11+ 移除 VS 点尺寸概念），无法直译，省略。
-#include "../../../_uniform_block.hlsli"
+#include "../../_uniform_block.hlsli"
 
 struct VSIn {
     float4 pos : TEXCOORD0;

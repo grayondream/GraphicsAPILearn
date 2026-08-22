@@ -1,7 +1,7 @@
 // 对应 res/GL/Advanced/MSAA/Post.vs：MSAA resolve 后的全屏 quad，pos 直接作 clip 坐标。
 // layout 为 Rect 的 RhiGeometry::Create(_object, true, false, true)（默认 uv=2）：
 // binding0 交错 pos@TEXCOORD0 + color@TEXCOORD1（stride 32）、uv@TEXCOORD2（binding1）。
-#include "../../../_uniform_block.hlsli"
+#include "../../_uniform_block.hlsli"
 
 struct VSIn {
     float4 pos : TEXCOORD0;

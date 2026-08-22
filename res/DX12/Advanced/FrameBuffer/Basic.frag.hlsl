@@ -1,6 +1,6 @@
 // 对应 res/GL/Advanced/FrameBuffer/Basic.frag：场景内平面直接贴图。
 // textureSampler 由 bindTexture(…, 0) 绑定 → t1。
-#include "../../../_uniform_block.hlsli"
+#include "../../_uniform_block.hlsli"
 
 Texture2D gTextureSampler : register(t1);
 

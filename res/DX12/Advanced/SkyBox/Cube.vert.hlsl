@@ -2,7 +2,7 @@
 // layout 以 SkyboxApp 的 RhiGeometry::Create(_object, true, true, true, Layout{3, 2}) 为准：
 // binding0 交错 pos@TEXCOORD0 + color@TEXCOORD1（stride 32）、normal@TEXCOORD2（binding2）、
 // uv@TEXCOORD3（binding1）。
-#include "../../../_uniform_block.hlsli"
+#include "../../_uniform_block.hlsli"
 
 struct VSIn {
     float4 pos : TEXCOORD0;

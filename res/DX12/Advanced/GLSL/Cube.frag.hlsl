@@ -1,6 +1,6 @@
 // 对应 res/GL/Advanced/GLSL/Cube.frag：gl_FragCoord→SV_Position.xy、gl_FrontFacing→
 // SV_IsFrontFace；textureSampler 死纹理（主路径未采样，源码注释行）未搬运。
-#include "../../../_uniform_block.hlsli"
+#include "../../_uniform_block.hlsli"
 
 struct PSIn {
     float4 sv : SV_Position;

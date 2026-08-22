@@ -1,6 +1,6 @@
 // 对应 res/GL/Advanced/DepthTest/Basic.frag：深度可视化（LinearizeDepth(gl_FragCoord.z)），
 // gl_FragCoord.z → SV_Position.z（NDC 深度）；near=0.1/far=100 为 GLSL 全局常量直译。
-#include "../../../_uniform_block.hlsli"
+#include "../../_uniform_block.hlsli"
 
 struct PSIn {
     float4 sv : SV_Position;
