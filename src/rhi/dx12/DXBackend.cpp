@@ -1,5 +1,6 @@
 #include "rhi/dx12/DXBackend.hpp"
 #include "rhi/dx12/DXBuffer.hpp"
+#include "rhi/dx12/DXPipeline.hpp"
 #include "rhi/core/ISurface.hpp"
 #include "rhi/core/IShader.hpp"
 #include "rhi/core/IPipeline.hpp"
@@ -123,7 +124,14 @@ public:
     void shutdown() override;
 
     std::shared_ptr<IShader> createShader() override { return std::make_shared<DXNullShader>(); }
-    std::shared_ptr<IPipeline> createPipeline(const VertexLayout&, const std::shared_ptr<IShader>&) override { return std::make_shared<DXNullPipeline>(); }
+    std::shared_ptr<IPipeline> createPipeline(const VertexLayout& layout, const std::shared_ptr<IShader>& shader) override {
+        auto dxShader = std::dynamic_pointer_cast<DXShader>(shader);
+        if (!_device.ptr || !_rootSignature.ptr || !dxShader || !dxShader->valid()) {
+            LOGE("[DX12] createPipeline: device/root signature/shader not ready, null fallback");
+            return std::make_shared<DXNullPipeline>();
+        }
+        return std::make_shared<DXPipeline>(_device.ptr, _rootSignature.ptr, layout, dxShader);
+    }
     std::shared_ptr<IBuffer> createBuffer() override {
         if (!_device.ptr) { LOGE("[DX12] createBuffer before init"); return std::make_shared<DXNullBuffer>(); }
         return std::make_shared<DXBuffer>(_device.ptr, _queue.ptr, _uploadAllocator.ptr, _frameFence.ptr, _fenceEvent);
@@ -167,6 +175,8 @@ private:
     HANDLE _fenceEvent{nullptr};
     // 缓冲初始化数据的一次性拷贝命令与 VB/IB 上传共用此 direct allocator（串行使用，用后 Reset）
     ComPtr<ID3D12CommandAllocator> _uploadAllocator;
+    // 全局单例 root signature（所有 DXPipeline 共享），生命周期与 device 一致
+    ComPtr<ID3D12RootSignature> _rootSignature;
 };
 
 bool DXRenderer::init(const std::shared_ptr<ISurface>& surface) {
@@ -183,6 +193,7 @@ bool DXRenderer::init(const std::shared_ptr<ISurface>& surface) {
     _fenceEvent = CreateEventW(nullptr, FALSE, FALSE, nullptr);
     DX_CHECK(_device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&_uploadAllocator)),
              "create upload allocator");
+    if (!CreateSharedRootSignature(_device.ptr, &_rootSignature)) return false;
     LOGI("[DX12] device ready");
     return true;
 }
@@ -190,6 +201,7 @@ bool DXRenderer::init(const std::shared_ptr<ISurface>& surface) {
 void DXRenderer::shutdown() {
     if (_fenceEvent) { CloseHandle(_fenceEvent); _fenceEvent = nullptr; }
     if (_uploadAllocator.Get()) { _uploadAllocator->Release(); _uploadAllocator.ptr = nullptr; }
+    if (_rootSignature.Get()) { _rootSignature->Release(); _rootSignature.ptr = nullptr; }
     if (_frameFence.Get()) { _frameFence->Release(); _frameFence.ptr = nullptr; }
     if (_queue.Get()) { _queue->Release(); _queue.ptr = nullptr; }
     if (_device.Get()) { _device->Release(); _device.ptr = nullptr; }
