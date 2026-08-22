@@ -1,0 +1,20 @@
+// 静态采样器别名表（root signature 静态采样器槽位 = f*3+w，见 DXPipeline::StaticSamplers）：
+//   filter: Linear=0 / Nearest=1 / LinearMipLinear=2
+//   wrap:   Repeat=0 / ClampToEdge=1 / ClampToBorder=2（borderColor 统一 OPAQUE_WHITE）
+// D3D12 静态采样器无法在 shader 内动态索引 → 各 shader 按纹理实际的 filter/wrap
+// 在此取对应别名（编译期固定寄存器，绑定随根签名一次生效，无需每 draw 动作）。
+// gSamplerDefault(s6) = LinearMipLinear+Repeat，即 RhiImage::Load2D 的默认组合。
+#ifndef DX_SAMPLERS_HLSLI
+#define DX_SAMPLERS_HLSLI
+
+SamplerState gSamplerLinearRepeat  : register(s0); // f=0 w=0
+SamplerState gSamplerLinearClamp   : register(s1); // f=0 w=1
+SamplerState gSamplerLinearBorder  : register(s2); // f=0 w=2
+SamplerState gSamplerNearestRepeat : register(s3); // f=1 w=0
+SamplerState gSamplerNearestClamp  : register(s4); // f=1 w=1
+SamplerState gSamplerNearestBorder : register(s5); // f=1 w=2
+SamplerState gSamplerDefault       : register(s6); // f=2 w=0（Load2D 默认）
+SamplerState gSamplerMipLinearClamp  : register(s7); // f=2 w=1
+SamplerState gSamplerMipLinearBorder : register(s8); // f=2 w=2
+
+#endif

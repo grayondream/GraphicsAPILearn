@@ -39,4 +39,7 @@ cbuffer UniformBlock : register(b0) {
 // floatPool 槽访问：槽 i 的字节偏移 = 3264 + 4*i
 #define FPOOL(i) gFloatPool[(i) >> 2][(i) & 3]
 
+// 静态采样器别名（槽位=f*3+w，注释见 _samplers.hlsli）随本模板一并可用
+#include "_samplers.hlsli"
+
 #endif

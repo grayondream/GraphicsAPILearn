@@ -36,6 +36,8 @@ public:
     D3D12_CPU_DESCRIPTOR_HANDLE rtv(uint32_t index);
     D3D12_CPU_DESCRIPTOR_HANDLE dsv();
     ID3D12Resource* backBuffer(uint32_t index);
+    // 窗口深度资源（blitFramebuffer 深度路径 dst=nullptr 时的拷贝目标）
+    ID3D12Resource* depthResource() { return _depth.Get(); }
 
     // GPU 空闲等待：fence GetCompletedValue()+1 单调推进并阻塞至完成
     // （ResizeBuffers 前必须调用，确保无在途命令引用 backbuffer）

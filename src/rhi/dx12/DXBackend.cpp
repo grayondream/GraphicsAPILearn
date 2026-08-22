@@ -3,6 +3,7 @@
 #include "rhi/dx12/DXPipeline.hpp"
 #include "rhi/dx12/DXShader.hpp"
 #include "rhi/dx12/DXSwapchain.hpp"
+#include "rhi/dx12/DXTexture2D.hpp"
 #include "rhi/core/ISurface.hpp"
 #include "rhi/core/IShader.hpp"
 #include "rhi/core/IPipeline.hpp"
@@ -13,14 +14,23 @@
 #include "rhi/core/ISwapchain.hpp"
 
 #include <array>
+#include <cstring>
+#include <filesystem>
+#include <fstream>
+#include <iterator>
 #include <map>
+#include <set>
+
+#ifndef RESOURCE_DIR
+#define RESOURCE_DIR "res"
+#endif
 
 namespace rhi {
 
 namespace {
 
-// 纹理/离屏 RT 工厂暂返回 no-op 对象而非 nullptr：其 create()==false 使样例在
-// 加载期经 ExitIfFailed 干净退出，避免空指针解引用段错误。Task 7/8 以同名真实类替换。
+// 离屏 RT 工厂暂返回 no-op 对象而非 nullptr：其 create()==false 使样例在
+// 加载期经 ExitIfFailed 干净退出，避免空指针解引用段错误。Task 8 以同名真实类替换。
 
 class DXNullPipeline : public IPipeline {
 public:
@@ -105,7 +115,7 @@ public:
     void release() override {}
 };
 
-// 只警告一次的桩实现提示（纹理/blit 属 Task 7/8 范围）
+// 只警告一次的桩实现提示（ITexture3D 绑定属 Task 8 范围）
 void WarnOnce(const char* message) {
     struct Flag { bool done{false}; };
     static std::map<const char*, Flag> warned;
@@ -113,6 +123,88 @@ void WarnOnce(const char* message) {
     if (!f.done) {
         f.done = true;
         LOGW("[DX12] {}", message);
+    }
+}
+
+// 读入 dxc 产物（DXShader::FindCso 同一查找约定）为 DXIL blob
+ComPtr<ID3DBlob> LoadBlobFromCso(const std::string& sourcePath, ShaderStage::Type type) {
+    namespace fs = std::filesystem;
+    const std::string cso = DXShader::FindCso(sourcePath, type);
+    std::ifstream f(cso, std::ios::binary);
+    if (!f) return {};
+    std::vector<uint8_t> bytes((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
+    if (bytes.empty() || bytes.size() % 4 != 0) return {};   // DXIL 容器按 32 位字组织
+    ComPtr<ID3DBlob> blob;
+    if (FAILED(D3DCreateBlob(bytes.size(), &blob)) || !blob.Get()) return {};
+    std::memcpy(blob->GetBufferPointer(), bytes.data(), bytes.size());
+    return blob;
+}
+
+// 内部 blit 专用 root signature：param0 = SRV 表 t0（PIXEL），静态采样器 s0 = Linear+Clamp。
+// 独立于共享根签名（App 侧 t<unit+1>/s0..s8），供 mipmap 降采样与 RT↔RT 颜色 blit 复用
+bool CreateBlitRootSignature(ID3D12Device* device, ComPtr<ID3D12RootSignature>& out) {
+    D3D12_ROOT_PARAMETER param{};
+    param.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+    param.DescriptorTable.NumDescriptorRanges = 1;
+    D3D12_DESCRIPTOR_RANGE range{};
+    range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+    range.NumDescriptors = 1;
+    range.BaseShaderRegister = 0;
+    range.RegisterSpace = 0;
+    range.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+    param.DescriptorTable.pDescriptorRanges = &range;
+    param.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+
+    D3D12_STATIC_SAMPLER_DESC sampler{};
+    sampler.Filter = D3D12_FILTER_MIN_MAG_LINEAR_MIP_POINT;
+    sampler.AddressU = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+    sampler.AddressV = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+    sampler.AddressW = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+    sampler.MipLODBias = 0;
+    sampler.MaxAnisotropy = 1;
+    sampler.ComparisonFunc = D3D12_COMPARISON_FUNC_NEVER;
+    sampler.BorderColor = D3D12_STATIC_BORDER_COLOR_OPAQUE_WHITE;
+    sampler.MinLOD = 0;
+    sampler.MaxLOD = D3D12_FLOAT32_MAX;
+    sampler.ShaderRegister = 0;
+    sampler.RegisterSpace = 0;
+    sampler.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+
+    D3D12_ROOT_SIGNATURE_DESC desc{};
+    desc.NumParameters = 1;
+    desc.pParameters = &param;
+    desc.NumStaticSamplers = 1;
+    desc.pStaticSamplers = &sampler;
+    desc.Flags = D3D12_ROOT_SIGNATURE_FLAG_NONE;
+
+    ComPtr<ID3DBlob> blob;
+    ComPtr<ID3DBlob> errBlob;
+    HRESULT hr = D3D12SerializeRootSignature(&desc, D3D_ROOT_SIGNATURE_VERSION_1_0, &blob, &errBlob);
+    if (FAILED(hr)) {
+        const char* msg = errBlob.Get() ? static_cast<const char*>(errBlob->GetBufferPointer()) : "";
+        LOGE("[DX12] serialize blit root signature failed hr=0x{:08X} {}", static_cast<uint32_t>(hr), msg);
+        return false;
+    }
+    DX_CHECK(device->CreateRootSignature(0, blob->GetBufferPointer(), blob->GetBufferSize(),
+                                         IID_PPV_ARGS(&out)),
+             "create blit root signature");
+    return out.Get() != nullptr;
+}
+
+namespace fs = std::filesystem;
+fs::path DxSourcePath(const char* rel) {
+    fs::path resRoot(RESOURCE_DIR);
+    if (resRoot.is_relative()) resRoot = fs::absolute(resRoot);
+    return resRoot / "DX12" / rel;
+}
+
+// 深度拷贝的 typed 格式（CopyTextureRegion 要求两端同格式；TYPELESS 资源给具体格式）
+DXGI_FORMAT DepthCopyFormat(DXGI_FORMAT resourceFormat) {
+    switch (resourceFormat) {
+        case DXGI_FORMAT_R32_TYPELESS:   return DXGI_FORMAT_R32_FLOAT;
+        case DXGI_FORMAT_R24G8_TYPELESS: return DXGI_FORMAT_R24_UNORM_X8_TYPELESS;
+        case DXGI_FORMAT_R16_TYPELESS:   return DXGI_FORMAT_R16_UNORM;
+        default:                         return resourceFormat;
     }
 }
 
@@ -131,6 +223,7 @@ D3D12_PRIMITIVE_TOPOLOGY ToDxTopology(PrimitiveType type) {
 class DXRenderer : public IRenderer {
 public:
     ~DXRenderer() override { shutdown(); }
+    DXRenderer() : _blitCtx(this) {}
 
     bool init(const std::shared_ptr<ISurface>& surface) override;
     void shutdown() override;
@@ -157,7 +250,17 @@ public:
         _uniformBuffer = buf;
         return buf;
     }
-    std::shared_ptr<ITexture2D> createTexture2D() override { return std::make_shared<DXNullTexture2D>(); }
+    std::shared_ptr<ITexture2D> createTexture2D() override {
+        if (!_device.ptr || !_srvHeap.ptr) {
+            LOGE("[DX12] createTexture2D before init, null fallback");
+            return std::make_shared<DXNullTexture2D>();
+        }
+        auto tex = std::make_shared<DXTexture2D>(_device.ptr, _queue.ptr,
+                                                 _uploadAllocator.ptr, _frameFence.ptr,
+                                                 _fenceEvent);
+        tex->setBlitContext(&_blitCtx);
+        return tex;
+    }
     std::shared_ptr<ITexture3D> createTexture3D() override { return std::make_shared<DXNullTexture3D>(); }
     std::shared_ptr<IRenderTarget> createRenderTarget() override { return std::make_shared<DXNullRenderTarget>(); }
     std::shared_ptr<ISwapchain> getSwapchain() override { return _swapchain; }
@@ -206,14 +309,14 @@ public:
         _rtActive = false;
         _omPending = true;
     }
-    void bindTexture(const std::shared_ptr<ITexture2D>&, unsigned int) override {
-        WarnOnce("bindTexture(ITexture2D) is a stub until Task 7 (SRV heap)");
+    void bindTexture(const std::shared_ptr<ITexture2D>& texture, unsigned int unit) override {
+        BindTexture2D(texture.get(), unit);
     }
     void bindTexture(const std::shared_ptr<ITexture3D>&, unsigned int) override {
         WarnOnce("bindTexture(ITexture3D) is a stub until Task 8 (cubemap)");
     }
-    void bindTexture(rhi::ITexture2D*, unsigned int) override {
-        WarnOnce("bindTexture(raw ITexture2D*) is a stub until Task 7 (SRV heap)");
+    void bindTexture(rhi::ITexture2D* texture, unsigned int unit) override {
+        BindTexture2D(texture, unit);
     }
     void draw(uint32_t vertexCount, uint32_t firstVertex) override {
         if (!prepareDraw(false)) return;
@@ -232,9 +335,21 @@ public:
         if (!prepareDraw(false)) return;
         _cmdList.ptr->DrawInstanced(vertexCount, instanceCount, firstVertex, 0);
     }
-    void blitFramebuffer(const std::shared_ptr<IRenderTarget>&,
-                         const std::shared_ptr<IRenderTarget>&, BlitMask) override {
-        WarnOnce("blitFramebuffer is a stub until Task 7/8 (blit PSO / MSAA resolve)");
+    // BlitMask 语义对照 VKRenderer::blitFramebuffer：
+    // - Depth+dst==nullptr：src 离屏深度 CopyTextureRegion 拷入窗口深度（Defer lightbox）；
+    // - Depth+dst!=nullptr：离屏 RT→RT 深度拷贝；
+    // - Color：仅 dst!=nullptr 时执行 RT→RT 全屏三角形 blit（VK 不做 color→swapchain，
+    //   对齐其行为）；MSAA src 的 resolve 场景由 Task 8 的 resolve 附件承担。
+    // 资源经 IRenderTarget 接口取（colorTexture2D(0)/depthTexture2D()->handle() 返回
+    // ID3D12Resource*，Task 8 的 DXRenderTarget 按此契约实现）；Task 7 期真实 RT 缺位
+    // 时命中 WarnOnce 早退。
+    void blitFramebuffer(const std::shared_ptr<IRenderTarget>& src,
+                         const std::shared_ptr<IRenderTarget>& dst, BlitMask mask) override {
+        if (!src || !_recording || !_cmdList.ptr) return;
+        const bool doColor = (static_cast<uint8_t>(mask) & static_cast<uint8_t>(BlitMask::Color)) != 0;
+        const bool doDepth = (static_cast<uint8_t>(mask) & static_cast<uint8_t>(BlitMask::Depth)) != 0;
+        if (doDepth && !DoBlitDepth(src, dst)) return;
+        if (doColor && dst) DoBlitColor(src, dst);
     }
     BackendCapabilities backendCapabilities() override {
         BackendCapabilities caps{};
@@ -272,6 +387,22 @@ public:
         _backBufferBound = false;
         _viewportSet = false;
         _viewport = {};
+        // 上一样例写过的 SRV 槽全部置空描述符：旧样例纹理已销毁，
+        // 悬垂 SRV 被新样例 draw 读到是未定义行为（对齐 VK 描述符集重建教训）
+        if (_device.ptr && _srvHeap.ptr) {
+            D3D12_SHADER_RESOURCE_VIEW_DESC nullSrv{};
+            nullSrv.Format = DXGI_FORMAT_R8_UNORM;
+            nullSrv.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+            nullSrv.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+            nullSrv.Texture2D.MostDetailedMip = 0;
+            nullSrv.Texture2D.MipLevels = 1;
+            for (unsigned unit : _boundUnits) {
+                D3D12_CPU_DESCRIPTOR_HANDLE dst{_srvHeap->GetCPUDescriptorHandleForHeapStart()};
+                dst.ptr += (unit + 1) * static_cast<SIZE_T>(_srvDescSize);
+                _device->CreateShaderResourceView(nullptr, &nullSrv, dst);
+            }
+        }
+        _boundUnits.clear();
     }
     void waitIdle() override { waitForGpuIdle(); }
     void flush() override {
@@ -292,11 +423,247 @@ public:
     bool imguiInitInfo(DXImGuiInitInfo& out) {
         out.device = _device.ptr;
         out.queue = _queue.ptr;
-        out.srvHeap = nullptr;
+        out.srvHeap = _srvHeap.ptr;   // Task 7：共享 SRV 堆（ImGui 字体纹理用槽 0）
         return _device.ptr && _queue.ptr;
     }
 
 private:
+    // ---- 内部 blit 能力（IDXBlitContext 实现，注入 DXTexture2D 做 mip 降采样）----
+    // 嵌套类天然可访问外层私有成员；生命周期与 Renderer 一致
+    class FrameBlitContext : public IDXBlitContext {
+    public:
+        explicit FrameBlitContext(DXRenderer* owner) : _owner(owner) {}
+        ID3D12RootSignature* BlitRootSignature() override {
+            return _owner->_blitRootSig.Get();
+        }
+        ID3D12PipelineState* BlitPsoFor(DXGI_FORMAT rtvFormat) override {
+            return _owner->EnsureBlitPso(rtvFormat);
+        }
+    private:
+        DXRenderer* _owner{nullptr};
+    };
+
+    // bindTexture 公共实现：SRV 写入共享 shader-visible 堆槽 unit+1
+    // （槽 0 预留 ImGui，寄存器映射 t<slot>，与根签名 param1 表 t0..t127 一致）
+    void BindTexture2D(rhi::ITexture2D* texture, unsigned int unit) {
+        if (!texture || !_srvHeap.ptr) return;
+        if (unit + 1 >= kSrvHeapSlots) {
+            WarnOnce("bindTexture unit out of SRV heap range; ignored");
+            return;
+        }
+        auto* dx = dynamic_cast<DXTexture2D*>(texture);
+        if (!dx || !dx->valid()) return;
+        if (dx->isMsaa()) {
+            WarnOnce("bindTexture: MSAA textures are RTV-only; sampling requires resolve (Task 8)");
+            return;
+        }
+        D3D12_SHADER_RESOURCE_VIEW_DESC sd{};
+        sd.Format = dx->srvFormat();
+        sd.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+        sd.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+        sd.Texture2D.MostDetailedMip = 0;
+        sd.Texture2D.MipLevels = dx->mipLevels();
+        D3D12_CPU_DESCRIPTOR_HANDLE dst{_srvHeap->GetCPUDescriptorHandleForHeapStart()};
+        dst.ptr += (unit + 1) * static_cast<SIZE_T>(_srvDescSize);
+        _device->CreateShaderResourceView(dx->resource(), &sd, dst);
+        _boundUnits.insert(unit);
+    }
+
+    // blit PSO 缓存（键=目标 RTV 格式）：全屏三角形、无深度、无混合、无输入布局
+    ID3D12PipelineState* EnsureBlitPso(DXGI_FORMAT rtvFormat) {
+        auto it = _blitPsos.find(rtvFormat);
+        if (it != _blitPsos.end()) return it->second.Get();
+        ComPtr<ID3DBlob> vs = LoadBlobFromCso(
+            DxSourcePath("_internal/blit.vert.hlsl").string(), ShaderStage::Vertex);
+        ComPtr<ID3DBlob> ps = LoadBlobFromCso(
+            DxSourcePath("_internal/blit.frag.hlsl").string(), ShaderStage::Fragment);
+        if (!vs.Get() || !ps.Get()) {
+            LOGE("[DX12] blit shaders not found under build/res/DX12/_internal");
+            return nullptr;
+        }
+        D3D12_GRAPHICS_PIPELINE_STATE_DESC desc{};
+        desc.pRootSignature = _blitRootSig.ptr;
+        desc.VS = {vs->GetBufferPointer(), vs->GetBufferSize()};
+        desc.PS = {ps->GetBufferPointer(), ps->GetBufferSize()};
+        desc.SampleMask = UINT_MAX;
+        // 其余状态零初始化即所需：Fill+无剔除、DepthEnable=FALSE、Blend 关闭
+        desc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+        desc.NumRenderTargets = 1;
+        desc.RTVFormats[0] = rtvFormat;
+        desc.SampleDesc.Count = 1;
+        ComPtr<ID3D12PipelineState> pso;
+        DX_CHECK(_device->CreateGraphicsPipelineState(&desc, IID_PPV_ARGS(&pso)),
+                 "create blit pipeline state");
+        if (!pso.Get()) return nullptr;
+        return _blitPsos.emplace(rtvFormat, std::move(pso)).first->second.Get();
+    }
+
+    // 懒建单槽暂存堆：颜色 blit 的临时 SRV（shader-visible）与 RTV
+    bool EnsureScratchHeaps() {
+        if (_scratchSrvHeap.ptr && _scratchRtvHeap.ptr) return true;
+        D3D12_DESCRIPTOR_HEAP_DESC shd{};
+        shd.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+        shd.NumDescriptors = 1;
+        shd.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+        DX_CHECK(_device->CreateDescriptorHeap(&shd, IID_PPV_ARGS(&_scratchSrvHeap)),
+                 "create blit scratch srv heap");
+        D3D12_DESCRIPTOR_HEAP_DESC rhd{};
+        rhd.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
+        rhd.NumDescriptors = 1;
+        DX_CHECK(_device->CreateDescriptorHeap(&rhd, IID_PPV_ARGS(&_scratchRtvHeap)),
+                 "create blit scratch rtv heap");
+        return _scratchSrvHeap.ptr && _scratchRtvHeap.ptr;
+    }
+
+    // 深度路径：src 深度 CopyTextureRegion 到 dst RT 或窗口深度（dst==nullptr）
+    bool DoBlitDepth(const std::shared_ptr<IRenderTarget>& src,
+                     const std::shared_ptr<IRenderTarget>& dst) {
+        auto* srcDepthTex = dynamic_cast<DXTexture2D*>(src->depthTexture2D());
+        ID3D12Resource* srcDepth = srcDepthTex ? srcDepthTex->resource() : nullptr;
+        if (!srcDepth) {
+            WarnOnce("blit depth: source has no depth texture yet (real RT lands in Task 8)");
+            return false;
+        }
+        ID3D12Resource* dstDepth = nullptr;
+        if (dst && dst->depthTexture2D()) {
+            auto* dstDepthTex = dynamic_cast<DXTexture2D*>(dst->depthTexture2D());
+            dstDepth = dstDepthTex ? dstDepthTex->resource() : nullptr;
+        } else if (!dst && _swapchain) {
+            dstDepth = _swapchain->depthResource();
+        }
+        if (!dstDepth) {
+            WarnOnce("blit depth: destination has no depth target yet");
+            return false;
+        }
+        // CopyTextureRegion 要求两端同格式（或同 TYPELESS family）：归一化为
+        // typed 深度格式比较，不一致则拒绝（GL/VK blit 的跨格式转换 DX12 不提供）
+        const DXGI_FORMAT srcFmt =
+            DepthCopyFormat(srcDepth->GetDesc().Format);
+        const DXGI_FORMAT dstFmt =
+            DepthCopyFormat(dstDepth->GetDesc().Format);
+        if (srcFmt != dstFmt) {
+            LOGW("[DX12] blit depth: format mismatch {} vs {} rejected",
+                 static_cast<int>(srcFmt), static_cast<int>(dstFmt));
+            return false;
+        }
+
+        // 窗口深度当前若作为 DSV 绑定在 OM 上，状态切换前先解绑 DSV（保留颜色 RTV）；
+        // GLBackend blit 后把 FBO 绑回默认帧缓冲 → 拷贝完成后恢复窗口 OM 绑定
+        const bool windowBound = _rtActive && !_renderTarget && !_omPending;
+        if (windowBound) {
+            const uint32_t idx = _swapchain ? _swapchain->currentIndex() : 0;
+            if (_swapchain && _swapchain->backBuffer(idx)) {
+                auto rtvHandle = _swapchain->rtv(idx);
+                _cmdList.ptr->OMSetRenderTargets(1, &rtvHandle, FALSE, nullptr);
+            }
+        }
+
+        D3D12_RESOURCE_BARRIER toCopy[2] = {
+            MakeTransition(srcDepth, D3D12_RESOURCE_STATE_DEPTH_WRITE,
+                           D3D12_RESOURCE_STATE_COPY_SOURCE),
+            MakeTransition(dstDepth, D3D12_RESOURCE_STATE_DEPTH_WRITE,
+                           D3D12_RESOURCE_STATE_COPY_DEST),
+        };
+        _cmdList.ptr->ResourceBarrier(2, toCopy);
+
+        // 全尺寸同格式拷贝（TYPELESS 资源两端同 family 合法）
+        D3D12_TEXTURE_COPY_LOCATION dstLoc{};
+        dstLoc.pResource = dstDepth;
+        dstLoc.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+        dstLoc.SubresourceIndex = 0;
+        D3D12_TEXTURE_COPY_LOCATION srcLoc{};
+        srcLoc.pResource = srcDepth;
+        srcLoc.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+        srcLoc.SubresourceIndex = 0;
+        _cmdList.ptr->CopyTextureRegion(&dstLoc, 0, 0, 0, &srcLoc, nullptr);
+
+        D3D12_RESOURCE_BARRIER toBack[2] = {
+            MakeTransition(srcDepth, D3D12_RESOURCE_STATE_COPY_SOURCE,
+                           D3D12_RESOURCE_STATE_DEPTH_WRITE),
+            MakeTransition(dstDepth, D3D12_RESOURCE_STATE_COPY_DEST,
+                           D3D12_RESOURCE_STATE_DEPTH_WRITE),
+        };
+        _cmdList.ptr->ResourceBarrier(2, toBack);
+
+        // 对齐 GL 语义（blitFramebuffer 结尾 glBindFramebuffer(GL_FRAMEBUFFER, 0)）：
+        // 深度拷入窗口后恢复窗口 OM 绑定（不清屏），后续 draw 直接可用
+        if (!dst && windowBound) activateWindowTargets(false);
+        return true;
+    }
+
+    // 颜色路径：全屏三角形把 src 颜色附件采样绘制到 dst 颜色附件（正高度视口，
+    // 恒等方向对齐 VK vkCmdBlitImage 行为）
+    void DoBlitColor(const std::shared_ptr<IRenderTarget>& src,
+                     const std::shared_ptr<IRenderTarget>& dst) {
+        auto* srcTex = dynamic_cast<DXTexture2D*>(src->colorTexture2D(0));
+        auto* dstTex = dynamic_cast<DXTexture2D*>(dst->colorTexture2D(0));
+        if (!srcTex || !dstTex || !srcTex->valid() || !dstTex->valid()) {
+            WarnOnce("blit color: RT attachments unavailable until Task 8");
+            return;
+        }
+        if (!EnsureScratchHeaps()) return;
+
+        // src 建 SRV（常驻 PSHR 态可直接读）、dst 建临时 RTV
+        D3D12_SHADER_RESOURCE_VIEW_DESC sd{};
+        sd.Format = srcTex->srvFormat();
+        sd.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+        sd.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+        sd.Texture2D.MostDetailedMip = 0;
+        sd.Texture2D.MipLevels = srcTex->mipLevels();
+        _device->CreateShaderResourceView(srcTex->resource(), &sd,
+                                          _scratchSrvHeap->GetCPUDescriptorHandleForHeapStart());
+        D3D12_RENDER_TARGET_VIEW_DESC rd{};
+        rd.Format = dstTex->srvFormat();
+        rd.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
+        rd.Texture2D.MipSlice = 0;
+        _device->CreateRenderTargetView(dstTex->resource(), &rd,
+                                        _scratchRtvHeap->GetCPUDescriptorHandleForHeapStart());
+
+        ID3D12PipelineState* pso = EnsureBlitPso(dstTex->srvFormat());
+        if (!pso) return;
+
+        D3D12_RESOURCE_BARRIER toRT = MakeTransition(
+            dstTex->resource(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
+            D3D12_RESOURCE_STATE_RENDER_TARGET);
+        _cmdList.ptr->ResourceBarrier(1, &toRT);
+
+        ID3D12DescriptorHeap* heaps[] = {_scratchSrvHeap.ptr};
+        _cmdList.ptr->SetDescriptorHeaps(1, heaps);
+        _cmdList.ptr->SetGraphicsRootSignature(_blitRootSig.ptr);
+        _cmdList.ptr->SetPipelineState(pso);
+        _cmdList.ptr->SetGraphicsRootDescriptorTable(
+            0, _scratchSrvHeap->GetGPUDescriptorHandleForHeapStart());
+        _cmdList.ptr->IASetVertexBuffers(0, 0, nullptr);
+        D3D12_RESOURCE_DESC dd = dstTex->resource()->GetDesc();
+        const float w = static_cast<float>(dd.Width);
+        const float h = static_cast<float>(dd.Height);
+        const D3D12_VIEWPORT vp{0.0f, 0.0f, w, h, 0.0f, 1.0f};
+        const D3D12_RECT sc{0, 0, static_cast<LONG>(w), static_cast<LONG>(h)};
+        _cmdList.ptr->RSSetViewports(1, &vp);
+        _cmdList.ptr->RSSetScissorRects(1, &sc);
+        auto rtvHandle = _scratchRtvHeap->GetCPUDescriptorHandleForHeapStart();
+        _cmdList.ptr->OMSetRenderTargets(1, &rtvHandle, FALSE, nullptr);
+        _cmdList.ptr->DrawInstanced(3, 0, 0, 0);
+
+        D3D12_RESOURCE_BARRIER toSRV = MakeTransition(
+            dstTex->resource(), D3D12_RESOURCE_STATE_RENDER_TARGET,
+            D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+        _cmdList.ptr->ResourceBarrier(1, &toSRV);
+        applyViewport();   // 主路径负高度视口恢复，防后续 draw 沿用 blit 视口
+    }
+
+    static D3D12_RESOURCE_BARRIER MakeTransition(ID3D12Resource* res,
+                                                 D3D12_RESOURCE_STATES before,
+                                                 D3D12_RESOURCE_STATES after) {
+        D3D12_RESOURCE_BARRIER barrier{};
+        barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        barrier.Transition.pResource = res;
+        barrier.Transition.StateBefore = before;
+        barrier.Transition.StateAfter = after;
+        barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+        return barrier;
+    }
+
     // 开录：Reset allocator+list。present 尾部已开录时幂等跳过；首帧或
     // flush() 之后由本函数懒启动（同 VK ensureRecording 模式）
     void ensureRecording() {
@@ -401,6 +768,21 @@ private:
     ComPtr<ID3D12CommandAllocator> _uploadAllocator;
     // 全局单例 root signature（所有 DXPipeline 共享），生命周期与 device 一致
     ComPtr<ID3D12RootSignature> _rootSignature;
+
+    // ---- 纹理/SRV（Task 7）----
+    static constexpr unsigned kSrvHeapSlots = 128;   // 与根签名 param1 表 t0..t127 一致
+    // 共享 shader-visible CBV_SRV_UAV 堆：槽 i ↔ 寄存器 t(i)，槽 0 预留 ImGui，
+    // 纹理 bindTexture(unit) 写槽 unit+1（寄存器 t<unit+1>）
+    ComPtr<ID3D12DescriptorHeap> _srvHeap;
+    UINT _srvDescSize{0};
+    std::set<unsigned> _boundUnits{};                // resetRenderState 时置空防悬垂描述符
+    // 内部 blit（mip 降采样 + RT↔RT 颜色拷贝）：专用根签名 + 按目标格式缓存的 PSO
+    ComPtr<ID3D12RootSignature> _blitRootSig;
+    std::map<DXGI_FORMAT, ComPtr<ID3D12PipelineState>> _blitPsos{};
+    FrameBlitContext _blitCtx;
+    ComPtr<ID3D12DescriptorHeap> _scratchSrvHeap;    // 颜色 blit 单槽暂存 SRV/RTV
+    ComPtr<ID3D12DescriptorHeap> _scratchRtvHeap;
+
     // 帧录制资源：单 allocator+command list，帧间经 fence 全串行化
     ComPtr<ID3D12CommandAllocator> _frameAllocator;
     ComPtr<ID3D12GraphicsCommandList> _cmdList;
@@ -439,6 +821,16 @@ bool DXRenderer::init(const std::shared_ptr<ISurface>& surface) {
     DX_CHECK(_device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&_uploadAllocator)),
              "create upload allocator");
     if (!CreateSharedRootSignature(_device.ptr, &_rootSignature)) return false;
+    if (!CreateBlitRootSignature(_device.ptr, &_blitRootSig)) return false;
+
+    // 共享 SRV 堆（shader-visible）：bindTexture 写槽 unit+1，draw 前 SetDescriptorHeaps
+    D3D12_DESCRIPTOR_HEAP_DESC shd{};
+    shd.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+    shd.NumDescriptors = kSrvHeapSlots;
+    shd.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+    DX_CHECK(_device->CreateDescriptorHeap(&shd, IID_PPV_ARGS(&_srvHeap)), "create srv heap");
+    if (!_srvHeap.ptr) return false;
+    _srvDescSize = _device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
     // 帧录制资源。CreateCommandList 返回即处于录制态，须先 Close 才能走统一的 Reset 流程
     DX_CHECK(_device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT,
@@ -473,6 +865,12 @@ void DXRenderer::shutdown() {
     if (_frameAllocator.Get()) { _frameAllocator->Release(); _frameAllocator.ptr = nullptr; }
     if (_fenceEvent) { CloseHandle(_fenceEvent); _fenceEvent = nullptr; }
     if (_uploadAllocator.Get()) { _uploadAllocator->Release(); _uploadAllocator.ptr = nullptr; }
+    _blitPsos.clear();
+    if (_blitRootSig.Get()) { _blitRootSig->Release(); _blitRootSig.ptr = nullptr; }
+    if (_scratchRtvHeap.Get()) { _scratchRtvHeap->Release(); _scratchRtvHeap.ptr = nullptr; }
+    if (_scratchSrvHeap.Get()) { _scratchSrvHeap->Release(); _scratchSrvHeap.ptr = nullptr; }
+    if (_srvHeap.Get()) { _srvHeap->Release(); _srvHeap.ptr = nullptr; }
+    _boundUnits.clear();
     if (_rootSignature.Get()) { _rootSignature->Release(); _rootSignature.ptr = nullptr; }
     if (_frameFence.Get()) { _frameFence->Release(); _frameFence.ptr = nullptr; }
     if (_queue.Get()) { _queue->Release(); _queue.ptr = nullptr; }
@@ -533,8 +931,15 @@ bool DXRenderer::prepareDraw(bool needsIndex) {
 
     _cmdList.ptr->SetGraphicsRootSignature(_rootSignature.ptr);
     _cmdList.ptr->SetPipelineState(pso);
-    // SRV 描述符堆与根描述符表（param1）随 Task 7 接入：本任务无纹理采样，
-    // 不绑 heap/表即合法（shader 不读 t 寄存器）
+    // SRV 描述符堆 + 根表（param1，t0..t127 ↔ 堆槽 0..127）：静态采样器已烘焙进
+    // 根签名随 SetGraphicsRootSignature 生效，无需每 draw 额外采样器绑定。
+    // 每次 draw 重设堆：mipgen/blit 可能中途切换过堆，此处自愈
+    if (_srvHeap.ptr) {
+        ID3D12DescriptorHeap* heaps[] = {_srvHeap.ptr};
+        _cmdList.ptr->SetDescriptorHeaps(1, heaps);
+        _cmdList.ptr->SetGraphicsRootDescriptorTable(
+            1, _srvHeap->GetGPUDescriptorHandleForHeapStart());
+    }
 
     // param0 根 CBV：直挂当前 UBO ring 槽 GPU VA。App 在 draw 前调 update() 推进
     // DXBuffer 内部 ring 头，这里读 submittedBase() 即得本次数据的槽基址；

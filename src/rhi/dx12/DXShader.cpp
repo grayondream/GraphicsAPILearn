@@ -79,6 +79,10 @@ static std::string ListExistingCsos() {
     return out.empty() ? "(none)" : out;
 }
 
+std::string DXShader::FindCso(const std::string& sourcePath, ShaderStage::Type type) {
+    return LocateCso(sourcePath, type);
+}
+
 bool DXShader::compile(const std::vector<ShaderStage>& stages) {
     _blobs.clear();
     _log.clear();
