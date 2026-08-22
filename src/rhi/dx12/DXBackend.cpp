@@ -1,4 +1,5 @@
 #include "rhi/dx12/DXBackend.hpp"
+#include "rhi/dx12/DXBuffer.hpp"
 #include "rhi/core/ISurface.hpp"
 #include "rhi/core/IShader.hpp"
 #include "rhi/core/IPipeline.hpp"
@@ -123,8 +124,14 @@ public:
 
     std::shared_ptr<IShader> createShader() override { return std::make_shared<DXNullShader>(); }
     std::shared_ptr<IPipeline> createPipeline(const VertexLayout&, const std::shared_ptr<IShader>&) override { return std::make_shared<DXNullPipeline>(); }
-    std::shared_ptr<IBuffer> createBuffer() override { return std::make_shared<DXNullBuffer>(); }
-    std::shared_ptr<IBuffer> createUniformBuffer() override { return std::make_shared<DXNullBuffer>(); }
+    std::shared_ptr<IBuffer> createBuffer() override {
+        if (!_device.ptr) { LOGE("[DX12] createBuffer before init"); return std::make_shared<DXNullBuffer>(); }
+        return std::make_shared<DXBuffer>(_device.ptr, _queue.ptr, _uploadAllocator.ptr, _frameFence.ptr, _fenceEvent);
+    }
+    std::shared_ptr<IBuffer> createUniformBuffer() override {
+        if (!_device.ptr) { LOGE("[DX12] createUniformBuffer before init"); return std::make_shared<DXNullBuffer>(); }
+        return std::make_shared<DXBuffer>(_device.ptr, _queue.ptr, _uploadAllocator.ptr, _frameFence.ptr, _fenceEvent);
+    }
     std::shared_ptr<ITexture2D> createTexture2D() override { return std::make_shared<DXNullTexture2D>(); }
     std::shared_ptr<ITexture3D> createTexture3D() override { return std::make_shared<DXNullTexture3D>(); }
     std::shared_ptr<IRenderTarget> createRenderTarget() override { return std::make_shared<DXNullRenderTarget>(); }
@@ -158,6 +165,8 @@ private:
     ComPtr<ID3D12CommandQueue> _queue;
     ComPtr<ID3D12Fence> _frameFence;
     HANDLE _fenceEvent{nullptr};
+    // 缓冲初始化数据的一次性拷贝命令与 VB/IB 上传共用此 direct allocator（串行使用，用后 Reset）
+    ComPtr<ID3D12CommandAllocator> _uploadAllocator;
 };
 
 bool DXRenderer::init(const std::shared_ptr<ISurface>& surface) {
@@ -172,12 +181,15 @@ bool DXRenderer::init(const std::shared_ptr<ISurface>& surface) {
     DX_CHECK(_device->CreateCommandQueue(&qd, IID_PPV_ARGS(&_queue)), "create queue");
     DX_CHECK(_device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&_frameFence)), "fence");
     _fenceEvent = CreateEventW(nullptr, FALSE, FALSE, nullptr);
+    DX_CHECK(_device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&_uploadAllocator)),
+             "create upload allocator");
     LOGI("[DX12] device ready");
     return true;
 }
 
 void DXRenderer::shutdown() {
     if (_fenceEvent) { CloseHandle(_fenceEvent); _fenceEvent = nullptr; }
+    if (_uploadAllocator.Get()) { _uploadAllocator->Release(); _uploadAllocator.ptr = nullptr; }
     if (_frameFence.Get()) { _frameFence->Release(); _frameFence.ptr = nullptr; }
     if (_queue.Get()) { _queue->Release(); _queue.ptr = nullptr; }
     if (_device.Get()) { _device->Release(); _device.ptr = nullptr; }
