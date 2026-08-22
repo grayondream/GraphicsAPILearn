@@ -26,7 +26,8 @@ D3D12_TEXTURE_ADDRESS_MODE DxAddressOf(TextureWrap wrap) {
     return D3D12_TEXTURE_ADDRESS_MODE_WRAP;
 }
 
-D3D12_STATIC_SAMPLER_DESC MakeSampler(D3D12_FILTER filter, D3D12_TEXTURE_ADDRESS_MODE address, UINT slot) {
+D3D12_STATIC_SAMPLER_DESC MakeSampler(D3D12_FILTER filter, D3D12_TEXTURE_ADDRESS_MODE address, UINT slot,
+                                      D3D12_COMPARISON_FUNC comparison = D3D12_COMPARISON_FUNC_NEVER) {
     D3D12_STATIC_SAMPLER_DESC s{};
     s.Filter = filter;
     s.AddressU = address;
@@ -35,7 +36,7 @@ D3D12_STATIC_SAMPLER_DESC MakeSampler(D3D12_FILTER filter, D3D12_TEXTURE_ADDRESS
     s.MipLODBias = 0;
     s.MaxAnisotropy = 1;   // 非各向异性过滤时必须为 1
     // 非 comparison 采样器该字段无效果；NONE 常量需较新 SDK，用语义等价的 NEVER 兼容旧头
-    s.ComparisonFunc = D3D12_COMPARISON_FUNC_NEVER;
+    s.ComparisonFunc = comparison;
     // 静态采样器只有黑/白两种边框色：对齐 VKTexture2D adopt 的 OPAQUE_WHITE 选择
     // （阴影贴图越界=远处=受光）；逐纹理 borderColor 动态需求延后 Task 8 采样器堆
     s.BorderColor = D3D12_STATIC_BORDER_COLOR_OPAQUE_WHITE;
@@ -169,19 +170,25 @@ const D3D12_STATIC_SAMPLER_DESC* StaticSamplers(size_t& count) {
     // 槽位布局 f*3+w（寄存器编号与 _samplers.hlsli 别名一致）：
     //   0..2 Linear(Repeat/Clamp/Border)、3..5 Nearest、6..8 LinearMipLinear；
     // 槽 6 即默认 minFilter(LinearMipLinear)+Repeat。
+    // s9：shadow map 硬件比较采样器（Task 10b Shadow 组），贴 GL Nearest 行为取
+    //   MIN_MAG_NEAREST + LESS_EQUAL；wrap=ClampToBorder+OPAQUE_WHITE（越界=最远深度
+    //   =受光，与 GL/VK borderColor 1.0 语义一致）。仅 Shadow 组的 shadowMap 使用。
     // w=ClampToBorder 的三个槽位（2/5/8）不进静态表：静态采样器边框色只有黑/白，
     // 任意 borderColor 由 DXRenderer 动态 SAMPLER 堆在 bind 路径按槽位写入
     // （未覆盖时堆内预填 OPAQUE_WHITE，行为与旧静态表一致）。非 border 组合继续走根签名静态表。
-    static const std::array<D3D12_STATIC_SAMPLER_DESC, 6> table = [] {
+    static const std::array<D3D12_STATIC_SAMPLER_DESC, 7> table = [] {
         constexpr TextureFilter filters[3] = {TextureFilter::Linear, TextureFilter::Nearest,
                                               TextureFilter::LinearMipLinear};
         constexpr TextureWrap wraps[2] = {TextureWrap::Repeat, TextureWrap::ClampToEdge};
-        std::array<D3D12_STATIC_SAMPLER_DESC, 6> t{};
+        std::array<D3D12_STATIC_SAMPLER_DESC, 7> t{};
         for (int f = 0; f < 3; ++f)
             for (int w = 0; w < 2; ++w)
                 t[static_cast<size_t>(f) * 3 + w] =
                     MakeSampler(DxFilterOf(filters[f]), DxAddressOf(wraps[w]),
                                 static_cast<UINT>(f * 3 + w));
+        t[9] = MakeSampler(D3D12_FILTER_COMPARISON_MIN_MAG_NEAREST_MIP_POINT,
+                           DxAddressOf(TextureWrap::ClampToBorder), 9,
+                           D3D12_COMPARISON_FUNC_LESS_EQUAL);
         return t;
     }();
     count = table.size();

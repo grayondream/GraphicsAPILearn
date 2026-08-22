@@ -1,0 +1,16 @@
+// 对应 res/GL/Light/Advanced/ShadowMap/Depth.fs：debug quad 直接显示深度值（正交）。
+// depthMap 由 bindTexture(fbo->depthTexture2D(), 0) 绑定 → t1；
+// LinearizeDepth 死代码（源码已注释）未搬运。
+#include "../../../_uniform_block.hlsli"
+
+Texture2D gDepthMap : register(t1);
+
+struct PSIn {
+    float4 sv : SV_Position;
+    float2 TexCoords : TEXCOORD0;
+};
+
+float4 PSMain(PSIn i) : SV_Target {
+    float depthValue = gDepthMap.Sample(gSamplerDefault, i.TexCoords).r;
+    return float4(depthValue.xxx, 1.0);   // orthographic
+}

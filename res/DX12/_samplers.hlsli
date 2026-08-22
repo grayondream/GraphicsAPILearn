@@ -16,5 +16,9 @@ SamplerState gSamplerNearestBorder : register(s5); // f=1 w=2
 SamplerState gSamplerDefault       : register(s6); // f=2 w=0（Load2D 默认）
 SamplerState gSamplerMipLinearClamp  : register(s7); // f=2 w=1
 SamplerState gSamplerMipLinearBorder : register(s8); // f=2 w=2
+// s9 不在 f*3+w 组合空间内：shadow map 专用硬件比较采样器（DXPipeline.cpp StaticSamplers
+// 同步提供静态条目），Nearest+LESS_EQUAL+ClampToBorder(OPAQUE_WHITE)。
+// SampleCmp 返回 ref <= stored ? 1 : 0（lit=1）；GLSL 手动比较的 shadow 取 1-lit。
+SamplerComparisonState gShadowCompare : register(s9);
 
 #endif
