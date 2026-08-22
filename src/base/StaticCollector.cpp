@@ -17,6 +17,10 @@ namespace StaticCollector {
         if (rhi::backendKind() == rhi::BackendKind::Vulkan) {
             return getVulkanShaderPath();
         }
+        if (rhi::backendKind() == rhi::BackendKind::Dx12) {
+            // 返回 HLSL 镜像树根：DXShader 以源路径推导 build/res/DX12 下同名 .cso
+            return getDX12ShaderPath();
+        }
         return FileUtils::join(getResPath(), "GL");
 	}
 

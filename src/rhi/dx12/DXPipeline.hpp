@@ -70,6 +70,9 @@ public:
     void setPrimitiveType(PrimitiveType type) override { _primitive = type; }
     PrimitiveType primitiveType() const override { return _primitive; }
 
+    // Renderer 绑定顶点缓冲时按 binding 取 stride（IBuffer 无法自述步长）
+    const VertexLayout& layout() const { return _layout; }
+
     // 缓冲绑定发生在 draw 时（Renderer 持 layout stride 调 BindAsVB，同 VK）
     void setVertexBuffer(const std::shared_ptr<IBuffer>&, uint32_t) override {}
     void setIndexBuffer(const std::shared_ptr<IBuffer>&) override {}
