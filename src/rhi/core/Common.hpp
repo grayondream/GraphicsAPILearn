@@ -6,7 +6,7 @@
 
 namespace rhi {
 
-enum class BackendKind : uint8_t { GL, Vulkan };
+enum class BackendKind : uint8_t { GL, Vulkan, Dx12 };
 
 inline BackendKind& CurrentBackendKind() { static BackendKind kind = BackendKind::GL; return kind; }
 inline void setBackendKind(BackendKind kind) { CurrentBackendKind() = kind; }

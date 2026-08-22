@@ -27,6 +27,9 @@ static std::vector<std::pair<std::string, GraphicsType>> AvailableBackends() {
 #if ENABLE_VULKAN
     v.emplace_back("vulkan", GraphicsType::Vulkan);
 #endif
+#if ENABLE_DX12
+    v.emplace_back("dx12", GraphicsType::DX12);
+#endif
     return v;
 }
 

@@ -98,6 +98,11 @@ endif()
 if(${ENABLE_DX12})
     message("Graphic API Enable D3D12")
     target_compile_definitions(${PROJECT_NAME} PRIVATE ENABLE_DX12=1)
+    # Windows SDK 自带 d3d12/dxgi/dxguid 导入库，直接链接；
+    # Linux 侧仅定义宏不链接（无 Windows SDK 导入库），保证既有 Linux 构建/CI 不受影响
+    if(WIN32)
+        target_link_libraries(${PROJECT_NAME} d3d12.lib dxgi.lib dxguid.lib)
+    endif()
 endif()
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
@@ -108,7 +113,9 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
     )
 endif()
 
-if(ENABLE_DX11 OR ENABLE_DX12)
+# 仅 DX11 需要旧式 d3d11/d3dx11/d3dcompiler 导入库（d3dx11 已从现代 Windows SDK 移除，
+# 若 DX12 也进此分支会 LNK1104；DX12 的链接见上方 ENABLE_DX12 块）
+if(ENABLE_DX11)
     target_link_libraries(${PROJECT_NAME}
         user32.lib
         gdi32.lib

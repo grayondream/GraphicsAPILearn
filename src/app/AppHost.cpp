@@ -11,6 +11,9 @@
 #if ENABLE_VULKAN
 #include "rhi/vk/VKBackend.hpp"
 #endif
+#if ENABLE_DX12
+#include "rhi/dx12/DXBackend.hpp"
+#endif
 #include "base/ErrorHandle.hpp"
 #include "base/Log.hpp"
 #include "utils/EnumUtil.hpp"
@@ -60,6 +63,21 @@ bool AppHost::rebuildBackend(const GLFWWindowProperties& props) {
     }
 #else
     (void)props;
+#endif
+#if ENABLE_DX12
+    // ImGui overlay 延后至 Task 9 接入，此分支暂不建 imgui window
+    if (_backend == GraphicsType::DX12) {
+        m_window->shutdown();
+        m_window->initialize();
+        rhi::setBackendKind(rhi::BackendKind::Dx12);
+        auto surface = std::make_shared<rhi::GLFWSurface>(
+            m_window->getNativeGLFWWindow(), static_cast<int>(props.width), static_cast<int>(props.height));
+        _renderer = rhi::createDX12Renderer();
+        if (!_renderer->init(surface)) { LOGE("Failed to init DX12 renderer"); return false; }
+        _renderer->setViewport(rhi::Viewport{0, 0, static_cast<int>(props.width), static_cast<int>(props.height)});
+        hookWindowCallbacks();
+        return reloadSample();
+    }
 #endif
     // 后端切换需按新 client API 重建原生窗口；VK 分支在上面已重建为 NO_API，
     // GL 分支同样需 shutdown+initialize 以按属性重建为 OPENGL 上下文窗口。
