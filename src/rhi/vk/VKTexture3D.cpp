@@ -106,7 +106,7 @@ bool VKTexture3D::initCube(const TextureDesc& desc, const TextureDataView2D* fac
         }
     }
     if (_mipLevels > 1) {
-        if (!genCubeMipmaps(faces[0].width, faces[0].height)) return false;
+        genCubeMipmaps();
         _layout = vk::ImageLayout::eShaderReadOnlyOptimal;
     }
     if (!createSampler(desc)) return false;
@@ -240,9 +240,12 @@ bool VKTexture3D::createSampler(const TextureDesc& desc) {
     return true;
 }
 
-bool VKTexture3D::genCubeMipmaps(int width, int height) {
+void VKTexture3D::genCubeMipmaps() {
+    if (_mipLevels <= 1) return;
+    const int width = static_cast<int>(_extent.width);
+    const int height = static_cast<int>(_extent.height);
     const vk::ImageAspectFlags aspect = vk::ImageAspectFlagBits::eColor;
-    const bool ok = SubmitOneShot(_dev, _queue, _graphicsFamily, [&](vk::raii::CommandBuffer& cmd) {
+    SubmitOneShot(_dev, _queue, _graphicsFamily, [&](vk::raii::CommandBuffer& cmd) {
         vk::ImageMemoryBarrier toSrc{};
         toSrc.oldLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
         toSrc.newLayout = vk::ImageLayout::eTransferSrcOptimal;
@@ -258,8 +261,8 @@ bool VKTexture3D::genCubeMipmaps(int width, int height) {
         cmd.pipelineBarrier(vk::PipelineStageFlagBits::eFragmentShader, vk::PipelineStageFlagBits::eTransfer,
                             {}, {}, {}, {toSrc});
 
-        int32_t w = width;
-        int32_t h = height;
+        int32_t w = static_cast<int32_t>(_extent.width);
+        int32_t h = static_cast<int32_t>(_extent.height);
         for (uint32_t mip = 1; mip < _mipLevels; mip++) {
             vk::ImageMemoryBarrier toDst{};
             toDst.oldLayout = vk::ImageLayout::eUndefined;
@@ -318,7 +321,6 @@ bool VKTexture3D::genCubeMipmaps(int width, int height) {
         cmd.pipelineBarrier(vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eFragmentShader,
                             {}, {}, {}, {toRead});
     });
-    return ok;
 }
 
 vk::ImageView VKTexture3D::faceView(int face, int mip) const {
@@ -345,6 +347,113 @@ void VKTexture3D::release() {
     _valid = false;
     _layout = vk::ImageLayout::eShaderReadOnlyOptimal;
     _mipLevels = 1;
+}
+
+void VKTexture3D::debugDumpCubeFace(const char* path, int face, int mip) const {
+    if (!_valid || !static_cast<VkImage>(*_image)) return;
+    _dev.waitIdle();
+    const uint32_t w = _extent.width, h = _extent.height;
+    const uint64_t bytes = static_cast<uint64_t>(w) * h * 8;
+    vk::BufferCreateInfo bci{};
+    bci.size = bytes;
+    bci.usage = vk::BufferUsageFlagBits::eTransferDst;
+    bci.sharingMode = vk::SharingMode::eExclusive;
+    auto br = _dev.createBuffer(bci);
+    if (br.result != vk::Result::eSuccess) return;
+    vk::raii::Buffer stage = std::move(br.value);
+    const vk::MemoryRequirements sreq = stage.getMemoryRequirements();
+    const vk::PhysicalDeviceMemoryProperties props = _phys.getMemoryProperties();
+    uint32_t smemIdx = UINT32_MAX;
+    for (uint32_t i = 0; i < props.memoryTypeCount; i++) {
+        if ((sreq.memoryTypeBits & (1u << i)) &&
+            (props.memoryTypes[i].propertyFlags & vk::MemoryPropertyFlagBits::eHostVisible) &&
+            (props.memoryTypes[i].propertyFlags & vk::MemoryPropertyFlagBits::eHostCoherent)) { smemIdx = i; break; }
+    }
+    if (smemIdx == UINT32_MAX) return;
+    vk::MemoryAllocateInfo smai(sreq.size, smemIdx);
+    auto sar = _dev.allocateMemory(smai);
+    if (sar.result != vk::Result::eSuccess) return;
+    vk::raii::DeviceMemory stageMem = std::move(sar.value);
+    vk::BindBufferMemoryInfo sbbmi(*stage, *stageMem, 0);
+    _dev.bindBufferMemory2({sbbmi});
+
+    vk::CommandPoolCreateInfo cpci{};
+    cpci.flags = vk::CommandPoolCreateFlagBits::eTransient;
+    cpci.queueFamilyIndex = _graphicsFamily;
+    auto cpr = _dev.createCommandPool(cpci);
+    if (cpr.result != vk::Result::eSuccess) return;
+    vk::raii::CommandPool pool = std::move(cpr.value);
+    vk::CommandBufferAllocateInfo cba(*pool, vk::CommandBufferLevel::ePrimary, 1);
+    auto cbr = _dev.allocateCommandBuffers(cba);
+    if (cbr.result != vk::Result::eSuccess) return;
+    vk::raii::CommandBuffer cb = std::move(cbr.value[0]);
+
+    cb.begin(vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit));
+    vk::ImageMemoryBarrier barrier{};
+    barrier.srcAccessMask = vk::AccessFlagBits::eColorAttachmentWrite;
+    barrier.dstAccessMask = vk::AccessFlagBits::eTransferRead;
+    barrier.oldLayout = _layout;
+    barrier.newLayout = vk::ImageLayout::eTransferSrcOptimal;
+    barrier.srcQueueFamilyIndex = vk::QueueFamilyIgnored;
+    barrier.dstQueueFamilyIndex = vk::QueueFamilyIgnored;
+    barrier.image = *_image;
+    barrier.subresourceRange.aspectMask = vk::ImageAspectFlagBits::eColor;
+    barrier.subresourceRange.baseMipLevel = static_cast<uint32_t>(mip);
+    barrier.subresourceRange.levelCount = 1;
+    barrier.subresourceRange.baseArrayLayer = static_cast<uint32_t>(face);
+    barrier.subresourceRange.layerCount = 1;
+    cb.pipelineBarrier(vk::PipelineStageFlagBits::eColorAttachmentOutput, vk::PipelineStageFlagBits::eTransfer,
+                       {}, {}, {}, {barrier});
+    vk::BufferImageCopy region{};
+    region.imageSubresource.aspectMask = vk::ImageAspectFlagBits::eColor;
+    region.imageSubresource.mipLevel = static_cast<uint32_t>(mip);
+    region.imageSubresource.baseArrayLayer = static_cast<uint32_t>(face);
+    region.imageSubresource.layerCount = 1;
+    region.imageOffset = vk::Offset3D(0, 0, 0);
+    region.imageExtent = vk::Extent3D(w, h, 1);
+    cb.copyImageToBuffer(*_image, vk::ImageLayout::eTransferSrcOptimal, *stage, {region});
+    cb.end();
+
+    vk::FenceCreateInfo fci{};
+    auto fr = _dev.createFence(fci);
+    if (fr.result != vk::Result::eSuccess) return;
+    vk::raii::Fence fence = std::move(fr.value);
+    vk::CommandBuffer raw = *cb;
+    vk::SubmitInfo si{};
+    si.commandBufferCount = 1;
+    si.pCommandBuffers = &raw;
+    _queue.submit({si}, *fence);
+    (void)_dev.waitForFences({*fence}, vk::True, UINT64_MAX);
+
+    auto mp = stageMem.mapMemory(0, bytes);
+    if (mp.result != vk::Result::eSuccess) return;
+    const uint16_t* px = static_cast<const uint16_t*>(mp.value);
+    FILE* fp = std::fopen(path, "wb");
+    if (!fp) { stageMem.unmapMemory(); return; }
+    std::fprintf(fp, "P6\n%u %u\n255\n", w, h);
+    for (uint32_t y = 0; y < h; y++) {
+        for (uint32_t x = 0; x < w; x++) {
+            const uint16_t* p = px + (static_cast<size_t>(y) * w + x) * 4;
+            const auto conv = [](uint16_t half) {
+                uint32_t sign = (half >> 15) & 1, exp = (half >> 10) & 0x1f, man = half & 0x3ff;
+                if (exp == 0) return man == 0 ? 0.0f : (man / 1024.0f) * (1 / 16384.0f);
+                if (exp == 31) return man == 0 ? (sign ? -1e30f : 1e30f) : 0.0f / 0.0f;
+                int e = static_cast<int>(exp) - 15;
+                float m = 1.0f + man / 1024.0f;
+                float v = m * std::pow(2.0f, static_cast<float>(e));
+                return sign ? -v : v;
+            };
+            float r = std::fmin(1.0f, std::fmax(0.0f, conv(p[0])));
+            float g = std::fmin(1.0f, std::fmax(0.0f, conv(p[1])));
+            float b = std::fmin(1.0f, std::fmax(0.0f, conv(p[2])));
+            std::fputc(static_cast<int>(r * 255.0f + 0.5f), fp);
+            std::fputc(static_cast<int>(g * 255.0f + 0.5f), fp);
+            std::fputc(static_cast<int>(b * 255.0f + 0.5f), fp);
+        }
+    }
+    std::fclose(fp);
+    stageMem.unmapMemory();
+    LOGI("debugDumpCubeFace: saved {} ({}x{})", path, w, h);
 }
 
 } // namespace rhi

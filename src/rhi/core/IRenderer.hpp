@@ -69,6 +69,7 @@ public:
     // 如 GL_DEPTH_TEST；VK 状态绑定在 pipeline 上无此问题，继承默认 no-op）
     virtual void resetRenderState() {}
     virtual void waitIdle() {}
+    virtual void flush() {}
 };
 
 } // namespace rhi

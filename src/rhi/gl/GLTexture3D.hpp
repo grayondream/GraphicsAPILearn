@@ -14,6 +14,7 @@ public:
     void* handle() override;
     bool valid() const override { return _id != 0; }
     void release() override;
+    void genCubeMipmaps() override;
     const TextureDesc& desc() const { return _desc; }
 
 private:

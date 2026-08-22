@@ -31,7 +31,7 @@ static RhiGeometry::Geometry CreateQuadBuffer(rhi::IRenderer* renderer) {
     constexpr int stride = 5 * static_cast<int>(sizeof(float));
     rhi::VertexLayout layout;
     layout.elements.push_back({rhi::VertexElement::Float3, 0, 0, rhi::VertexInputRate::PerVertex, 0, stride});
-    layout.elements.push_back({rhi::VertexElement::Float2, 1, 0, rhi::VertexInputRate::PerVertex, 12, stride});
+    layout.elements.push_back({rhi::VertexElement::Float2, 2, 0, rhi::VertexInputRate::PerVertex, 12, stride});
     return RhiGeometry::CreateFromArray(renderer, quadVertices, sizeof(quadVertices), 4, layout);
 }
 
@@ -66,7 +66,7 @@ void GLIBLSpecularApp::initCaptureViews() {
     desc.wrapS = desc.wrapT = desc.wrapR = rhi::TextureWrap::ClampToEdge;
     desc.minFilter = rhi::TextureFilter::Linear;
     desc.magFilter = rhi::TextureFilter::Linear;
-    desc.generateMipmap = false;
+    desc.generateMipmap = true;
     m_envCubemap = renderer()->createTexture3D();
     m_envCubemap->createEmpty(desc, 512, 512);
 }
@@ -169,6 +169,7 @@ void GLIBLSpecularApp::renderToCubemap() {
     renderer()->setVertexBuffer(m_cube.normalBuffer, 2);
     const int size = 512;
     for (int i = 0; i < 6; ++i) {
+        renderer()->setRenderTarget(m_captureRT);
         renderer()->setViewport(rhi::Viewport{0, 0, size, size});
         rhi::SetUniform(_ubo, "view", captureViews[i]);
         m_captureRT->attachCubeFace(m_envCubemap.get(), i);
@@ -191,6 +192,7 @@ void GLIBLSpecularApp::renderIrradianceMap() {
     renderer()->setVertexBuffer(m_cube.normalBuffer, 2);
     const int size = 32;
     for (int i = 0; i < 6; ++i) {
+        renderer()->setRenderTarget(m_captureRT);
         renderer()->setViewport(rhi::Viewport{0, 0, size, size});
         rhi::SetUniform(_ubo, "view", captureViews[i]);
         m_captureRT->attachCubeFace(m_irradianceMap.get(), i);
@@ -217,6 +219,7 @@ void GLIBLSpecularApp::renderPerfilterMap() {
         float roughness = static_cast<float>(mip) / static_cast<float>(maxMipLevels - 1);
         rhi::SetUniform(_ubo, "roughness", roughness);
         for (int i = 0; i < 6; ++i) {
+            renderer()->setRenderTarget(m_captureRT);
             renderer()->setViewport(rhi::Viewport{0, 0, static_cast<int>(mipSize), static_cast<int>(mipSize)});
             rhi::SetUniform(_ubo, "view", captureViews[i]);
             m_captureRT->attachCubeFace(m_prefilterMap.get(), i, static_cast<int>(mip));
@@ -286,12 +289,17 @@ static std::vector<glm::vec3> GenreateObjPos(int radius = 5, float gap = 0.5f, c
 
 void GLIBLSpecularApp::renderBeforeLoop() {
     renderToCubemap();
+    renderer()->flush();
+    m_envCubemap->genCubeMipmaps();
     createIrradianceMap();
     renderIrradianceMap();
+    renderer()->flush();
     createPrefilterMap();
     renderPerfilterMap();
+    renderer()->flush();
     createBrdfLUT();
     renderBrdfLUT();
+    renderer()->flush();
 }
 
 void GLIBLSpecularApp::renderBackground(const std::shared_ptr<rhi::IPipeline>& program, const glm::mat4& view, const glm::mat4& projection) {
@@ -315,6 +323,11 @@ void GLIBLSpecularApp::renderObjectsAndLights(const std::shared_ptr<rhi::IPipeli
     rhi::SetUniform(_ubo, "roughness", m_roughness);
     rhi::SetUniform(_ubo, "metallic", m_metallic);
     rhi::SetUniform(_ubo, "ao", m_ao);
+    const auto [lightPositions, lightColors] = GetLightPosAndColor();
+    for (size_t i = 0; i < lightPositions.size(); ++i) {
+        rhi::SetUniform(_ubo, "lightPositions", i, lightPositions[i]);
+        rhi::SetUniform(_ubo, "lightColors", i, lightColors[i]);
+    }
     const int cnt = objPos.size();
     for (int i = 0; i < cnt; ++i) {
         rhi::SetUniform(_ubo, "albedo", glm::vec3(i * 1.0f / cnt, 0.0f, 0.0f));
@@ -323,13 +336,10 @@ void GLIBLSpecularApp::renderObjectsAndLights(const std::shared_ptr<rhi::IPipeli
         objectPos = glm::scale(objectPos, glm::vec3(0.4f));
         renderSphere(program, objectPos);
     }
-    const auto [lightPositions, lightColors] = GetLightPosAndColor();
     for (size_t i = 0; i < lightPositions.size(); ++i) {
         auto lightModel = glm::mat4(1.0f);
         lightModel = glm::translate(lightModel, lightPositions[i]);
         lightModel = glm::scale(lightModel, glm::vec3(0.2f));
-        rhi::SetUniform(_ubo, "lightPositions", i, lightPositions[i]);
-        rhi::SetUniform(_ubo, "lightColors", i, lightColors[i]);
         renderSphere(program, lightModel);
     }
 }

@@ -75,6 +75,7 @@ public:
 
     void waitIdle() override { if (_device != nullptr) _device.waitIdle(); }
     void resetRenderState() override;
+    void flush() override;
 
     bool imguiInitInfo(VKImGuiInitInfo& out) override;
     void renderImGuiDrawData(void* drawData) override;
@@ -93,6 +94,7 @@ private:
     void updateUboDescriptor();
     void bindSamplersToCurrentSet();
     bool ensureRenderPass();
+    void ensureRecording();
     void applyViewport();
     bool bindPipelineAndState();
     bool bindVertexBuffers();
@@ -638,9 +640,36 @@ void VKRenderer::beginFrame() {
     _winMsaaUsed = false;
 }
 
+void VKRenderer::flush() {
+    // 仅用于帧循环外的离屏预计算提交（IBL renderBeforeLoop 等）：结束当前 cmd、
+    // 提交并等待完成。不重新开始录制——后续绘制由 ensureRecording() 懒启动，
+    // 全部预计算结束后 _recording=false，首个 beginFrame() 才能正常接管。
+    if (!_recording) return;
+    if (_rpActive) { _cmd.endRenderPass(); _rpActive = false; }
+    vk::Result er = _cmd.end();
+    _recording = false;
+    if (er != vk::Result::eSuccess) return;
+
+    vk::FenceCreateInfo fci{};
+    auto fr = _device.createFence(fci);
+    if (fr.result != vk::Result::eSuccess) return;
+    vk::raii::Fence fence = std::move(fr.value);
+
+    vk::CommandBuffer cb = *_cmd;
+    vk::SubmitInfo si{};
+    si.commandBufferCount = 1;
+    si.pCommandBuffers = &cb;
+    _graphicsQueue.submit({si}, *fence);
+    (void)_device.waitForFences({*fence}, vk::True, UINT64_MAX);
+}
+
 void VKRenderer::endFrame() {
     if (!_recording) return;
-    if (_rpActive) _cmd.endRenderPass();
+    if (_rpActive) {
+        _cmd.endRenderPass();
+        _rpActive = false; // 必须清除：否则帧间隙执行的 reloadSample/renderBeforeLoop 会误判 RP 仍活跃，
+                           // ensureRenderPass 直接跳过导致 draw 落在无渲染通道的命令流中
+    }
     // Window MSAA: resolve the internal MSAA RT to the current swapchain image.
     // The MSAA pass renders with the swapchain-style (flipped-y) viewport so the
     // RT content already matches the display order; a straight copy suffices.
@@ -1243,14 +1272,16 @@ void VKRenderer::blitFramebuffer(const std::shared_ptr<IRenderTarget>& src,
 }
 
 void VKRenderer::draw(uint32_t vertexCount, uint32_t firstVertex) {
+    ensureRecording();
     if (!_recording || !_pipeline) return;
     if (!ensureRenderPass()) return;
-    if (!bindPipelineAndState()) return;
+    bindPipelineAndState();
     bindVertexBuffers();
     _cmd.draw(vertexCount, 1, firstVertex, 0);
 }
 
 void VKRenderer::drawIndexed(uint32_t indexCount, uint32_t indexOffset, uint32_t vertexOffset) {
+    ensureRecording();
     if (!_recording || !_pipeline) return;
     if (!ensureRenderPass()) return;
     if (!bindPipelineAndState()) return;
@@ -1262,6 +1293,7 @@ void VKRenderer::drawIndexed(uint32_t indexCount, uint32_t indexOffset, uint32_t
 }
 
 void VKRenderer::drawIndexedInstanced(uint32_t indexCount, uint32_t instanceCount, uint32_t indexOffset, uint32_t vertexOffset) {
+    ensureRecording();
     if (!_recording || !_pipeline) return;
     if (!ensureRenderPass()) return;
     if (!bindPipelineAndState()) return;
@@ -1273,6 +1305,7 @@ void VKRenderer::drawIndexedInstanced(uint32_t indexCount, uint32_t instanceCoun
 }
 
 void VKRenderer::drawInstanced(uint32_t vertexCount, uint32_t instanceCount, uint32_t firstVertex) {
+    ensureRecording();
     if (!_recording || !_pipeline) return;
     if (!ensureRenderPass()) return;
     if (!bindPipelineAndState()) return;
@@ -1320,6 +1353,15 @@ std::shared_ptr<VKRenderTarget> VKRenderer::effectiveRT() {
     return nullptr;
 }
 
+// 离屏预计算（如 IBL renderBeforeLoop）发生在首帧 beginFrame 之前，此时无录制中的
+// command buffer，所有 draw 会被静默丢弃。这里懒启动一段一次性 cmd，使帧循环外的
+// 绘制/提交（flush）也能正常工作；帧循环内 _recording 恒为 true，本函数为空操作。
+void VKRenderer::ensureRecording() {
+    if (_recording) return;
+    vk::CommandBufferBeginInfo cbbi(vk::CommandBufferUsageFlagBits::eOneTimeSubmit);
+    if (_cmd.begin(cbbi) == vk::Result::eSuccess) _recording = true;
+}
+
 bool VKRenderer::ensureRenderPass() {
     if (_rpActive) return true;
     std::shared_ptr<VKRenderTarget> vkrt = effectiveRT();
@@ -1330,7 +1372,7 @@ bool VKRenderer::ensureRenderPass() {
     if (vkrt && vkrt->valid()) {
         rp = vkrt->renderPass();
         fb = vkrt->framebuffer();
-        ext = vkrt->extent2d();
+        ext = vkrt->framebufferExtent(); // cube face attach 时与 FB 一致（可能小于 RT extent）
         colorCount = vkrt->colorCount();
     } else {
         const uint32_t idx = _swapchain->currentImage();

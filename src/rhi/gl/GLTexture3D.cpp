@@ -72,4 +72,11 @@ void GLTexture3D::release() {
     if (_id) { glDeleteTextures(1, &_id); _id = 0; }
 }
 
+void GLTexture3D::genCubeMipmaps() {
+    if (_id && _target == GL_TEXTURE_CUBE_MAP) {
+        glBindTexture(GL_TEXTURE_CUBE_MAP, _id);
+        glGenerateMipmap(GL_TEXTURE_CUBE_MAP);
+    }
+}
+
 } // namespace rhi

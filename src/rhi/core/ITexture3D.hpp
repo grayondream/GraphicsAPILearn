@@ -22,6 +22,7 @@ public:
     virtual void* handle() = 0;
     virtual bool valid() const = 0;
     virtual void release() = 0;
+    virtual void genCubeMipmaps() {}
 };
 
 } // namespace rhi

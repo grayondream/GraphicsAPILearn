@@ -31,15 +31,23 @@ public:
     vk::RenderPass renderPass() const { return _renderPass != nullptr ? *_renderPass : vk::RenderPass{nullptr}; }
     vk::Framebuffer framebuffer() const { return _framebuffer != nullptr ? *_framebuffer : vk::Framebuffer{nullptr}; }
     vk::Extent2D extent2d() const { return _extent; }
+    vk::Extent2D framebufferExtent() const { return (_fbExtent.width != 0) ? _fbExtent : _extent; }
     // True attachment count of the render pass, in attachment order:
     // [color msaa] x N, [resolve] x N (when MSAA), [depth] (optional).
     uint32_t attachmentCount() const {
         uint32_t n = _colorCount;
         if (this->msaa()) n += _colorCount;
+        if (_cubeColor && _colorCount == 0) n += 1;
         if (_depthAttachment || _cubeDepth) n += 1;
         return n;
     }
-    uint32_t colorCount() const { return _colorCount; }
+    // A color-only cubemap face attached via attachCubeFace acts as the sole
+    // color attachment of the pass (PBR IBL capture), even though the RT owns
+    // no color image. Expose it so pipelines blend a matching color attachment.
+    uint32_t colorCount() const {
+        if (_colorCount > 0) return _colorCount;
+        return _cubeColor ? 1u : 0u;
+    }
     bool msaa() const { return _samples > 1; }
     uint32_t samples() const { return _samples; }
     bool hasDepthAttachment() const { return _depthAttachment || _cubeDepth; }
@@ -76,6 +84,7 @@ private:
     uint32_t _graphicsFamily{0};
 
     vk::Extent2D _extent{};
+    vk::Extent2D _fbExtent{}; // 当前 framebuffer 实际尺寸（cube face attach 时可能小于 _extent）
     uint32_t _samples{1};
     uint32_t _colorCount{0};
     bool _floatRtFallback{false};
@@ -87,6 +96,10 @@ private:
     bool _cubeDepth{false};
     vk::ImageView _cubeDepthView{};
     vk::Format _cubeDepthFormat{};
+    // Attached color cubemap face (PBR IBL): active after first attachCubeFace on
+    // an RT that owns no color image. The cube face is the pass's color attachment.
+    bool _cubeColor{false};
+    vk::Format _cubeColorFormat{};
 
     vk::raii::RenderPass _renderPass{nullptr};
     vk::raii::Framebuffer _framebuffer{nullptr};

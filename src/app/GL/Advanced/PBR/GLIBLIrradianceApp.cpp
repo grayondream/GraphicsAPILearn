@@ -134,6 +134,7 @@ void GLIBLIrradianceApp::renderToCubemap() {
     renderer()->setVertexBuffer(m_cube.normalBuffer, 2);
     const int size = 512;
     for (int i = 0; i < 6; ++i) {
+        renderer()->setRenderTarget(m_captureRT);
         renderer()->setViewport(rhi::Viewport{0, 0, size, size});
         rhi::SetUniform(_ubo, "view", captureViews[i]);
         m_captureRT->attachCubeFace(m_envCubemap.get(), i);
@@ -156,6 +157,7 @@ void GLIBLIrradianceApp::renderIrradianceMap() {
     renderer()->setVertexBuffer(m_cube.normalBuffer, 2);
     const int size = 32;
     for (int i = 0; i < 6; ++i) {
+        renderer()->setRenderTarget(m_captureRT);
         renderer()->setViewport(rhi::Viewport{0, 0, size, size});
         rhi::SetUniform(_ubo, "view", captureViews[i]);
         m_captureRT->attachCubeFace(m_irradianceMap.get(), i);
@@ -201,8 +203,11 @@ static std::vector<glm::vec3> GenreateObjPos(int radius = 5, float gap = 0.5f, c
 
 void GLIBLIrradianceApp::renderBeforeLoop() {
     renderToCubemap();
+    renderer()->flush();
+    m_envCubemap->genCubeMipmaps();
     createIrradianceMap();
     renderIrradianceMap();
+    renderer()->flush();
 }
 
 void GLIBLIrradianceApp::renderBackground(const std::shared_ptr<rhi::IPipeline>& program, const glm::mat4& view, const glm::mat4& projection) {
@@ -224,6 +229,11 @@ void GLIBLIrradianceApp::renderObjectsAndLights(const std::shared_ptr<rhi::IPipe
     rhi::SetUniform(_ubo, "roughness", m_roughness);
     rhi::SetUniform(_ubo, "metallic", m_metallic);
     rhi::SetUniform(_ubo, "ao", m_ao);
+    const auto [lightPositions, lightColors] = GetLightPosAndColor();
+    for (size_t i = 0; i < lightPositions.size(); ++i) {
+        rhi::SetUniform(_ubo, "lightPositions", i, lightPositions[i]);
+        rhi::SetUniform(_ubo, "lightColors", i, lightColors[i]);
+    }
     const int cnt = objPos.size();
     for (int i = 0; i < cnt; ++i) {
         rhi::SetUniform(_ubo, "albedo", glm::vec3(i * 1.0f / cnt, 0.0f, 0.0f));
@@ -232,13 +242,10 @@ void GLIBLIrradianceApp::renderObjectsAndLights(const std::shared_ptr<rhi::IPipe
         objectPos = glm::scale(objectPos, glm::vec3(0.4f));
         renderSphere(program, objectPos);
     }
-    const auto [lightPositions, lightColors] = GetLightPosAndColor();
     for (size_t i = 0; i < lightPositions.size(); ++i) {
         auto lightModel = glm::mat4(1.0f);
         lightModel = glm::translate(lightModel, lightPositions[i]);
         lightModel = glm::scale(lightModel, glm::vec3(0.2f));
-        rhi::SetUniform(_ubo, "lightPositions", i, lightPositions[i]);
-        rhi::SetUniform(_ubo, "lightColors", i, lightColors[i]);
         renderSphere(program, lightModel);
     }
 }

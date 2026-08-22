@@ -19,6 +19,7 @@ public:
     void release() override;
 
     bool adopt(vk::ImageView view, vk::Format format, vk::Extent2D ext, const TextureDesc& desc);
+    void debugDumpToPPM(const std::string& path);
 
     vk::Sampler sampler() const { return _sampler != nullptr ? *_sampler : vk::Sampler{nullptr}; }
     vk::ImageView view() const { return _adoptedView ? _adoptedView : (_view != nullptr ? *_view : vk::ImageView{nullptr}); }

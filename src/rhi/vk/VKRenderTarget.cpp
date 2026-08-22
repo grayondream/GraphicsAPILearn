@@ -158,7 +158,7 @@ bool VKRenderTarget::createRenderPass() {
     std::vector<vk::AttachmentReference> colorRefs;
     std::vector<vk::AttachmentReference> resolveRefs;
 
-    for (const auto& c : _colors) {
+for (const auto& c : _colors) {
         vk::AttachmentDescription ad{};
         ad.format = ToVkTextureFormat(c.format);
         ad.samples = msaa ? ToVkSamples(static_cast<int>(_samples)) : vk::SampleCountFlagBits::e1;
@@ -171,6 +171,22 @@ bool VKRenderTarget::createRenderPass() {
         // adopted colorTexture2D(i) can be sampled (e.g. post-processing).
         ad.finalLayout = msaa ? vk::ImageLayout::eColorAttachmentOptimal
                               : vk::ImageLayout::eShaderReadOnlyOptimal;
+        uint32_t idx = static_cast<uint32_t>(attachments.size());
+        attachments.push_back(ad);
+        colorRefs.push_back(vk::AttachmentReference(idx, vk::ImageLayout::eColorAttachmentOptimal));
+    }
+    // Color-only cubemap capture (PBR IBL): the attached cube face is the sole
+    // color attachment even though the RT owns no color image.
+    if (_cubeColor && _colors.empty()) {
+        vk::AttachmentDescription ad{};
+        ad.format = _cubeColorFormat;
+        ad.samples = vk::SampleCountFlagBits::e1;
+        ad.loadOp = vk::AttachmentLoadOp::eClear;
+        ad.storeOp = vk::AttachmentStoreOp::eStore;
+        ad.stencilLoadOp = vk::AttachmentLoadOp::eDontCare;
+        ad.stencilStoreOp = vk::AttachmentStoreOp::eDontCare;
+        ad.initialLayout = vk::ImageLayout::eUndefined;
+        ad.finalLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
         uint32_t idx = static_cast<uint32_t>(attachments.size());
         attachments.push_back(ad);
         colorRefs.push_back(vk::AttachmentReference(idx, vk::ImageLayout::eColorAttachmentOptimal));
@@ -258,6 +274,7 @@ bool VKRenderTarget::createFramebuffer() {
         return false;
     }
     _framebuffer = std::move(fr.value);
+    _fbExtent = _extent;
     return true;
 }
 
@@ -296,19 +313,33 @@ bool VKRenderTarget::attachCubeFace(ITexture3D* cube, int face, int mip) {
         // Depth-only cubemap: attach the requested face's single-layer depth view
         // (render pass from attachDepthCube already carries the depth attachment).
         views.push_back(vkCube->faceView(face, mip));
-    } else {
-        if (!_colors.empty()) views.push_back(vkCube->faceView(face, mip));
+    } else if (_colors.empty()) {
+        // Color-only cubemap (PBR IBL): the cube face becomes the sole color
+        // attachment. First attach wires the cube format into the render pass,
+        // subsequent faces/mips reuse it (format is fixed per cube).
+        if (!_cubeColor) {
+            _cubeColor = true;
+            _cubeColorFormat = vkCube->format();
+            LOGI("attachCubeFace: color-only cube fmt={} face={} mip={}", static_cast<int>(_cubeColorFormat), face, mip);
+            _renderPass = vk::raii::RenderPass{nullptr};
+            if (!createRenderPass()) return false;
+        }
+        views.push_back(vkCube->faceView(face, mip));
         if (_depthAttachment) views.push_back(*_depth.view);
     }
     if (views.empty()) return false;
 
+    // Framebuffer 必须与所附 cube 面（含 mip）实际尺寸一致：Vulkan 不像 GL 那样
+    // 自动把光栅裁剪到附件大小，FB 尺寸大于附件图像时 clear/draw 会越界写。
+    const vk::Extent2D faceExt = vkCube->mipExtent(static_cast<uint32_t>(mip));
     vk::FramebufferCreateInfo fci{};
     fci.renderPass = *_renderPass;
     fci.attachmentCount = static_cast<uint32_t>(views.size());
     fci.pAttachments = views.data();
-    fci.width = _extent.width;
-    fci.height = _extent.height;
+    fci.width = faceExt.width;
+    fci.height = faceExt.height;
     fci.layers = 1;
+    _fbExtent = faceExt;
     auto fr = _dev.createFramebuffer(fci);
     if (fr.result != vk::Result::eSuccess) return false;
     _framebuffer = std::move(fr.value);
@@ -389,6 +420,8 @@ void VKRenderTarget::clearImages() {
     _cubeDepth = false;
     _cubeDepthView = vk::ImageView{};
     _cubeDepthFormat = vk::Format{};
+    _cubeColor = false;
+    _cubeColorFormat = vk::Format{};
     _colorCount = 0;
 }
 
