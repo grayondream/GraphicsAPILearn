@@ -6,9 +6,10 @@
 namespace rhi {
 
 // Vertex/Index：DEFAULT 堆 + 一次性 upload 暂存拷贝（fence 同步，暂存即用即释放）。
-// Uniform：UPLOAD 堆持久映射 ring buffer（32 槽，槽大小按 D3D12 CBV 256 对齐约束
+// Uniform：UPLOAD 堆持久映射 ring buffer（256 槽，槽大小按 D3D12 CBV 256 对齐约束
 // 向上取整），每次 update 落到下一槽，避免同帧多 pass GPU 异步读被后写覆盖
-// （对齐 VKBuffer 的 kRingSlots 方案）。
+// （对齐 VKBuffer 的 kRingSlots 方案；256 槽覆盖 LightSource 多实例逐 draw update
+// 等一帧 >32 次 update 的样例）。
 class DXBuffer : public IBuffer {
 public:
     DXBuffer(ID3D12Device* device, ID3D12CommandQueue* queue,
@@ -45,7 +46,7 @@ private:
     size_t _size{0};
     ComPtr<ID3D12Resource> _resource;
 
-    static constexpr uint32_t kRingSlots = 32;
+    static constexpr uint32_t kRingSlots = 256;
     size_t _slotSize{0};      // uniform 槽大小（256 对齐后的 sizeof(UniformBlock)）
     uint32_t _ringHead{0};    // 累计更新计数，模 kRingSlots 得当前槽
     void* _mapped{nullptr};   // uniform 的持久映射
