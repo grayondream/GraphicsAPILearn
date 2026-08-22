@@ -1,0 +1,39 @@
+#pragma once
+#include "app/Samples/Base/CameraBaseApp.hpp"
+#include "rhi/core/IRenderer.hpp"
+#include "rhi/core/ITexture2D.hpp"
+#include "rhi/core/IBuffer.hpp"
+#include "rhi/core/IPipeline.hpp"
+#include "rhi/core/UniformBlock.hpp"
+#include "app/Samples/RhiGeometry.hpp"
+#include <memory>
+#include <array>
+#include "geometry/Camera.hpp"
+#include "geometry/Vertex.hpp"
+
+class BlendApp : public CameraBaseApp {
+public:
+	virtual ~BlendApp();
+
+protected:
+	virtual bool load(std::shared_ptr<rhi::IRenderer> rhiRenderer) override;
+	virtual void draw(const float dt) override;
+
+private:
+	std::shared_ptr<rhi::ITexture2D> _cubeTexture{};
+	std::shared_ptr<rhi::ITexture2D> _floorTexture{};
+	std::shared_ptr<rhi::ITexture2D> _winTexture{};
+	std::shared_ptr<rhi::IPipeline> _pipeline{};
+	std::shared_ptr<rhi::IBuffer> _cubeVb{}, _cubeUv{}, _cubeEbo{};
+	std::shared_ptr<rhi::IBuffer> _planeVb{}, _planeUv{};
+	std::shared_ptr<rhi::IBuffer> _winVb{}, _winUv{};
+	uint32_t _cubeIndexCount{};
+	uint32_t _planeVertexCount{};
+	uint32_t _winVertexCount{};
+	float _curTime{};
+	glm::vec3 _objectPosition = glm::vec3(0, 0, 0.0f);
+	glm::vec3 _winPos = glm::vec3(0.0f, 0.0f, 0.0f);
+	int _winCount = 5;
+	rhi::UniformBlock _ubo{};
+	std::shared_ptr<rhi::IBuffer> _uboBuffer{};
+};

@@ -1,6 +1,6 @@
 #include "Model.hpp"
 #include <utils/FileUtils.hpp>
-#include "app/GL/RhiImage.hpp"
+#include "app/Samples/RhiImage.hpp"
 #include <base/Log.hpp>
 using FileUtils::join;
 
