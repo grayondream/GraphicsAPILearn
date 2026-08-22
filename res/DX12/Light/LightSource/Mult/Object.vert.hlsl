@@ -2,7 +2,7 @@
 // {.uvLocation=3, .normalLocation=2}) 为准：binding0 交错 pos@TEXCOORD0 + color@TEXCOORD1
 // （stride 32）、normal@TEXCOORD2（binding2）、uv@TEXCOORD3（binding1）。
 // 对应 res/GL/Light/LightSource/Mult/Object.vert。GLSL 死接口 objectColor 未搬运。
-#include "../../_uniform_block.hlsli"
+#include "../../../_uniform_block.hlsli"
 
 struct VSIn {
     float4 pos : TEXCOORD0;

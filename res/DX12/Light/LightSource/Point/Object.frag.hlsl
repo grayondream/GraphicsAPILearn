@@ -2,7 +2,7 @@
 // 纹理寄存器约定 t<unit+1>：bindTexture(_diffuseTex,0)→t1、bindTexture(_specularTex,1)→t2；
 // 采样器取 RhiImage::Load2D 默认组合 LinearMipLinear+Repeat（s6）。
 // GLSL 死接口 objOriginColor 未搬运；GLSL 块内 lights[1] 对应模板 gLights[256] 的 [0]。
-#include "../../_samplers.hlsli"
+#include "../../../_uniform_block.hlsli"
 
 Texture2D gDiffuseMap : register(t1);
 Texture2D gSpecularMap : register(t2);
