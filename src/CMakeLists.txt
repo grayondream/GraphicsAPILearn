@@ -98,10 +98,51 @@ endif()
 if(${ENABLE_DX12})
     message("Graphic API Enable D3D12")
     target_compile_definitions(${PROJECT_NAME} PRIVATE ENABLE_DX12=1)
-    # Windows SDK 自带 d3d12/dxgi/dxguid 导入库，直接链接；
+    # Windows SDK 自带 d3d12/dxgi/dxguid/d3dcompiler 导入库，直接链接；
     # Linux 侧仅定义宏不链接（无 Windows SDK 导入库），保证既有 Linux 构建/CI 不受影响
     if(WIN32)
-        target_link_libraries(${PROJECT_NAME} d3d12.lib dxgi.lib dxguid.lib)
+        target_link_libraries(${PROJECT_NAME} d3d12.lib dxgi.lib dxguid.lib d3dcompiler.lib)
+    endif()
+    # ---- dxc 构建目标（仿 vk_shaders；产物 build/res/DX12/<dir>/<name>.<stage>.cso，
+    #      与 DXShader::LocateCso 的查找路径约定一致）----
+    find_program(DXC_TOOL dxc HINTS "$ENV{VCPKG_ROOT}/installed/x64-windows/tools/directx-dxc")
+    if(DXC_TOOL)
+        set(DX_SHADER_SOURCE "${CMAKE_SOURCE_DIR}/res/DX12")
+        set(DX_SHADER_OUTPUT "${CMAKE_BINARY_DIR}/res/DX12")
+        file(GLOB_RECURSE DX_HLSL_SOURCES
+            "${DX_SHADER_SOURCE}/*.vert.hlsl"
+            "${DX_SHADER_SOURCE}/*.frag.hlsl"
+            "${DX_SHADER_SOURCE}/*.geom.hlsl")
+        foreach(src IN LISTS DX_HLSL_SOURCES)
+            file(RELATIVE_PATH rel "${DX_SHADER_SOURCE}" "${src}")
+            get_filename_component(rel_dir "${rel}" DIRECTORY)
+            string(REGEX REPLACE "\\.(vert|frag|geom)\\.hlsl$" "" base "${rel}")
+            if(rel MATCHES "\\.vert\\.hlsl$")
+                set(profile vs_6_1)
+                set(entry VSMain)
+                set(stage vert)
+            elseif(rel MATCHES "\\.frag\\.hlsl$")
+                set(profile ps_6_1)
+                set(entry PSMain)
+                set(stage frag)
+            else()
+                set(profile gs_6_0)
+                set(entry GSMain)
+                set(stage geom)
+            endif()
+            set(out "${DX_SHADER_OUTPUT}/${base}.${stage}.cso")
+            add_custom_command(OUTPUT "${out}"
+                COMMAND ${CMAKE_COMMAND} -E make_directory "${DX_SHADER_OUTPUT}/${rel_dir}"
+                COMMAND "${DXC_TOOL}" -T ${profile} -E ${entry} -Fo "${out}" "${src}"
+                DEPENDS "${src}" COMMENT "Compiling DX shader ${rel}" VERBATIM)
+            list(APPEND DX_CSO_OUTPUTS "${out}")
+        endforeach()
+        if(DX_CSO_OUTPUTS)
+            add_custom_target(dx_shaders ALL DEPENDS ${DX_CSO_OUTPUTS})
+            add_dependencies(renderLearn dx_shaders)
+        endif()
+    else()
+        message(WARNING "[DX12] dxc not found - dx_shaders skipped, HLSL will not compile to .cso")
     endif()
 endif()
 
