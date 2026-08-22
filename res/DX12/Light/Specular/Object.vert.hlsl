@@ -1,0 +1,25 @@
+// 物体管线以 SimpleLightSpecular 的 RhiGeometry::Create(shape, normal+index,
+// {.normalLocation=2}) 为准：binding0 交错 pos@TEXCOORD0 + color@TEXCOORD1（stride 32）、
+// normal@TEXCOORD2（binding2，无 uv）。对应 res/GL/Light/Specular/Object.vert。
+// GLSL 死接口 objectColor（frag 未消费）未搬运。
+#include "../../_uniform_block.hlsli"
+
+struct VSIn {
+    float4 pos : TEXCOORD0;
+    float4 col : TEXCOORD1;
+    float4 normal : TEXCOORD2;
+};
+
+struct VSOut {
+    float4 sv : SV_Position;
+    float4 normal : TEXCOORD0;
+    float4 fragPos : TEXCOORD1;
+};
+
+VSOut VSMain(VSIn i) {
+    VSOut o;
+    o.fragPos = mul(gModel, i.pos);
+    o.sv = mul(gProjection, mul(gView, o.fragPos));
+    o.normal = mul(transpose(inverse(gModel)), i.normal);
+    return o;
+}
