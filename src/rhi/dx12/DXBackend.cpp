@@ -23,6 +23,11 @@
 #include <map>
 #include <set>
 
+// ImGui DX12 渲染 backend（本 TU 仅在 ENABLE_DX12 时编译，头路径由 src/CMakeLists
+// 的 ENABLE_DX12 块显式添加；imgui 核心来自 vcpkg imgui::imgui）
+#include <imgui.h>
+#include <imgui_impl_dx12.h>
+
 #ifndef RESOURCE_DIR
 #define RESOURCE_DIR "res"
 #endif
@@ -444,6 +449,10 @@ public:
         out.srvHeap = _srvHeap.ptr;   // Task 7：共享 SRV 堆（ImGui 字体纹理用槽 0）
         return _device.ptr && _queue.ptr;
     }
+
+    // ImGui overlay 绘制钩子（present 前由 AppHost 经 IImGuiWindow::render 触发）：
+    // 把 ImDrawData 录制进当前帧 cmdlist（类外定义）
+    void renderImGuiDrawData(void* drawData) override;
 
 private:
     // ---- 内部 blit 能力（IDXBlitContext 实现，注入 DXTexture2D 做 mip 降采样）----
@@ -1212,6 +1221,37 @@ bool DXRenderer::prepareDraw(bool needsIndex) {
     return true;
 }
 
+// overlay 恒绘制到窗口 backbuffer：先落地 pending RT（无 draw 帧的清屏在此生效），
+// 结束可能残留的离屏 pass，再把 OM 绑回窗口（不清屏，场景画面已就绪）。imgui
+// backend 自带 PSO/root signature/顶点装配，仅需调用方备好 OM 目标与含字体 SRV
+// （共享堆槽 0）的描述符堆；每次 draw 的 prepareDraw 会自愈重设全部状态。
+void DXRenderer::renderImGuiDrawData(void* drawData) {
+    auto* dd = static_cast<ImDrawData*>(drawData);
+    if (!dd || !_recording || !_cmdList.ptr) return;
+    if (_omPending) flushOmTargets();
+    if (_activeOffscreen) {
+        _activeOffscreen->EndPass(_cmdList.ptr);
+        _activeOffscreen.reset();
+    }
+    activateWindowTargets(false);
+    _omPending = false;
+    // 字体 SRV 在共享 CBV_SRV_UAV 堆槽 0；border 动态采样器堆同绑（同 prepareDraw）
+    ID3D12DescriptorHeap* heaps[2] = {};
+    UINT heapCount = 0;
+    if (_srvHeap.ptr) heaps[heapCount++] = _srvHeap.ptr;
+    if (_samplerHeap.ptr) heaps[heapCount++] = _samplerHeap.ptr;
+    if (heapCount > 0) _cmdList.ptr->SetDescriptorHeaps(heapCount, heaps);
+    ImGui_ImplDX12_RenderDrawData(dd, _cmdList.ptr);
+    // imgui 把 viewport/scissor 设为自身正高度值：重放本后端视口（负高度翻转），
+    // 同 VKRenderer 尾部 applyViewport 的理由
+    applyViewport();
+}
+
 std::shared_ptr<IRenderer> createDX12Renderer() { return std::make_shared<DXRenderer>(); }
+
+bool GetDXImGuiInitInfo(const std::shared_ptr<IRenderer>& renderer, DXImGuiInitInfo& out) {
+    auto* dx = dynamic_cast<DXRenderer*>(renderer.get());
+    return dx && dx->imguiInitInfo(out);
+}
 
 } // namespace rhi

@@ -5,6 +5,7 @@
 #include "app/SampleFactory.hpp"
 #include "app/Samples/ImGuiOpenglWindow.hpp"
 #include "app/Samples/ImGuiVulkanWindow.hpp"
+#include "app/Samples/ImGuiDirectx12Window.hpp"
 #include "rhi/gl/GLBackend.hpp"
 #include "rhi/gl/GLFWSurface.hpp"
 #include "rhi/core/Common.hpp"
@@ -65,16 +66,20 @@ bool AppHost::rebuildBackend(const GLFWWindowProperties& props) {
     (void)props;
 #endif
 #if ENABLE_DX12
-    // ImGui overlay 延后至 Task 9 接入，此分支暂不建 imgui window
     if (_backend == GraphicsType::DX12) {
         m_window->shutdown();
         m_window->initialize();
         rhi::setBackendKind(rhi::BackendKind::Dx12);
         auto surface = std::make_shared<rhi::GLFWSurface>(
-            m_window->getNativeGLFWWindow(), static_cast<int>(props.width), static_cast<int>(props.height));
+            m_window->getNativeGLFWwindow(), static_cast<int>(props.width), static_cast<int>(props.height));
         _renderer = rhi::createDX12Renderer();
         if (!_renderer->init(surface)) { LOGE("Failed to init DX12 renderer"); return false; }
         _renderer->setViewport(rhi::Viewport{0, 0, static_cast<int>(props.width), static_cast<int>(props.height)});
+        _renderer->setPipeline(nullptr);
+        auto imguiDx = std::make_unique<ImGuiDirectx12Window>();
+        imguiDx->setRenderer(_renderer);
+        imguiDx->init(m_window->getNativeGLFWwindow());
+        m_imguiWindow = std::move(imguiDx);
         hookWindowCallbacks();
         return reloadSample();
     }

@@ -98,6 +98,11 @@ endif()
 if(${ENABLE_DX12})
     message("Graphic API Enable D3D12")
     target_compile_definitions(${PROJECT_NAME} PRIVATE ENABLE_DX12=1)
+    # DXRenderer 需要 imgui_impl_dx12.h（imgui DX12 后端头，位于 3party/imgui/DX12）。
+    # 该目录由 3party/imgui 子 CMake 的 include_directories 声明，但因 add_subdirectory
+    # 隔离不传播到 src 的 renderLearn target（imgui_impl_dx12.cpp 靠同目录引号 include
+    # 编译），故这里对本 target 显式添加（同 Vulkan 块的做法）。
+    target_include_directories(${PROJECT_NAME} PRIVATE "${RENDER_3PARTY_PATH}/imgui/DX12")
     # Windows SDK 自带 d3d12/dxgi/dxguid/d3dcompiler 导入库，直接链接；
     # Linux 侧仅定义宏不链接（无 Windows SDK 导入库），保证既有 Linux 构建/CI 不受影响
     if(WIN32)
