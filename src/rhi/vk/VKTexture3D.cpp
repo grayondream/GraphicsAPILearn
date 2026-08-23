@@ -3,6 +3,7 @@
 #include "VKUpload.hpp"
 #include "base/Log.hpp"
 #include <cstring>
+#include <limits>
 
 namespace rhi {
 
@@ -437,7 +438,7 @@ void VKTexture3D::debugDumpCubeFace(const char* path, int face, int mip) const {
             const auto conv = [](uint16_t half) {
                 uint32_t sign = (half >> 15) & 1, exp = (half >> 10) & 0x1f, man = half & 0x3ff;
                 if (exp == 0) return man == 0 ? 0.0f : (man / 1024.0f) * (1 / 16384.0f);
-                if (exp == 31) return man == 0 ? (sign ? -1e30f : 1e30f) : 0.0f / 0.0f;
+                if (exp == 31) return man == 0 ? (sign ? -1e30f : 1e30f) : std::numeric_limits<float>::quiet_NaN();
                 int e = static_cast<int>(exp) - 15;
                 float m = 1.0f + man / 1024.0f;
                 float v = m * std::pow(2.0f, static_cast<float>(e));

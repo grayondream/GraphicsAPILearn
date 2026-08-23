@@ -17,6 +17,7 @@
 
 #include <array>
 #include <cstring>
+#include <d3dcompiler.h>   // D3DCreateBlob（DXIL blob 装载）
 #include <filesystem>
 #include <fstream>
 #include <iterator>
@@ -1003,11 +1004,15 @@ private:
     std::shared_ptr<IPipeline> _pipeline{};
     std::array<std::shared_ptr<IBuffer>, 16> _vertexBuffers{};
     std::shared_ptr<IBuffer> _indexBuffer{};
+    // 最近 setRenderTarget 传入的目标（窗口=nullptr）；flushOmTargets 消费
+    std::shared_ptr<IRenderTarget> _renderTarget{};
     float _clearColor[4]{0.0f, 0.0f, 0.0f, 1.0f};
     // clear 色按渲染目标分别记录（key=IRenderTarget*，swapchain 用 nullptr），
     // 对齐 GL/VK 语义：clearColor 只影响"调用时绑定"的目标，避免多 pass 交叉污染
     std::map<void*, std::array<float, 4>> _clearColors{};
-    IBuffer* _uniformBuffer{nullptr};   // 最近创建的 UBO（App 每样例一个，resetRenderState 清除）
+    // 最近创建的 UBO（App 每样例一个，resetRenderState 清除）；持 shared_ptr
+    // 以便 prepareDraw 里 dynamic_pointer_cast<DXBuffer> 取 ring 槽基址
+    std::shared_ptr<IBuffer> _uniformBuffer{};
     bool _viewportSet{false};
 };
 
@@ -1025,8 +1030,8 @@ bool DXRenderer::init(const std::shared_ptr<ISurface>& surface) {
     _fenceEvent = CreateEventW(nullptr, FALSE, FALSE, nullptr);
     DX_CHECK(_device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&_uploadAllocator)),
              "create upload allocator");
-    if (!CreateSharedRootSignature(_device.ptr, &_rootSignature)) return false;
-    if (!CreateBlitRootSignature(_device.ptr, &_blitRootSig)) return false;
+    if (!CreateSharedRootSignature(_device.ptr, _rootSignature)) return false;
+    if (!CreateBlitRootSignature(_device.ptr, _blitRootSig)) return false;
 
     // 共享 SRV 堆（shader-visible）：bindTexture 写槽 unit+1，draw 前 SetDescriptorHeaps
     D3D12_DESCRIPTOR_HEAP_DESC shd{};

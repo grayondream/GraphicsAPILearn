@@ -60,7 +60,7 @@ bool DXSwapchain::init(ID3D12Device* device, ID3D12CommandQueue* queue,
 }
 
 void DXSwapchain::shutdown() {
-    if (_queue.Get() && _frameFence) waitForGpuIdle();
+    if (_queue && _frameFence) waitForGpuIdle();
     destroySizeDependent();
     if (_swapchain.Get()) { _swapchain->Release(); _swapchain.ptr = nullptr; }
     if (_factory.Get()) { _factory->Release(); _factory.ptr = nullptr; }

@@ -132,7 +132,7 @@ void ShadowMapApp::renderScene2FrameBuffer() {
         renderer()->drawIndexed(_cubeIndexCount, 0, 0);
     }
     renderer()->setRenderTarget(nullptr);
-    renderer()->setViewport(rhi::Viewport{0, 0, windowWidth(), windowHeight()});
+    renderer()->setViewport(rhi::Viewport{0, 0, static_cast<int>(windowWidth()), static_cast<int>(windowHeight())});
 }
 
 void ShadowMapApp::reanderFraemBuffer() {

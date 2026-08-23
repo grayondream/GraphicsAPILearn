@@ -8,23 +8,9 @@ namespace rhi {
 
 namespace {
 
-D3D12_FILTER DxFilterOf(TextureFilter filter) {
-    switch (filter) {
-        case TextureFilter::Linear:          return D3D12_FILTER_MIN_MAG_LINEAR_MIP_POINT;
-        case TextureFilter::Nearest:         return D3D12_FILTER_MIN_MAG_MIP_POINT;
-        case TextureFilter::LinearMipLinear: return D3D12_FILTER_MIN_MAG_MIP_LINEAR;
-    }
-    return D3D12_FILTER_MIN_MAG_LINEAR_MIP_POINT;
-}
-
-D3D12_TEXTURE_ADDRESS_MODE DxAddressOf(TextureWrap wrap) {
-    switch (wrap) {
-        case TextureWrap::Repeat:         return D3D12_TEXTURE_ADDRESS_MODE_WRAP;
-        case TextureWrap::ClampToEdge:    return D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
-        case TextureWrap::ClampToBorder:  return D3D12_TEXTURE_ADDRESS_MODE_BORDER;
-    }
-    return D3D12_TEXTURE_ADDRESS_MODE_WRAP;
-}
+// 注意：DxFilterOf/DxAddressOf 的定义在下方 rhi 命名空间作用域（与 DXPipeline.hpp
+// 声明配对，DXBackend 动态采样器堆复用）。不得再于匿名命名空间定义同签名函数——
+// 两份可见重载会让 MSVC 报调用二义（C2668）。
 
 D3D12_STATIC_SAMPLER_DESC MakeSampler(D3D12_FILTER filter, D3D12_TEXTURE_ADDRESS_MODE address, UINT slot,
                                       D3D12_COMPARISON_FUNC comparison = D3D12_COMPARISON_FUNC_NEVER) {
@@ -128,6 +114,26 @@ void WarnFrontAndBackOnce() {
 
 } // namespace
 
+// filter/wrap → D3D12 描述（rhi 作用域定义，与 DXPipeline.hpp 声明配对；
+// DXBackend 动态采样器堆与本文件静态表共用）
+D3D12_FILTER DxFilterOf(TextureFilter filter) {
+    switch (filter) {
+        case TextureFilter::Linear:          return D3D12_FILTER_MIN_MAG_LINEAR_MIP_POINT;
+        case TextureFilter::Nearest:         return D3D12_FILTER_MIN_MAG_MIP_POINT;
+        case TextureFilter::LinearMipLinear: return D3D12_FILTER_MIN_MAG_MIP_LINEAR;
+    }
+    return D3D12_FILTER_MIN_MAG_LINEAR_MIP_POINT;
+}
+
+D3D12_TEXTURE_ADDRESS_MODE DxAddressOf(TextureWrap wrap) {
+    switch (wrap) {
+        case TextureWrap::Repeat:         return D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+        case TextureWrap::ClampToEdge:    return D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+        case TextureWrap::ClampToBorder:  return D3D12_TEXTURE_ADDRESS_MODE_BORDER;
+    }
+    return D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+}
+
 bool PSOKey::operator==(const PSOKey& o) const {
     if (stateHash != o.stateHash || colorCount != o.colorCount ||
         depth != o.depth || samples != o.samples)
@@ -171,24 +177,27 @@ const D3D12_STATIC_SAMPLER_DESC* StaticSamplers(size_t& count) {
     //   0..2 Linear(Repeat/Clamp/Border)、3..5 Nearest、6..8 LinearMipLinear；
     // 槽 6 即默认 minFilter(LinearMipLinear)+Repeat。
     // s9：shadow map 硬件比较采样器（Task 10b Shadow 组），贴 GL Nearest 行为取
-    //   MIN_MAG_NEAREST + LESS_EQUAL；wrap=ClampToBorder+OPAQUE_WHITE（越界=最远深度
+    //   MIN_MAG_MIP_POINT + LESS_EQUAL；wrap=ClampToBorder+OPAQUE_WHITE（越界=最远深度
     //   =受光，与 GL/VK borderColor 1.0 语义一致）。仅 Shadow 组的 shadowMap 使用。
     // w=ClampToBorder 的三个槽位（2/5/8）不进静态表：静态采样器边框色只有黑/白，
     // 任意 borderColor 由 DXRenderer 动态 SAMPLER 堆在 bind 路径按槽位写入
     // （未覆盖时堆内预填 OPAQUE_WHITE，行为与旧静态表一致）。非 border 组合继续走根签名静态表。
+    // 表按有效条目紧凑填充（寄存器编号仍为 f*3+w 与 9）：数组容量必须 ≥ 最大编号+1，
+    // 否则按下标写 t[9] 是越界 UB
     static const std::array<D3D12_STATIC_SAMPLER_DESC, 7> table = [] {
         constexpr TextureFilter filters[3] = {TextureFilter::Linear, TextureFilter::Nearest,
                                               TextureFilter::LinearMipLinear};
         constexpr TextureWrap wraps[2] = {TextureWrap::Repeat, TextureWrap::ClampToEdge};
         std::array<D3D12_STATIC_SAMPLER_DESC, 7> t{};
+        size_t n = 0;
         for (int f = 0; f < 3; ++f)
             for (int w = 0; w < 2; ++w)
-                t[static_cast<size_t>(f) * 3 + w] =
+                t[n++] =
                     MakeSampler(DxFilterOf(filters[f]), DxAddressOf(wraps[w]),
                                 static_cast<UINT>(f * 3 + w));
-        t[9] = MakeSampler(D3D12_FILTER_COMPARISON_MIN_MAG_NEAREST_MIP_POINT,
-                           DxAddressOf(TextureWrap::ClampToBorder), 9,
-                           D3D12_COMPARISON_FUNC_LESS_EQUAL);
+        t[n++] = MakeSampler(D3D12_FILTER_COMPARISON_MIN_MAG_MIP_POINT,
+                             DxAddressOf(TextureWrap::ClampToBorder), 9,
+                             D3D12_COMPARISON_FUNC_LESS_EQUAL);
         return t;
     }();
     count = table.size();

@@ -41,8 +41,10 @@ static std::string LocateCso(const std::string& glslSource, ShaderStage::Type ty
         resRoot = fs::absolute(resRoot);
     fs::path buildDx = resRoot.parent_path() / "build" / "res" / "DX12";
     fs::path rel = srcNoExt.lexically_relative(resRoot / "DX12");
+    // native() 在 MSVC 下是 wstring，不能与 char 字面量比较；统一转窄字符串
+    const std::string relStr = rel.string();
     if (!rel.empty() && !rel.is_absolute() &&
-        rel.native().rfind("..", 0) != 0) {
+        relStr.rfind("..", 0) != 0) {
         fs::path candidate = buildDx / rel;
         candidate += suffix;
         if (fs::exists(candidate))
@@ -70,7 +72,8 @@ static std::string ListExistingCsos() {
          it != end; it.increment(ec)) {
         if (ec || n >= 16) { out += ", ..."; break; }
         const auto& p = it->path();
-        if (p.native().size() > 4 && p.native().compare(p.native().size() - 4, 4, ".cso") == 0) {
+        const std::string pStr = p.string();   // native() 为 wstring，先转窄字符串再比较
+        if (pStr.size() > 4 && pStr.compare(pStr.size() - 4, 4, ".cso") == 0) {
             out += out.empty() ? p.lexically_relative(buildDx).string()
                                : ", " + p.lexically_relative(buildDx).string();
             ++n;

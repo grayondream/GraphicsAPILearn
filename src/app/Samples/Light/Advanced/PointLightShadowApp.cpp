@@ -157,7 +157,7 @@ void PointLightShadowApp::renderScene2FrameBuffer(std::shared_ptr<rhi::IPipeline
         renderScene(program, lightPos);
     }
     renderer()->setRenderTarget(nullptr);
-    renderer()->setViewport(rhi::Viewport{0, 0, windowWidth(), windowHeight()});
+    renderer()->setViewport(rhi::Viewport{0, 0, static_cast<int>(windowWidth()), static_cast<int>(windowHeight())});
     renderer()->clearColor(0.0f, 0.0f, 0.0f, 1.0f);
 }
 

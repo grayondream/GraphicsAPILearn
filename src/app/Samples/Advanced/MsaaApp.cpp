@@ -116,7 +116,7 @@ void MsaaApp::drawFrameBufferMssa() {
 	_uboBuffer->update(&_ubo, sizeof(rhi::UniformBlock), 0);
 	renderer()->drawIndexed(36, 0, 0);
 
-	renderer()->setViewport(rhi::Viewport{0, 0, windowWidth(), windowHeight()});
+	renderer()->setViewport(rhi::Viewport{0, 0, static_cast<int>(windowWidth()), static_cast<int>(windowHeight())});
 	renderer()->blitFramebuffer(_msaaFbo, _postFbo, rhi::BlitMask::Color);
 	renderer()->setRenderTarget(nullptr);
 	renderer()->clearColor(0.1f, 0.1f, 0.1f, 1.0f);

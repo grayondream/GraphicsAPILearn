@@ -71,14 +71,14 @@ bool AppHost::rebuildBackend(const GLFWWindowProperties& props) {
         m_window->initialize();
         rhi::setBackendKind(rhi::BackendKind::Dx12);
         auto surface = std::make_shared<rhi::GLFWSurface>(
-            m_window->getNativeGLFWwindow(), static_cast<int>(props.width), static_cast<int>(props.height));
+            m_window->getNativeGLFWWindow(), static_cast<int>(props.width), static_cast<int>(props.height));
         _renderer = rhi::createDX12Renderer();
         if (!_renderer->init(surface)) { LOGE("Failed to init DX12 renderer"); return false; }
         _renderer->setViewport(rhi::Viewport{0, 0, static_cast<int>(props.width), static_cast<int>(props.height)});
         _renderer->setPipeline(nullptr);
         auto imguiDx = std::make_unique<ImGuiDirectx12Window>();
         imguiDx->setRenderer(_renderer);
-        imguiDx->init(m_window->getNativeGLFWwindow());
+        imguiDx->init(m_window->getNativeGLFWWindow());
         m_imguiWindow = std::move(imguiDx);
         hookWindowCallbacks();
         return reloadSample();

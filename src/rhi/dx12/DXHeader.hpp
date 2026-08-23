@@ -32,7 +32,8 @@ struct ComPtr {
     ComPtr& operator=(const ComPtr&) = delete;
     ComPtr(ComPtr&& other) noexcept : ptr(other.ptr) { other.ptr = nullptr; }
     ComPtr& operator=(ComPtr&& other) noexcept {
-        if (this != &other) {
+        // 不能写 &other：operator& 被重载为返回 T**，须用 addressof 取对象地址
+        if (this != std::addressof(other)) {
             if (ptr) ptr->Release();
             ptr = other.ptr;
             other.ptr = nullptr;

@@ -166,7 +166,7 @@ void ShadowApp::renderScene2FrameBuffer(const glm::mat4& lightSpaceMatrix, const
         renderScene(_depthProgram, lightPos);
     }
     renderer()->setRenderTarget(nullptr);
-    renderer()->setViewport(rhi::Viewport{0, 0, windowWidth(), windowHeight()});
+    renderer()->setViewport(rhi::Viewport{0, 0, static_cast<int>(windowWidth()), static_cast<int>(windowHeight())});
 }
 
 void ShadowApp::renderScene2Screen(const glm::mat4& lightSpaceMatrix, const glm::vec3& lightPos) {
