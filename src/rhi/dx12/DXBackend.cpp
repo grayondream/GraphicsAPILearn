@@ -1480,6 +1480,12 @@ bool DXRenderer::prepareDraw(bool needsIndex) {
             // 本 draw 的绑定快照窗：staging 规范槽 → 可见堆窗内同偏移拷贝，
             // 表基址指向窗首（寄存器 t<unit+1> ↔ 窗内槽 unit+1，与 HLSL 约定一致）。
             // 描述符堆是全局状态，无快照则全帧 draw 共见最后一次绑定。
+            // 回绕告警（终审 F3）：描述符堆执行期生效，同帧第 kBindSets+1 个 draw
+            // 会复用窗口 1 并覆写尚未提交的最早快照——静默错绑。此处仅 WarnOnce
+            // 告警不阻断；正常样例单帧远低于该上限，不应触发。
+            if (_bindSetCursor > 0 && (_bindSetCursor % kBindSets) == 0) {
+                WarnOnce("bind-set snapshot windows exhausted (>1024 draws per frame); earliest snapshots are being overwritten");
+            }
             const UINT window = kSrvHeapSlots * (1 + (_bindSetCursor % kBindSets));
             ++_bindSetCursor;
             auto stagingCpu = _srvStagingHeap->GetCPUDescriptorHandleForHeapStart();
