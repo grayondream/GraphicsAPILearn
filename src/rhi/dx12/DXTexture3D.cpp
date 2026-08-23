@@ -398,7 +398,9 @@ bool DXTexture3D::recordCubeMipgen(ID3D12GraphicsCommandList* cmd,
                                    ID3D12DescriptorHeap* rtvHeap) {
     if (!_blitCtx || !srvHeap || !rtvHeap) return false;
     ID3D12RootSignature* rs = _blitCtx->BlitRootSignature();
-    ID3D12PipelineState* pso = _blitCtx->BlitPsoFor(_srvFormat);
+    // 源 SRV 是 TEXTURE2DARRAY 视图（单面单 mip）：必须用数组变体 PSO，
+    // Texture2D 声明采样数组视图属未定义行为（读到的切片/内容不可靠）
+    ID3D12PipelineState* pso = _blitCtx->BlitArrayPsoFor(_srvFormat);
     if (!rs || !pso) return false;
 
     const UINT srvInc = _device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);

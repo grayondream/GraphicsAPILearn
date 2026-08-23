@@ -16,6 +16,9 @@ public:
     virtual ID3D12RootSignature* BlitRootSignature() = 0;
     // 按 RTV 格式取/建全屏三角形 blit PSO（无深度/无混合/无输入布局）
     virtual ID3D12PipelineState* BlitPsoFor(DXGI_FORMAT rtvFormat) = 0;
+    // 数组变体：源 SRV 为 TEXTURE2DARRAY 视图（cubemap 逐面逐级 mipgen 用），
+    // 与 Texture2D 声明混用属视图类型不匹配 UB，须用 blit_array.frag 的 PSO
+    virtual ID3D12PipelineState* BlitArrayPsoFor(DXGI_FORMAT rtvFormat) = 0;
 };
 
 // 2D 纹理（Task 7）：

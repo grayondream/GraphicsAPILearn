@@ -449,8 +449,9 @@ public:
         _heapSamplerColors.clear();
         PrefillBorderSamplers();
         // 上一样例写过的 SRV 槽全部置空描述符：旧样例纹理已销毁，
-        // 悬垂 SRV 被新样例 draw 读到是未定义行为（对齐 VK 描述符集重建教训）
-        if (_device.ptr && _srvHeap.ptr) {
+        // 悬垂 SRV 被新样例 draw 读到是未定义行为（对齐 VK 描述符集重建教训）。
+        // 写 staging 规范槽：可见堆由 prepareDraw 快照，规范槽清零即全窗清零
+        if (_device.ptr && _srvStagingHeap.ptr) {
             D3D12_SHADER_RESOURCE_VIEW_DESC nullSrv{};
             nullSrv.Format = DXGI_FORMAT_R8_UNORM;
             nullSrv.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
@@ -458,12 +459,13 @@ public:
             nullSrv.Texture2D.MostDetailedMip = 0;
             nullSrv.Texture2D.MipLevels = 1;
             for (unsigned unit : _boundUnits) {
-                D3D12_CPU_DESCRIPTOR_HANDLE dst{_srvHeap->GetCPUDescriptorHandleForHeapStart()};
+                D3D12_CPU_DESCRIPTOR_HANDLE dst{_srvStagingHeap->GetCPUDescriptorHandleForHeapStart()};
                 dst.ptr += (unit + 1) * static_cast<SIZE_T>(_srvDescSize);
                 _device->CreateShaderResourceView(nullptr, &nullSrv, dst);
             }
         }
         _boundUnits.clear();
+        _bindSetCursor = 0;
     }
     void waitIdle() override { waitForGpuIdle(); }
     void flush() override {
@@ -504,6 +506,9 @@ private:
         ID3D12PipelineState* BlitPsoFor(DXGI_FORMAT rtvFormat) override {
             return _owner->EnsureBlitPso(rtvFormat);
         }
+        ID3D12PipelineState* BlitArrayPsoFor(DXGI_FORMAT rtvFormat) override {
+            return _owner->EnsureBlitArrayPso(rtvFormat);
+        }
     private:
         DXRenderer* _owner{nullptr};
     };
@@ -532,12 +537,10 @@ private:
         sd.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
         sd.Texture2D.MostDetailedMip = 0;
         sd.Texture2D.MipLevels = dx->mipLevels();
-        D3D12_CPU_DESCRIPTOR_HANDLE dst{_srvHeap->GetCPUDescriptorHandleForHeapStart()};
+        // 只写 staging 规范槽；可见堆由 prepareDraw 按 draw 快照（见成员注释）
+        D3D12_CPU_DESCRIPTOR_HANDLE dst{_srvStagingHeap->GetCPUDescriptorHandleForHeapStart()};
         dst.ptr += (unit + 1) * static_cast<SIZE_T>(_srvDescSize);
         _device->CreateShaderResourceView(dx->resource(), &sd, dst);
-        LOGI("[DX12][BINDDBG] t{} <- res={} fmt={} mips={}", unit + 1,
-             static_cast<void*>(dx->resource()), static_cast<int>(dx->srvFormat()),
-             dx->mipLevels());
         _boundUnits.insert(unit);
         TouchHeapSampler(dx->samplerParams(), dx->borderColor().data());
     }
@@ -552,7 +555,7 @@ private:
         }
         auto* dx = dynamic_cast<DXTexture3D*>(texture);
         if (!dx || !dx->valid()) return;
-        D3D12_CPU_DESCRIPTOR_HANDLE dst{_srvHeap->GetCPUDescriptorHandleForHeapStart()};
+        D3D12_CPU_DESCRIPTOR_HANDLE dst{_srvStagingHeap->GetCPUDescriptorHandleForHeapStart()};
         dst.ptr += (unit + 1) * static_cast<SIZE_T>(_srvDescSize);
         if (!dx->WriteSrv(dst)) {
             WarnOnce("bindTexture3D: SRV write failed");
@@ -621,14 +624,24 @@ private:
         }
     }
 
-    // blit PSO 缓存（键=目标 RTV 格式）：全屏三角形、无深度、无混合、无输入布局
+    // blit PSO 缓存（键=目标 RTV 格式）：全屏三角形、无深度、无混合、无输入布局。
+    // arrayVariant=true 用 blit_array.frag（TEXTURE2DARRAY 源视图，cubemap mipgen）
     ID3D12PipelineState* EnsureBlitPso(DXGI_FORMAT rtvFormat) {
-        auto it = _blitPsos.find(rtvFormat);
-        if (it != _blitPsos.end()) return it->second.Get();
+        return EnsureBlitPsoImpl(rtvFormat, false);
+    }
+    ID3D12PipelineState* EnsureBlitArrayPso(DXGI_FORMAT rtvFormat) {
+        return EnsureBlitPsoImpl(rtvFormat, true);
+    }
+    ID3D12PipelineState* EnsureBlitPsoImpl(DXGI_FORMAT rtvFormat, bool arrayVariant) {
+        auto& cache = arrayVariant ? _blitArrayPsos : _blitPsos;
+        auto it = cache.find(rtvFormat);
+        if (it != cache.end()) return it->second.Get();
         ComPtr<ID3DBlob> vs = LoadBlobFromCso(
             DxSourcePath("_internal/blit.vert.hlsl").string(), ShaderStage::Vertex);
         ComPtr<ID3DBlob> ps = LoadBlobFromCso(
-            DxSourcePath("_internal/blit.frag.hlsl").string(), ShaderStage::Fragment);
+            DxSourcePath(arrayVariant ? "_internal/blit_array.frag.hlsl"
+                                      : "_internal/blit.frag.hlsl").string(),
+            ShaderStage::Fragment);
         if (!vs.Get() || !ps.Get()) {
             LOGE("[DX12] blit shaders not found under build/res/DX12/_internal");
             return nullptr;
@@ -671,7 +684,7 @@ private:
         DX_CHECK(_device->CreateGraphicsPipelineState(&desc, IID_PPV_ARGS(&pso)),
                  "create blit pipeline state");
         if (!pso.Get()) return nullptr;
-        return _blitPsos.emplace(rtvFormat, std::move(pso)).first->second.Get();
+        return cache.emplace(rtvFormat, std::move(pso)).first->second.Get();
     }
 
     // 懒建单槽暂存堆：颜色 blit 的临时 SRV（shader-visible）与 RTV
@@ -1043,10 +1056,18 @@ private:
 
     // ---- 纹理/SRV（Task 7）----
     static constexpr unsigned kSrvHeapSlots = 128;   // 与根签名 param1 表 t0..t127 一致
-    // 共享 shader-visible CBV_SRV_UAV 堆：槽 i ↔ 寄存器 t(i)，槽 0 预留 ImGui，
-    // 纹理 bindTexture(unit) 写槽 unit+1（寄存器 t<unit+1>）
+    // 共享 shader-visible CBV_SRV_UAV 堆：槽 i ↔ 寄存器 t(i)，槽 0 预留 ImGui。
+    // bindTexture 只写 _srvStagingHeap（CPU-only 规范描述符）；prepareDraw 每次
+    // draw 把当前绑定状态拷贝进可见堆的一个"快照窗"再绑表基址。描述符堆是
+    // 全局状态而非命令流：若直接写固定槽，同帧后绑者覆盖先绑者、全帧 draw 在
+    // 提交时看到的都是最后一次绑定（GL 按命令序生效 / VK 每 draw 绑各自描述符集
+    // 均无此问题；Defer 同帧 t1 被 wood→brick→gPosition 重绑即触发——GBuffer 执行
+    // 时采到 gPosition 附件）。快照窗游标在 present 尾部随 allocator Reset 归零。
+    static constexpr unsigned kBindSets = 1024;   // 每帧 bind-状态快照数上限
     ComPtr<ID3D12DescriptorHeap> _srvHeap;
+    ComPtr<ID3D12DescriptorHeap> _srvStagingHeap;
     UINT _srvDescSize{0};
+    UINT _bindSetCursor{0};
     std::set<unsigned> _boundUnits{};                // resetRenderState 时置空防悬垂描述符
     // 动态采样器堆（Task 8 borderColor）：ClampToBorder 组合按槽位 2/5/8 动态写入，
     // 预填 OPAQUE_WHITE 与旧"静态表全白边框"行为一致；_heapSamplerColors 记录
@@ -1056,8 +1077,10 @@ private:
     UINT _samplerDescSize{0};
     std::map<UINT, std::array<float, 4>> _heapSamplerColors{};
     // 内部 blit（mip 降采样 + RT↔RT 颜色拷贝）：专用根签名 + 按目标格式缓存的 PSO
+    // （_blitArrayPsos 为 TEXTURE2DARRAY 源视图变体，cubemap mipgen 专用）
     ComPtr<ID3D12RootSignature> _blitRootSig;
     std::map<DXGI_FORMAT, ComPtr<ID3D12PipelineState>> _blitPsos{};
+    std::map<DXGI_FORMAT, ComPtr<ID3D12PipelineState>> _blitArrayPsos{};
     FrameBlitContext _blitCtx;
     ComPtr<ID3D12DescriptorHeap> _scratchSrvHeap;    // 颜色 blit 单槽暂存 SRV/RTV
     ComPtr<ID3D12DescriptorHeap> _scratchRtvHeap;
@@ -1117,13 +1140,21 @@ bool DXRenderer::init(const std::shared_ptr<ISurface>& surface) {
     if (!CreateSharedRootSignature(_device.ptr, _rootSignature)) return false;
     if (!CreateBlitRootSignature(_device.ptr, _blitRootSig)) return false;
 
-    // 共享 SRV 堆（shader-visible）：bindTexture 写槽 unit+1，draw 前 SetDescriptorHeaps
+    // 共享 SRV 堆（shader-visible）：槽 0 预留 ImGui 字体；其余按快照窗划分，
+    // prepareDraw 每 draw 拷入当前绑定状态（见 _srvHeap 成员注释）
     D3D12_DESCRIPTOR_HEAP_DESC shd{};
     shd.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
-    shd.NumDescriptors = kSrvHeapSlots;
+    shd.NumDescriptors = kSrvHeapSlots * (1 + kBindSets);
     shd.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
     DX_CHECK(_device->CreateDescriptorHeap(&shd, IID_PPV_ARGS(&_srvHeap)), "create srv heap");
     if (!_srvHeap.ptr) return false;
+    // 规范描述符堆（CPU-only）：bindTexture/resetRenderState 的写入目标
+    D3D12_DESCRIPTOR_HEAP_DESC stg = shd;
+    stg.NumDescriptors = kSrvHeapSlots;
+    stg.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
+    DX_CHECK(_device->CreateDescriptorHeap(&stg, IID_PPV_ARGS(&_srvStagingHeap)),
+             "create srv staging heap");
+    if (!_srvStagingHeap.ptr) return false;
     _srvDescSize = _device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
     // 动态采样器堆（borderColor）：预填 border 槽位后行为与旧静态表一致
@@ -1180,6 +1211,7 @@ void DXRenderer::shutdown() {
     if (_scratchSrvHeap.Get()) { _scratchSrvHeap->Release(); _scratchSrvHeap.ptr = nullptr; }
     if (_samplerHeap.Get()) { _samplerHeap->Release(); _samplerHeap.ptr = nullptr; }
     _heapSamplerColors.clear();
+    if (_srvStagingHeap.Get()) { _srvStagingHeap->Release(); _srvStagingHeap.ptr = nullptr; }
     if (_srvHeap.Get()) { _srvHeap->Release(); _srvHeap.ptr = nullptr; }
     _boundUnits.clear();
     if (_rootSignature.Get()) { _rootSignature->Release(); _rootSignature.ptr = nullptr; }
@@ -1222,6 +1254,7 @@ bool DXRenderer::present() {
     DX_CHECK(_cmdList->Reset(_frameAllocator.ptr, nullptr), "reset frame command list");
     _recording = true;
     _rtActive = false;
+    _bindSetCursor = 0;   // 快照窗按帧回收：本帧命令已全部执行完毕
     return ok;
 }
 
@@ -1404,7 +1437,7 @@ bool DXRenderer::prepareDraw(bool needsIndex) {
 
     _cmdList.ptr->SetGraphicsRootSignature(_rootSignature.ptr);
     _cmdList.ptr->SetPipelineState(pso);
-    // SRV 描述符堆 + 根表（param1，t0..t127 ↔ 堆槽 0..127）。border 寄存器
+    // SRV 描述符堆 + 根表（param1，t0..t127 ↔ 快照窗内偏移）。border 寄存器
     // s2/s5/s8 不在静态表内、由采样器堆提供 → 两堆同绑；静态采样器随根签名
     // 生效不受 SetDescriptorHeaps 影响。每次 draw 重设堆：mipgen/blit 可能中途
     // 切换过堆，此处自愈。
@@ -1416,8 +1449,23 @@ bool DXRenderer::prepareDraw(bool needsIndex) {
     if (heapCount > 0) {
         _cmdList.ptr->SetDescriptorHeaps(heapCount, heaps);
         if (_srvHeap.ptr) {
-            _cmdList.ptr->SetGraphicsRootDescriptorTable(
-                1, _srvHeap->GetGPUDescriptorHandleForHeapStart());
+            // 本 draw 的绑定快照窗：staging 规范槽 → 可见堆窗内同偏移拷贝，
+            // 表基址指向窗首（寄存器 t<unit+1> ↔ 窗内槽 unit+1，与 HLSL 约定一致）。
+            // 描述符堆是全局状态，无快照则全帧 draw 共见最后一次绑定。
+            const UINT window = kSrvHeapSlots * (1 + (_bindSetCursor % kBindSets));
+            ++_bindSetCursor;
+            auto stagingCpu = _srvStagingHeap->GetCPUDescriptorHandleForHeapStart();
+            auto visibleCpu = _srvHeap->GetCPUDescriptorHandleForHeapStart();
+            for (unsigned unit : _boundUnits) {
+                D3D12_CPU_DESCRIPTOR_HANDLE src = stagingCpu;
+                src.ptr += (unit + 1) * static_cast<SIZE_T>(_srvDescSize);
+                D3D12_CPU_DESCRIPTOR_HANDLE dst = visibleCpu;
+                dst.ptr += (window + unit + 1) * static_cast<SIZE_T>(_srvDescSize);
+                _device->CopyDescriptorsSimple(1, dst, src);
+            }
+            D3D12_GPU_DESCRIPTOR_HANDLE tableBase = _srvHeap->GetGPUDescriptorHandleForHeapStart();
+            tableBase.ptr += window * static_cast<SIZE_T>(_srvDescSize);
+            _cmdList.ptr->SetGraphicsRootDescriptorTable(1, tableBase);
         }
     }
 
