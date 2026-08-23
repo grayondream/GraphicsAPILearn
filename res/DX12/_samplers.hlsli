@@ -20,5 +20,9 @@ SamplerState gSamplerMipLinearBorder : register(s8); // f=2 w=2
 // 同步提供静态条目），Nearest+LESS_EQUAL+ClampToBorder(OPAQUE_WHITE)。
 // SampleCmp 返回 ref <= stored ? 1 : 0（lit=1）；GLSL 手动比较的 shadow 取 1-lit。
 SamplerComparisonState gShadowCompare : register(s9);
+// s10：cubemap LOD 对齐（SkyBox 组专用）。GL/VK 参考实现对立方体纹理的隐式 LOD
+// 约定比 D3D12 高约 +0.28（跨 API cube-LOD 公式差异，实测参考输出恒为纯 mip1），
+// 以 MipLODBias 吸收，使 DX12 与参考逐像素对齐；不影响其余样例的 s6。
+SamplerState gSamplerCubeLodAlign : register(s10); // f=2 w=0 + MipLODBias 0.28
 
 #endif

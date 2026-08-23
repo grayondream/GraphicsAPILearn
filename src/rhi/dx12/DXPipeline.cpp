@@ -179,16 +179,20 @@ const D3D12_STATIC_SAMPLER_DESC* StaticSamplers(size_t& count) {
     // s9：shadow map 硬件比较采样器（Task 10b Shadow 组），贴 GL Nearest 行为取
     //   MIN_MAG_MIP_POINT + LESS_EQUAL；wrap=ClampToBorder+OPAQUE_WHITE（越界=最远深度
     //   =受光，与 GL/VK borderColor 1.0 语义一致）。仅 Shadow 组的 shadowMap 使用。
+    // s10：cubemap LOD 对齐采样器（SkyBox 组）：GL/VK 参考实现（NVIDIA）对立方体
+    //   纹理的隐式 LOD 约定比 D3D12 高约 +0.28（实测参考输出恒为纯 mip1，DX12 为
+    //   0.72 混合），此偏差属跨 API cube-LOD 公式差异而非着色器语义差。镜像树以
+    //   带 MipLODBias 的专用别名吸收，避免全局改 s6 波及其余样例。
     // w=ClampToBorder 的三个槽位（2/5/8）不进静态表：静态采样器边框色只有黑/白，
     // 任意 borderColor 由 DXRenderer 动态 SAMPLER 堆在 bind 路径按槽位写入
     // （未覆盖时堆内预填 OPAQUE_WHITE，行为与旧静态表一致）。非 border 组合继续走根签名静态表。
-    // 表按有效条目紧凑填充（寄存器编号仍为 f*3+w 与 9）：数组容量必须 ≥ 最大编号+1，
-    // 否则按下标写 t[9] 是越界 UB
-    static const std::array<D3D12_STATIC_SAMPLER_DESC, 7> table = [] {
+    // 表按有效条目紧凑填充（寄存器编号仍为 f*3+w 与 9/10）：数组容量必须 ≥ 条目数，
+    // 寄存器编号来自 MakeSampler 参数与数组下标无关
+    static const std::array<D3D12_STATIC_SAMPLER_DESC, 8> table = [] {
         constexpr TextureFilter filters[3] = {TextureFilter::Linear, TextureFilter::Nearest,
                                               TextureFilter::LinearMipLinear};
         constexpr TextureWrap wraps[2] = {TextureWrap::Repeat, TextureWrap::ClampToEdge};
-        std::array<D3D12_STATIC_SAMPLER_DESC, 7> t{};
+        std::array<D3D12_STATIC_SAMPLER_DESC, 8> t{};
         size_t n = 0;
         for (int f = 0; f < 3; ++f)
             for (int w = 0; w < 2; ++w)
@@ -198,6 +202,10 @@ const D3D12_STATIC_SAMPLER_DESC* StaticSamplers(size_t& count) {
         t[n++] = MakeSampler(D3D12_FILTER_COMPARISON_MIN_MAG_MIP_POINT,
                              DxAddressOf(TextureWrap::ClampToBorder), 9,
                              D3D12_COMPARISON_FUNC_LESS_EQUAL);
+        t[n] = MakeSampler(DxFilterOf(TextureFilter::LinearMipLinear),
+                           DxAddressOf(TextureWrap::Repeat), 10);
+        t[n].MipLODBias = 0.28f;
+        ++n;
         return t;
     }();
     count = table.size();
