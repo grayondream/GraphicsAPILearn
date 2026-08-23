@@ -863,7 +863,7 @@ private:
             dstTex->resource(), D3D12_RESOURCE_STATE_RENDER_TARGET,
             D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
         _cmdList.ptr->ResourceBarrier(1, &toSRV);
-        applyViewport();   // 主路径负高度视口恢复，防后续 draw 沿用 blit 视口
+        applyViewport();   // 主路径正高度视口恢复，防后续 draw 沿用 blit 视口
     }
 
     // MSAA resolve：src（RTV-only，DENY_SHADER_RESOURCE，常驻 RENDER_TARGET）经
@@ -993,11 +993,11 @@ private:
                                         : std::array<float, 4>{0.0f, 0.0f, 0.0f, 1.0f};
     }
 
-    // GL 投影矩阵 y-up 而 D3D12 NDC y-down：窗口路径负高度 viewport 翻转显示
-    // （同 VK 方案），MinDepth/MaxDepth=[0,1] 顺带把 GL z∈[-1,1] 线性映射进深度域；
-    // 离屏 RT 用正高度视口：RT 行 0=场景底部对齐 GL framebuffer 语义，否则后处理
-    // quad 采样上下颠倒、深度采样与 light-space NDC 错位、cubemap 捕获方向翻转
-    // （同 VK applyViewport 的 offscreen 分支）
+    // GL 投影矩阵 y-up：D3D12 NDC 本就 y-up 且视口公式 sy=Y+(1-y_ndc)*H/2 已把
+    // +y 映到视口顶边——与 GL 呈现朝向天然一致，swapchain 无需任何翻转。
+    // （负高度是 Vulkan 专属技巧：VK NDC y-down 才需要它；误用会使直绘 swapchain
+    // 的样例整体上下镜像。fragcoord 系后处理链因读写同帧同朝向而自抵消，故此前
+    // 仅 Triangle/Rect 类直绘样例暴露。）离屏 RT 保持正高度视口（行为不变）
     void applyViewport() {
         if (!_cmdList.ptr) return;
         int fbW = _swapchain ? _swapchain->width() : 0;
@@ -1017,8 +1017,7 @@ private:
         const float h = (_viewportSet && _viewport.height > 0)
                             ? static_cast<float>(_viewport.height)
                             : static_cast<float>(fbH);
-        D3D12_VIEWPORT vp = offscreen ? D3D12_VIEWPORT{x, y, w, h, 0.0f, 1.0f}
-                                      : D3D12_VIEWPORT{x, y + h, w, -h, 0.0f, 1.0f};
+        D3D12_VIEWPORT vp{x, y, w, h, 0.0f, 1.0f};
         D3D12_RECT scissor{static_cast<LONG>(x), static_cast<LONG>(y),
                            static_cast<LONG>(x + w), static_cast<LONG>(y + h)};
         _cmdList.ptr->RSSetViewports(1, &vp);
@@ -1528,7 +1527,7 @@ void DXRenderer::renderImGuiDrawData(void* drawData) {
     if (_samplerHeap.ptr) heaps[heapCount++] = _samplerHeap.ptr;
     if (heapCount > 0) _cmdList.ptr->SetDescriptorHeaps(heapCount, heaps);
     ImGui_ImplDX12_RenderDrawData(dd, _cmdList.ptr);
-    // imgui 把 viewport/scissor 设为自身正高度值：重放本后端视口（负高度翻转），
+    // imgui 把 viewport/scissor 设为自身正高度值：重放本后端视口，
     // 同 VKRenderer 尾部 applyViewport 的理由
     applyViewport();
 }
