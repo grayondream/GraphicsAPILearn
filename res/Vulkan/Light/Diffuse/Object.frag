@@ -22,16 +22,9 @@ in vec4 normal;
 in vec4 fragPos;
 in vec4 objOriginColor;
 void main(){
-    // ambient
-    float ambientStrength = 0.3;
-    vec4 ambient = ambientStrength * vec4Pool[3];
-  	
-    // diffuse 
-    vec4 norm = normalize(normal);
-    vec4 lightDir = normalize(vec4Pool[2] - fragPos);
-    float diff = max(dot(norm, lightDir), 0.0);
-    vec4 diffuse = diff * vec4Pool[3];
-            
-    vec4 result = (ambient + diffuse) * vec4Pool[4];
-    FragColor = result;
+    // TEMP PROBE: explicit 3D normalize + 3D dot (same as DX probe)
+    vec3 n3 = normalize(normal.xyz);
+    vec3 dv3 = vec4Pool[2].xyz - fragPos.xyz;
+    float diff = clamp(dot(n3, normalize(dv3)), 0.0, 1.0);
+    FragColor = vec4(diff * vec4Pool[3].xyz, 1.0);
 }
