@@ -22,9 +22,9 @@ in vec4 normal;
 in vec4 fragPos;
 in vec4 objOriginColor;
 void main(){
-    // TEMP PROBE: explicit 3D normalize + 3D dot (same as DX probe)
-    vec3 n3 = normalize(normal.xyz);
-    vec3 dv3 = vec4Pool[2].xyz - fragPos.xyz;
-    float diff = clamp(dot(n3, normalize(dv3)), 0.0, 1.0);
-    FragColor = vec4(diff * vec4Pool[3].xyz, 1.0);
+    // TEMP PROBE2: 4D vs 3D side by side + w diagnostics
+    vec4 d4 = vec4Pool[2] - fragPos;
+    float dOrig = max(dot(normalize(normal), normalize(d4)), 0.0);
+    float dProbe = clamp(dot(normalize(normal.xyz), normalize(d4.xyz)), 0.0, 1.0);
+    FragColor = vec4(dOrig, dProbe, clamp(abs(fragPos.w) * 0.25 + abs(d4.w) * 0.25, 0.0, 1.0), 1.0);
 }
