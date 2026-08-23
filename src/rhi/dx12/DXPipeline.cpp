@@ -208,7 +208,7 @@ const D3D12_STATIC_SAMPLER_DESC* StaticSamplers(size_t& count) {
         ++n;
         t[n] = MakeSampler(DxFilterOf(TextureFilter::LinearMipLinear),
                            DxAddressOf(TextureWrap::Repeat), 11);
-        t[n].MipLODBias = 0.45f;
+        t[n].MipLODBias = 0.65f;
         ++n;
         return t;
     }();
