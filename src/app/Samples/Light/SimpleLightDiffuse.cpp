@@ -41,6 +41,11 @@ bool SimpleLightDiffuse::load(std::shared_ptr<rhi::IRenderer> rhiRenderer) {
 		ExitIfFailed(ok, "Create RHI shader failed: {}", shader->getLog());
 
 		auto geo = RhiGeometry::Create(renderer().get(), shape, false, true, true, {.normalLocation = 2});
+		{
+			const float* dbgN = shape.normal();
+			for (int i = 0; i < 8; i += 4)
+				LOGW("TEMP-DBG normal v{} = ({}, {}, {}, {})", i / 4, dbgN[i], dbgN[i + 1], dbgN[i + 2], dbgN[i + 3]);
+		}
 		_vb = geo.vertexBuffer;
 		_normal = geo.normalBuffer;
 		_ebo = geo.indexBuffer;
