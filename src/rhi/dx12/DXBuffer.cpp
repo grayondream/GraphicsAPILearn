@@ -163,14 +163,26 @@ bool DXBuffer::update(const void* data, size_t size, size_t offset) {
         }
         ++_ringHead;
         const uint32_t slot = _ringHead % kRingSlots;
-        // 回绕守卫（终审 F4）：写满一圈后开始覆写最老槽，而引用它的绘制命令要等
-        // present 才执行。kRingSlots=256 为覆盖 LightSource 批次的设计值，此处只
-        // 告警一次不阻断；正常样例单帧 update 远低于该上限，不应触发。
+        // 帧界感知（终审 F4 修正）：_uploadFence 即渲染器共享 _frameFence，present
+        // 尾部 waitForGpuIdle 必推进它。completed 值较上次 update 有增长 ⇒ 跨过了
+        // 一次全帧同步，此前所有槽的在飞引用均已执行完毕，回绕覆写重新安全——
+        // 据此把告警窗口收敛到"同一在飞窗口内 >256 次 update"的真实风险场景。
+        if (_uploadFence) {
+            const UINT64 completed = _uploadFence->GetCompletedValue();
+            if (completed != _lastFenceCompleted) {
+                _lastFenceCompleted = completed;
+                _ringWrapWarned = false;   // 新在飞窗口：重新武装告警
+            }
+        }
+        // 回绕守卫（终审 F4）：同一在飞窗口内写满一圈即开始覆写本窗口内更早写入、
+        // 尚被未提交绘制引用的槽。kRingSlots=256 为覆盖 LightSource 批次的设计值，
+        // 此处只告警一次不阻断；正常样例每帧仅个位数 update，不应触发。
         if (slot == 0 && !_ringWrapWarned) {
             _ringWrapWarned = true;
-            LOGW("[DX12] UBO ring wrapped after {} updates: oldest slots are being "
-                 "overwritten while earlier draws may still reference them",
-                 _ringHead);
+            LOGW("[DX12] UBO ring wrapped within one in-flight window (>{} updates): "
+                 "oldest slots are being overwritten while earlier draws may still "
+                 "reference them",
+                 kRingSlots);
         }
         const size_t dst = slot * _slotSize + offset;
         std::memcpy(static_cast<char*>(_mapped) + dst, data, size);

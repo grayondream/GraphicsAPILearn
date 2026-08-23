@@ -49,7 +49,8 @@ private:
     static constexpr uint32_t kRingSlots = 256;
     size_t _slotSize{0};      // uniform 槽大小（256 对齐后的 sizeof(UniformBlock)）
     uint32_t _ringHead{0};    // 累计更新计数，模 kRingSlots 得当前槽
-    bool _ringWrapWarned{false};  // ring 回绕告警只发一次（终审 F4）
+    UINT64 _lastFenceCompleted{0};  // 上次 update 观测的共享 fence 值（帧界感知）
+    bool _ringWrapWarned{false};  // 当前在飞窗口内 ring 回绕告警只发一次（终审 F4）
     void* _mapped{nullptr};   // uniform 的持久映射
 
     bool _vbViewReady{false};
