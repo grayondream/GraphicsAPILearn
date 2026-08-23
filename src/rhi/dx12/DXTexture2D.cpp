@@ -386,7 +386,8 @@ bool DXTexture2D::CreateMipgenHeaps(ComPtr<ID3D12DescriptorHeap>& srvOut,
     return rtvOut.Get() != nullptr;
 }
 
-// 手动 mipmap 生成：blit PSO 全屏三角形逐级线性降采样。每级先把该子资源切到
+// 手动 mipmap 生成：mipdown PSO（Gather 角点等权盒平均，对齐 vkCmdBlitImage
+// linear 的 2:1 盒式语义）全屏三角形逐级降采样。每级先把该子资源切到
 // RENDER_TARGET 写入，画完立即切回 PIXEL_SHADER_RESOURCE 供下一级采样。
 // 堆生命周期由调用方保证（存活至命令执行完成）。
 bool DXTexture2D::recordMipgen(ID3D12GraphicsCommandList* cmd,
@@ -394,7 +395,8 @@ bool DXTexture2D::recordMipgen(ID3D12GraphicsCommandList* cmd,
                                ID3D12DescriptorHeap* rtvHeap) {
     if (!_blitCtx || !srvHeap || !rtvHeap) return false;
     ID3D12RootSignature* rs = _blitCtx->BlitRootSignature();
-    ID3D12PipelineState* pso = _blitCtx->BlitPsoFor(_srvFormat);
+    // 盒平均专用 PSO（线性 Sample 的 blit PSO 留给 RT↔RT 颜色拷贝的恒等映射）
+    ID3D12PipelineState* pso = _blitCtx->MipdownPsoFor(_srvFormat);
     if (!rs || !pso) return false;
 
     const UINT srvInc = _device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);

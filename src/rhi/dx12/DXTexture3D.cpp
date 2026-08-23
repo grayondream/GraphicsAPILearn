@@ -390,9 +390,10 @@ void DXTexture3D::genCubeMipmaps() {
     }
 }
 
-// 手动 cubemap mipmap：blit PSO 全屏三角形逐面逐级线性降采样。第 i 级先把全部
-// 6 个面的该子资源切到 RENDER_TARGET 写入、画完立即切回 PSHR 供下一级采样。
-// 堆生命周期由调用方保证（存活至命令执行完成）。
+// 手动 cubemap mipmap：mipdown_array PSO（Texture2DArray Gather 角点等权盒平均，
+// 对齐 vkCmdBlitImage linear 的 2:1 盒式语义）全屏三角形逐面逐级降采样。第 i 级
+// 先把全部 6 个面的该子资源切到 RENDER_TARGET 写入、画完立即切回 PSHR 供下一级
+// 采样。堆生命周期由调用方保证（存活至命令执行完成）。
 bool DXTexture3D::recordCubeMipgen(ID3D12GraphicsCommandList* cmd,
                                    ID3D12DescriptorHeap* srvHeap,
                                    ID3D12DescriptorHeap* rtvHeap) {
@@ -400,7 +401,7 @@ bool DXTexture3D::recordCubeMipgen(ID3D12GraphicsCommandList* cmd,
     ID3D12RootSignature* rs = _blitCtx->BlitRootSignature();
     // 源 SRV 是 TEXTURE2DARRAY 视图（单面单 mip）：必须用数组变体 PSO，
     // Texture2D 声明采样数组视图属未定义行为（读到的切片/内容不可靠）
-    ID3D12PipelineState* pso = _blitCtx->BlitArrayPsoFor(_srvFormat);
+    ID3D12PipelineState* pso = _blitCtx->MipdownArrayPsoFor(_srvFormat);
     if (!rs || !pso) return false;
 
     const UINT srvInc = _device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
