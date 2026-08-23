@@ -16,6 +16,7 @@
 #include "rhi/core/ISwapchain.hpp"
 
 #include <array>
+#include <cstdio>    // std::fopen/fprintf（RHI_DUMP_FRAME PPM 导出）
 #include <cstdlib>   // std::getenv（调试层开关）
 #include <cstring>
 #include <d3dcompiler.h>   // D3DCreateBlob（DXIL blob 装载）
@@ -1004,6 +1005,10 @@ private:
     // 公共绘制前奏：pending RT 落地 → PSO 取用/根签名 → UBO 根 CBV → 拓扑 → VB/IB
     bool prepareDraw(bool needsIndex);
 
+    // RHI_DUMP_FRAME 帧导出（单次，对齐 VKRenderer::dumpFrame）：读回当前
+    // backbuffer 写 PPM(P6)。时序=present() 内、帧命令 Execute 之后 Present 之前
+    void dumpFrame();
+
     // 共享 fence 单调等待（Signal 必须 GetCompletedValue()+1 推进，同 DXBuffer upload）
     void waitForGpuIdle() {
         if (!_queue.Get() || !_frameFence.Get() || !_fenceEvent) return;
@@ -1074,6 +1079,12 @@ private:
     // 以便 prepareDraw 里 dynamic_pointer_cast<DXBuffer> 取 ring 槽基址
     std::shared_ptr<IBuffer> _uniformBuffer{};
     bool _viewportSet{false};
+
+    // ---- RHI_DUMP_FRAME 帧导出（一次性，dumpFrame 使用）----
+    bool _dumpDone{false};
+    // 独立小 fence：避免 Signal 推进干扰共享 _frameFence 的 GetCompletedValue()+1
+    // 单调计数约定（Task 3 报告）；等待事件复用 _fenceEvent（单线程串行安全）
+    ComPtr<ID3D12Fence> _dumpFence;
 };
 
 bool DXRenderer::init(const std::shared_ptr<ISurface>& surface) {
@@ -1151,6 +1162,7 @@ void DXRenderer::shutdown() {
     if (_cmdList.ptr) { _cmdList.ptr->Release(); _cmdList.ptr = nullptr; }
     if (_frameAllocator.Get()) { _frameAllocator->Release(); _frameAllocator.ptr = nullptr; }
     if (_fenceEvent) { CloseHandle(_fenceEvent); _fenceEvent = nullptr; }
+    if (_dumpFence.Get()) { _dumpFence->Release(); _dumpFence.ptr = nullptr; }
     if (_uploadAllocator.Get()) { _uploadAllocator->Release(); _uploadAllocator.ptr = nullptr; }
     _blitPsos.clear();
     if (_blitRootSig.Get()) { _blitRootSig->Release(); _blitRootSig.ptr = nullptr; }
@@ -1193,6 +1205,7 @@ bool DXRenderer::present() {
     _recording = false;
     ID3D12CommandList* lists[] = {_cmdList.ptr};
     _queue->ExecuteCommandLists(1, lists);
+    dumpFrame();   // 帧命令已提交、Present 前：对齐 VK present→dumpFrame 时序
     const bool ok = _swapchain->present();   // Present(1,0)
     _swapchain->waitForGpuIdle();            // MoveToNextFrame：等 GPU 完成后方可复用 allocator
     DX_CHECK(_frameAllocator->Reset(), "reset frame allocator");
@@ -1200,6 +1213,153 @@ bool DXRenderer::present() {
     _recording = true;
     _rtActive = false;
     return ok;
+}
+
+// RHI_DUMP_FRAME 帧导出：一次性 READBACK placed buffer（行距 256 对齐）+ 专用
+// transient allocator/cmdlist，PRESENT→COPY_SOURCE 屏障 → CopyTextureRegion 读回
+// → fence 等待 → Map 写 PPM(P6)。交换链为 R8G8B8A8_UNORM，内存字节序即 R,G,B,A：
+// 无通道调换直接落盘（VK 侧 B8G8R8A8 才需读回换序）；行序 top-down 与 VK 输出口
+// 径一致，无翻转。调用点=present() 内 ExecuteCommandLists 之后 Present 之前，
+// 队列顺序保证帧渲染命令先于本拷贝执行
+void DXRenderer::dumpFrame() {
+    const char* dumpPath = std::getenv("RHI_DUMP_FRAME");
+    if (!dumpPath || _dumpDone || !_swapchain || !_swapchain->initialized()) return;
+    const char* skipEnv = std::getenv("RHI_DUMP_SKIP");
+    if (skipEnv) {
+        static int skipCount = 0;
+        if (skipCount++ < std::atoi(skipEnv)) return;
+    }
+    _dumpDone = true;
+
+    const int w = _swapchain->width();
+    const int h = _swapchain->height();
+    ID3D12Resource* bb = _swapchain->backBuffer(_swapchain->currentIndex());
+    if (w <= 0 || h <= 0 || !bb) {
+        LOGE("dumpFrame: swapchain backbuffer not ready");
+        return;
+    }
+
+    // READBACK 堆 buffer：行距按 D3D12_TEXTURE_DATA_PITCH_ALIGNMENT(256) 对齐
+    const UINT64 rowPitch =
+        (static_cast<UINT64>(w) * 4 + D3D12_TEXTURE_DATA_PITCH_ALIGNMENT - 1) &
+        ~(static_cast<UINT64>(D3D12_TEXTURE_DATA_PITCH_ALIGNMENT - 1));
+    const UINT64 bufSize = rowPitch * static_cast<UINT64>(h);
+    D3D12_HEAP_PROPERTIES hp{};
+    hp.Type = D3D12_HEAP_TYPE_READBACK;
+    D3D12_RESOURCE_DESC rd{};
+    rd.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+    rd.Alignment = 0;
+    rd.Width = bufSize;
+    rd.Height = 1;
+    rd.DepthOrArraySize = 1;
+    rd.MipLevels = 1;
+    rd.Format = DXGI_FORMAT_UNKNOWN;
+    rd.SampleDesc.Count = 1;
+    rd.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+    ComPtr<ID3D12Resource> readback;
+    DX_CHECK(_device->CreateCommittedResource(&hp, D3D12_HEAP_FLAG_NONE, &rd,
+                                              D3D12_RESOURCE_STATE_COPY_DEST, nullptr,
+                                              IID_PPV_ARGS(&readback)),
+             "create dump readback buffer");
+    if (!readback.ptr) { LOGE("dumpFrame: createBuffer failed"); return; }
+
+    // 专用 transient allocator/cmdlist：帧 allocator 正被下帧录制占用，不可复用
+    ComPtr<ID3D12CommandAllocator> alloc;
+    DX_CHECK(_device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT,
+                                             IID_PPV_ARGS(&alloc)),
+             "create dump command allocator");
+    ComPtr<ID3D12GraphicsCommandList> cl;
+    DX_CHECK(_device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT,
+                                        alloc.ptr, nullptr, IID_PPV_ARGS(&cl)),
+             "create dump command list");
+    if (!alloc.ptr || !cl.ptr) { LOGE("dumpFrame: alloc cmd failed"); return; }
+
+    D3D12_RESOURCE_BARRIER toCopy{};
+    toCopy.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+    toCopy.Transition.pResource = bb;
+    toCopy.Transition.StateBefore = D3D12_RESOURCE_STATE_PRESENT;
+    toCopy.Transition.StateAfter = D3D12_RESOURCE_STATE_COPY_SOURCE;
+    toCopy.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+    cl.ptr->ResourceBarrier(1, &toCopy);
+
+    D3D12_TEXTURE_COPY_LOCATION dstLoc{};
+    dstLoc.pResource = readback.ptr;
+    dstLoc.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
+    dstLoc.PlacedFootprint.Offset = 0;
+    dstLoc.PlacedFootprint.Footprint.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+    dstLoc.PlacedFootprint.Footprint.Width = static_cast<UINT>(w);
+    dstLoc.PlacedFootprint.Footprint.Height = static_cast<UINT>(h);
+    dstLoc.PlacedFootprint.Footprint.Depth = 1;
+    dstLoc.PlacedFootprint.Footprint.RowPitch = static_cast<UINT>(rowPitch);
+    D3D12_TEXTURE_COPY_LOCATION srcLoc{};
+    srcLoc.pResource = bb;
+    srcLoc.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+    srcLoc.SubresourceIndex = 0;
+    cl.ptr->CopyTextureRegion(&dstLoc, 0, 0, 0, &srcLoc, nullptr);
+
+    // flip 模型要求呈现时回 PRESENT 态：拷完立即还原
+    D3D12_RESOURCE_BARRIER toPresent{};
+    toPresent.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+    toPresent.Transition.pResource = bb;
+    toPresent.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_SOURCE;
+    toPresent.Transition.StateAfter = D3D12_RESOURCE_STATE_PRESENT;
+    toPresent.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+    cl.ptr->ResourceBarrier(1, &toPresent);
+    DX_CHECK(cl->Close(), "close dump command list");
+
+    ID3D12CommandList* lists[] = {cl.ptr};
+    _queue->ExecuteCommandLists(1, lists);
+
+    // 独立小 fence 单值等待（仅此一次使用，无单调推进问题）
+    if (!_dumpFence.ptr) {
+        DX_CHECK(_device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&_dumpFence)),
+                 "create dump fence");
+        if (!_dumpFence.ptr) { LOGE("dumpFrame: createFence failed"); return; }
+    }
+    constexpr UINT64 kDumpFenceValue = 1;
+    _queue->Signal(_dumpFence.ptr, kDumpFenceValue);
+    if (_dumpFence->GetCompletedValue() < kDumpFenceValue) {
+        _dumpFence->SetEventOnCompletion(kDumpFenceValue, _fenceEvent);
+        WaitForSingleObject(_fenceEvent, INFINITE);
+    }
+
+    void* mapped = nullptr;
+    if (FAILED(readback->Map(0, nullptr, &mapped)) || !mapped) {
+        LOGE("dumpFrame: mapMemory failed");
+        return;
+    }
+    const unsigned char* px = static_cast<const unsigned char*>(mapped);
+    std::string path = dumpPath;
+    {
+        FILE* fp = std::fopen(path.c_str(), "wb");
+        if (!fp) {
+            LOGE("dumpFrame: cannot open {}", path);
+            readback->Unmap(0, nullptr);
+            return;
+        }
+        std::fprintf(fp, "P6\n%u %u\n255\n", static_cast<unsigned>(w), static_cast<unsigned>(h));
+        for (int y = 0; y < h; y++) {
+            const unsigned char* row = px + static_cast<size_t>(y) * rowPitch;
+            for (int x = 0; x < w; x++) {
+                std::fputc(row[x * 4 + 0], fp);   // R
+                std::fputc(row[x * 4 + 1], fp);   // G
+                std::fputc(row[x * 4 + 2], fp);   // B
+            }
+        }
+        std::fclose(fp);
+    }
+    readback->Unmap(0, nullptr);
+    LOGI("dumpFrame: saved {} ({}x{})", path, w, h);
+
+    uint32_t black = 0, nonblack = 0;
+    for (int y = 0; y < h; y++) {
+        const unsigned char* row = px + static_cast<size_t>(y) * rowPitch;
+        for (int x = 0; x < w; x++) {
+            const unsigned char* p = row + static_cast<size_t>(x) * 4;
+            if (p[0] < 8 && p[1] < 8 && p[2] < 8) black++; else nonblack++;
+        }
+    }
+    LOGI("dumpFrame: pixels black={} nonblack={}", black, nonblack);
 }
 
 bool DXRenderer::prepareDraw(bool needsIndex) {
