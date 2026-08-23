@@ -19,14 +19,21 @@ public:
     // 数组变体：源 SRV 为 TEXTURE2DARRAY 视图（cubemap 逐面逐级 mipgen 用），
     // 与 Texture2D 声明混用属视图类型不匹配 UB，须用 blit_array.frag 的 PSO
     virtual ID3D12PipelineState* BlitArrayPsoFor(DXGI_FORMAT rtvFormat) = 0;
+    // mip 降采样专用（mipdown.frag）：Gather 角点等权盒平均，对齐 vkCmdBlitImage
+    // linear 的 2:1 盒式语义；与线性 Sample 的 blit PSO 并存——RT↔RT 颜色拷贝的
+    // 恒等映射不能被盒平均污染
+    virtual ID3D12PipelineState* MipdownPsoFor(DXGI_FORMAT rtvFormat) = 0;
+    // mipdown 的 TEXTURE2DARRAY 变体（mipdown_array.frag，cubemap mipgen 用）
+    virtual ID3D12PipelineState* MipdownArrayPsoFor(DXGI_FORMAT rtvFormat) = 0;
 };
 
 // 2D 纹理（Task 7）：
 // - 上传：DEFAULT 堆资源 + UPLOAD 暂存 CopyTextureRegion（fence 同步，同 DXBuffer 模式）；
 //   RGB8 / RGB16F / RGBA32F 等 3 通道源数据 CPU 展开为 4 分量存储布局
 //   （对齐 VKTexture2D 依赖 RhiImage 预展开 + 本端兜底）；
-// - mipmap：D3D12 无 GenerateMips 内建 API，用 blit PSO 渲到各 mip 层 RTV 手动线性
-//   降采样（子资源级状态切换 PSHR↔RENDER_TARGET），blit 能力经 IDXBlitContext 注入；
+// - mipmap：D3D12 无 GenerateMips 内建 API，用 mipdown PSO（Gather 角点等权盒
+//   平均，对齐 VK vkCmdBlitImage linear 2:1 语义）渲染到各 mip 层 RTV 手动降采样
+//   （子资源级状态切换 PSHR↔RENDER_TARGET），blit 能力经 IDXBlitContext 注入；
 // - MSAA（multisample=true）：按 samples 建 4X/8X 资源，仅 ALLOW_RENDER_TARGET
 //   （DENY_SHADER_RESOURCE 与其组合非法；RTV-only 由 isMsaa 守卫保证）；
 //   采样数经 CheckFeatureSupport 校验回落。

@@ -509,6 +509,12 @@ private:
         ID3D12PipelineState* BlitArrayPsoFor(DXGI_FORMAT rtvFormat) override {
             return _owner->EnsureBlitArrayPso(rtvFormat);
         }
+        ID3D12PipelineState* MipdownPsoFor(DXGI_FORMAT rtvFormat) override {
+            return _owner->EnsureMipdownPso(rtvFormat);
+        }
+        ID3D12PipelineState* MipdownArrayPsoFor(DXGI_FORMAT rtvFormat) override {
+            return _owner->EnsureMipdownArrayPso(rtvFormat);
+        }
     private:
         DXRenderer* _owner{nullptr};
     };
@@ -624,24 +630,33 @@ private:
         }
     }
 
-    // blit PSO 缓存（键=目标 RTV 格式）：全屏三角形、无深度、无混合、无输入布局。
-    // arrayVariant=true 用 blit_array.frag（TEXTURE2DARRAY 源视图，cubemap mipgen）
+    // 全屏三角形 PSO 缓存（键=目标 RTV 格式）：无深度、无混合、无输入布局，
+    // 仅像素着色器不同——
+    //   blit / blit_array：线性 Sample 恒等映射（RT↔RT 颜色拷贝）
+    //   mipdown / mipdown_array：Gather 角点等权盒平均（mip 降采样专用，
+    //     对齐 vkCmdBlitImage linear 的 2:1 盒式语义）
     ID3D12PipelineState* EnsureBlitPso(DXGI_FORMAT rtvFormat) {
-        return EnsureBlitPsoImpl(rtvFormat, false);
+        return EnsureBlitPsoImpl(rtvFormat, "_internal/blit.frag.hlsl", _blitPsos);
     }
     ID3D12PipelineState* EnsureBlitArrayPso(DXGI_FORMAT rtvFormat) {
-        return EnsureBlitPsoImpl(rtvFormat, true);
+        return EnsureBlitPsoImpl(rtvFormat, "_internal/blit_array.frag.hlsl", _blitArrayPsos);
     }
-    ID3D12PipelineState* EnsureBlitPsoImpl(DXGI_FORMAT rtvFormat, bool arrayVariant) {
-        auto& cache = arrayVariant ? _blitArrayPsos : _blitPsos;
+    ID3D12PipelineState* EnsureMipdownPso(DXGI_FORMAT rtvFormat) {
+        return EnsureBlitPsoImpl(rtvFormat, "_internal/mipdown.frag.hlsl", _mipdownPsos);
+    }
+    ID3D12PipelineState* EnsureMipdownArrayPso(DXGI_FORMAT rtvFormat) {
+        return EnsureBlitPsoImpl(rtvFormat, "_internal/mipdown_array.frag.hlsl",
+                                 _mipdownArrayPsos);
+    }
+    ID3D12PipelineState* EnsureBlitPsoImpl(
+        DXGI_FORMAT rtvFormat, const char* fragSource,
+        std::map<DXGI_FORMAT, ComPtr<ID3D12PipelineState>>& cache) {
         auto it = cache.find(rtvFormat);
         if (it != cache.end()) return it->second.Get();
         ComPtr<ID3DBlob> vs = LoadBlobFromCso(
             DxSourcePath("_internal/blit.vert.hlsl").string(), ShaderStage::Vertex);
         ComPtr<ID3DBlob> ps = LoadBlobFromCso(
-            DxSourcePath(arrayVariant ? "_internal/blit_array.frag.hlsl"
-                                      : "_internal/blit.frag.hlsl").string(),
-            ShaderStage::Fragment);
+            DxSourcePath(fragSource).string(), ShaderStage::Fragment);
         if (!vs.Get() || !ps.Get()) {
             LOGE("[DX12] blit shaders not found under build/res/DX12/_internal");
             return nullptr;
@@ -1079,10 +1094,14 @@ private:
     UINT _samplerDescSize{0};
     std::map<UINT, std::array<float, 4>> _heapSamplerColors{};
     // 内部 blit（mip 降采样 + RT↔RT 颜色拷贝）：专用根签名 + 按目标格式缓存的 PSO
-    // （_blitArrayPsos 为 TEXTURE2DARRAY 源视图变体，cubemap mipgen 专用）
+    // （_blitArrayPsos 为 TEXTURE2DARRAY 源视图变体，cubemap mipgen 专用；
+    //   _mipdownPsos/_mipdownArrayPsos 同构，像素着色器换 Gather 盒平均 mipdown）
     ComPtr<ID3D12RootSignature> _blitRootSig;
+
     std::map<DXGI_FORMAT, ComPtr<ID3D12PipelineState>> _blitPsos{};
     std::map<DXGI_FORMAT, ComPtr<ID3D12PipelineState>> _blitArrayPsos{};
+    std::map<DXGI_FORMAT, ComPtr<ID3D12PipelineState>> _mipdownPsos{};
+    std::map<DXGI_FORMAT, ComPtr<ID3D12PipelineState>> _mipdownArrayPsos{};
     FrameBlitContext _blitCtx;
     ComPtr<ID3D12DescriptorHeap> _scratchSrvHeap;    // 颜色 blit 单槽暂存 SRV/RTV
     ComPtr<ID3D12DescriptorHeap> _scratchRtvHeap;
@@ -1208,6 +1227,9 @@ void DXRenderer::shutdown() {
     if (_dumpFence.Get()) { _dumpFence->Release(); _dumpFence.ptr = nullptr; }
     if (_uploadAllocator.Get()) { _uploadAllocator->Release(); _uploadAllocator.ptr = nullptr; }
     _blitPsos.clear();
+    _blitArrayPsos.clear();
+    _mipdownPsos.clear();
+    _mipdownArrayPsos.clear();
     if (_blitRootSig.Get()) { _blitRootSig->Release(); _blitRootSig.ptr = nullptr; }
     if (_scratchRtvHeap.Get()) { _scratchRtvHeap->Release(); _scratchRtvHeap.ptr = nullptr; }
     if (_scratchSrvHeap.Get()) { _scratchSrvHeap->Release(); _scratchSrvHeap.ptr = nullptr; }
