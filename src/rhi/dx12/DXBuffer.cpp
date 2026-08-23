@@ -191,7 +191,8 @@ void* DXBuffer::handle() { return _resource.Get(); }
 
 void DXBuffer::BindAsVB(ID3D12GraphicsCommandList* cmdList, uint32_t slot, uint32_t stride) {
     if (!cmdList || !_resource.Get()) return;
-    if (!_vbViewReady) {
+    // stride 缓存须随参数失效（终审 F7）：同一 VB 换用不同步长的 layout 时重建视图
+    if (!_vbViewReady || _vbView.StrideInBytes != static_cast<UINT>(stride)) {
         _vbView.BufferLocation = _resource->GetGPUVirtualAddress();
         _vbView.SizeInBytes = static_cast<UINT>(_size);
         _vbView.StrideInBytes = stride;
