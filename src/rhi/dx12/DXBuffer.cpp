@@ -163,23 +163,23 @@ bool DXBuffer::update(const void* data, size_t size, size_t offset) {
         }
         ++_ringHead;
         const uint32_t slot = _ringHead % kRingSlots;
-        // 帧界感知（终审 F4 修正）：_uploadFence 即渲染器共享 _frameFence，present
-        // 尾部 waitForGpuIdle 必推进它。completed 值较上次 update 有增长 ⇒ 跨过了
-        // 一次全帧同步，此前所有槽的在飞引用均已执行完毕，回绕覆写重新安全——
-        // 据此把告警窗口收敛到"同一在飞窗口内 >256 次 update"的真实风险场景。
+        // 帧界感知（终审 F4）：_uploadFence 即渲染器共享 _frameFence，present 尾部
+        // waitForGpuIdle 必推进它；copyViaStaging 等一次性上传的 Signal+等待同理。
+        // completed 值较上次 update 有增长 ⇒ 跨过一次全量同步，旧槽引用已全部执行
+        // 完毕、覆写重新安全——在飞窗口内的连续 update 计数随之归零。
         if (_uploadFence) {
             const UINT64 completed = _uploadFence->GetCompletedValue();
             if (completed != _lastFenceCompleted) {
                 _lastFenceCompleted = completed;
-                _ringWrapWarned = false;   // 新在飞窗口：重新武装告警
+                _windowUpdates = 0;
             }
         }
-        // 回绕守卫（终审 F4）：同一在飞窗口内写满一圈即开始覆写本窗口内更早写入、
-        // 尚被未提交绘制引用的槽。kRingSlots=256 为覆盖 LightSource 批次的设计值，
-        // 此处只告警一次不阻断；正常样例每帧仅个位数 update，不应触发。
-        if (slot == 0 && !_ringWrapWarned) {
-            _ringWrapWarned = true;
-            LOGW("[DX12] UBO ring wrapped within one in-flight window (>{} updates): "
+        // 回绕守卫（终审 F4）：同一在飞窗口内第 kRingSlots+1 次 update 开始覆写本
+        // 窗口内更早写入、尚被未提交绘制引用的槽。kRingSlots=256 为覆盖 LightSource
+        // 批次的设计值（正常样例每帧个位数~百余次 update），== 判定保证每窗口至多
+        // 告警一次、不阻断；跨帧回绕经 fence 全串行化天然安全，不在此列。
+        if (++_windowUpdates == kRingSlots + 1) {
+            LOGW("[DX12] UBO ring exhausted within one in-flight window (>{} updates): "
                  "oldest slots are being overwritten while earlier draws may still "
                  "reference them",
                  kRingSlots);
