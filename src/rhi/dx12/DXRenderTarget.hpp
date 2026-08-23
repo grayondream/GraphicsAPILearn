@@ -91,6 +91,14 @@ private:
     int _mip{0};
     bool _cubeIsDepth{false};
 
+    // BeginPass 生效时的挂接快照：逐面捕获循环里 attachCubeFace 在 EndPass 之前
+    // 就改写 _face/_mip，EndPass 必须按"本 pass 实际渲染"的面恢复常驻态——
+    // 读当前挂接值会对新面发无效屏障且旧面滞留 RENDER_TARGET（终审 F2）
+    DXTexture3D* _boundCube{nullptr};
+    int _boundFace{-1};
+    int _boundMip{0};
+    bool _boundCubeIsDepth{false};
+
     // 状态跟踪（BeginPass/EndPass 幂等依据；blit 状态感知转移读取）
     bool _colorsInRT{false};        // owned 非 MSAA 颜色当前处于 RENDER_TARGET
     bool _depthInWrite{true};       // 当前深度资源处于 DEPTH_WRITE

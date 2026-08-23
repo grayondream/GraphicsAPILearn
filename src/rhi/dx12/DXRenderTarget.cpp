@@ -216,6 +216,10 @@ void DXRenderTarget::release() {
     _face = -1;
     _mip = 0;
     _cubeIsDepth = false;
+    _boundCube = nullptr;
+    _boundFace = -1;
+    _boundMip = 0;
+    _boundCubeIsDepth = false;
     _colorsInRT = false;
     _depthInWrite = true;
     _cubeFaceInRT = false;
@@ -267,6 +271,11 @@ void DXRenderTarget::renderDims(int& w, int& h) const {
 
 void DXRenderTarget::BeginPass(ID3D12GraphicsCommandList* cmd) {
     if (!_valid || !cmd) return;
+    // 快照本次生效的挂接值：EndPass 按快照恢复，避免读到 pass 后已变更的 _face
+    _boundCube = _cube;
+    _boundFace = _face;
+    _boundMip = _mip;
+    _boundCubeIsDepth = _cubeIsDepth;
     std::vector<D3D12_RESOURCE_BARRIER> bars;
     if (!_colorsInRT) {
         for (auto& t : _colors) {
@@ -306,15 +315,15 @@ void DXRenderTarget::EndPass(ID3D12GraphicsCommandList* cmd) {
         }
         _colorsInRT = false;
     }
-    if (_cube && !_cubeIsDepth && _face >= 0 && _cubeFaceInRT) {
+    if (_boundCube && !_boundCubeIsDepth && _boundFace >= 0 && _cubeFaceInRT) {
         bars.push_back(MakeTransition(
-            _cube->resource(), D3D12_RESOURCE_STATE_RENDER_TARGET,
+            _boundCube->resource(), D3D12_RESOURCE_STATE_RENDER_TARGET,
             D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
-            _cube->subresource(_face, _mip)));
+            _boundCube->subresource(_boundFace, _boundMip)));
         _cubeFaceInRT = false;
     }
     ID3D12Resource* depthRes = nullptr;
-    if (_cube && _cubeIsDepth && _face >= 0) depthRes = _cube->resource();
+    if (_boundCube && _boundCubeIsDepth && _boundFace >= 0) depthRes = _boundCube->resource();
     else if (_depth.get()) depthRes = _depth->resource();
     if (depthRes && _depthInWrite) {
         // 回 PSHR：pass 间深度调试 quad 采样、阴影图采样均依赖常驻可读态
