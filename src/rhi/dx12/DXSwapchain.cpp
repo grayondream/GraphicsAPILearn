@@ -173,7 +173,7 @@ ID3D12Resource* DXSwapchain::backBuffer(uint32_t index) {
 void* DXSwapchain::handle() { return _swapchain.Get(); }
 
 void DXSwapchain::waitForGpuIdle() {
-    if (!_queue.Get() || !_frameFence || !_fenceEvent) return;
+    if (!_queue || !_frameFence || !_fenceEvent) return;
     // 共享 fence 单调约定（同 DXBuffer）：Signal 必须 GetCompletedValue()+1 推进
     const UINT64 value = _frameFence->GetCompletedValue() + 1;
     _queue->Signal(_frameFence, value);
