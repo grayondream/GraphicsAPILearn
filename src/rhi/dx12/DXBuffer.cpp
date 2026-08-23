@@ -177,7 +177,13 @@ bool DXBuffer::update(const void* data, size_t size, size_t offset) {
         return true;
     }
 
-    // 非 UBO 动态更新（当前 App 未用）：仍走一次性暂存拷贝保正确性
+    // 非 UBO 动态更新（当前 App 未用）：仍走一次性暂存拷贝保正确性。
+    // 越界校验（终审 F8）：offset+size 超出缓冲会致 GPU 写越界，拒绝拷贝
+    if (offset + size > _size) {
+        LOGE("[DX12] vertex/index update out of range offset={} size={} buffer={}",
+             offset, size, _size);
+        return false;
+    }
     return copyViaStaging(data, size, offset);
 }
 
