@@ -22,7 +22,7 @@ VSOut VSMain(VSIn i) {
     VSOut o;
     o.FragPos = mul(gModel, i.aPos).xyz;
     float3x3 nm = (float3x3)gModel;
-    o.Normal = mul(transpose(Mat3Inverse(nm)), i.aNormal.xyz);
+    o.Normal = float4(mul(transpose(Mat3Inverse(nm)), i.aNormal.xyz), 0.0);
     o.TexCoords = i.aTexCoord;
     o.FragPosLightSpace = mul(gExtraMat4[0], float4(o.FragPos, 1.0));   // extraMat4[0]=lightSpaceMatrix
     o.sv = mul(gProjection, mul(gView, mul(gModel, i.aPos)));

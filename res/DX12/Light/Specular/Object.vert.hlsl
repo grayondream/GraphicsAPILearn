@@ -20,6 +20,6 @@ VSOut VSMain(VSIn i) {
     VSOut o;
     o.fragPos = mul(gModel, i.pos);
     o.sv = mul(gProjection, mul(gView, o.fragPos));
-    o.normal = mul(transpose(Mat3Inverse(gModel)), i.normal);
+    o.normal = float4(mul(transpose(Mat3Inverse(gModel)), i.normal), 0.0);
     return o;
 }
