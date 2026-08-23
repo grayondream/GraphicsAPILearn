@@ -174,6 +174,8 @@ bool DXTexture2D::init(const TextureDesc& desc, const TextureDataView2D& data) {
     if (!uploadAndGenMips(desc, data)) {
         return false;
     }
+    LOGI("[DX12][INITDBG] tex2d {}x{} mips={} res={} fmt={}", _width, _height,
+         _mipLevels, static_cast<void*>(_resource.Get()), static_cast<int>(_srvFormat));
     // 上传路径与 createEmpty 同样须置 valid（Model::loadMaterialTextures 以
     // valid() 判定成败，漏置会让全部模型纹理被误报加载失败）
     _valid = true;

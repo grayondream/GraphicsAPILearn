@@ -517,7 +517,11 @@ private:
             return;
         }
         auto* dx = dynamic_cast<DXTexture2D*>(texture);
-        if (!dx || !dx->valid()) return;
+        if (!dx || !dx->valid()) {
+            LOGW("[DX12][BINDDBG] bindTexture2D unit={} skipped: tex={} valid={}",
+                 unit, static_cast<void*>(texture), dx ? dx->valid() : false);
+            return;
+        }
         if (dx->isMsaa()) {
             WarnOnce("bindTexture: MSAA textures are RTV-only; sampling requires resolve (Task 8)");
             return;
@@ -531,6 +535,9 @@ private:
         D3D12_CPU_DESCRIPTOR_HANDLE dst{_srvHeap->GetCPUDescriptorHandleForHeapStart()};
         dst.ptr += (unit + 1) * static_cast<SIZE_T>(_srvDescSize);
         _device->CreateShaderResourceView(dx->resource(), &sd, dst);
+        LOGI("[DX12][BINDDBG] t{} <- res={} fmt={} mips={}", unit + 1,
+             static_cast<void*>(dx->resource()), static_cast<int>(dx->srvFormat()),
+             dx->mipLevels());
         _boundUnits.insert(unit);
         TouchHeapSampler(dx->samplerParams(), dx->borderColor().data());
     }
