@@ -409,6 +409,8 @@ bool DXTexture3D::recordCubeMipgen(ID3D12GraphicsCommandList* cmd,
     ID3D12DescriptorHeap* heaps[] = {srvHeap};
     cmd->SetDescriptorHeaps(1, heaps);
     cmd->SetGraphicsRootSignature(rs);
+    // SV_VertexID 全屏三角形：拓扑须显式声明（默认 UNDEFINED 是调试层 #719 类噪音源）
+    cmd->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
     int mw = _width;
     int mh = _height;
     for (UINT i = 1; i < _mipLevels; ++i) {
@@ -441,7 +443,9 @@ bool DXTexture3D::recordCubeMipgen(ID3D12GraphicsCommandList* cmd,
             D3D12_CPU_DESCRIPTOR_HANDLE rtv = rtvBase;
             rtv.ptr += static_cast<SIZE_T>(f * _mipLevels + i) * rtvInc;
             cmd->OMSetRenderTargets(1, &rtv, FALSE, nullptr);
-            cmd->DrawInstanced(3, 0, 0, 0);
+            // InstanceCount 必须 ≥1：传 0 是合法 no-op，mip 链会整条保持未写入的
+            // 未定义内容（隐式 LOD 采样即得黑/噪 mip——SkyBox 变暗根因）
+            cmd->DrawInstanced(3, 1, 0, 0);
         }
 
         for (auto& b : toRT) std::swap(b.Transition.StateBefore, b.Transition.StateAfter);

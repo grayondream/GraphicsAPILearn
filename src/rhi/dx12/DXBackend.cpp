@@ -822,6 +822,8 @@ private:
         _cmdList.ptr->SetDescriptorHeaps(1, heaps);
         _cmdList.ptr->SetGraphicsRootSignature(_blitRootSig.ptr);
         _cmdList.ptr->SetPipelineState(pso);
+        // SV_VertexID 全屏三角形：拓扑须显式声明（默认 UNDEFINED 是调试层 #719 类噪音源）
+        _cmdList.ptr->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
         _cmdList.ptr->SetGraphicsRootDescriptorTable(
             0, _scratchSrvHeap->GetGPUDescriptorHandleForHeapStart());
         _cmdList.ptr->IASetVertexBuffers(0, 0, nullptr);
@@ -834,7 +836,8 @@ private:
         _cmdList.ptr->RSSetScissorRects(1, &sc);
         auto rtvHandle = _scratchRtvHeap->GetCPUDescriptorHandleForHeapStart();
         _cmdList.ptr->OMSetRenderTargets(1, &rtvHandle, FALSE, nullptr);
-        _cmdList.ptr->DrawInstanced(3, 0, 0, 0);
+        // InstanceCount 必须 ≥1：传 0 是合法 no-op，blit 目标保持未写入
+        _cmdList.ptr->DrawInstanced(3, 1, 0, 0);
 
         D3D12_RESOURCE_BARRIER toSRV = MakeTransition(
             dstTex->resource(), D3D12_RESOURCE_STATE_RENDER_TARGET,
