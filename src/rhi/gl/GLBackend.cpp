@@ -179,7 +179,9 @@ private:
         glReadPixels(0,0,vp[2],vp[3],GL_RGB,GL_UNSIGNED_BYTE,px.data());
         std::ofstream f(dumpPath, std::ios::binary);
         f << "P6\n" << vp[2] << " " << vp[3] << "\n255\n";
-        f.write((char*)px.data(), px.size());
+        // glReadPixels 行序为 bottom-up，翻转写入使 PPM 为 top-down（对齐 VK/DX dump 口径）
+        for (GLint y = vp[3] - 1; y >= 0; --y)
+            f.write((char*)(px.data() + (size_t)y * vp[2] * 3), (size_t)vp[2] * 3);
         f.close();
         LOGI("dumpFrame: saved {} ({}x{})", dumpPath, vp[2], vp[3]);
     }

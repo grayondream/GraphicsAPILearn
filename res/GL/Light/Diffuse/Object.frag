@@ -20,9 +20,16 @@ in vec4 normal;
 in vec4 fragPos;
 in vec4 objOriginColor;
 void main(){
-    // TEMP PROBE4: raw interpolated normal diagnostics
-    FragColor = vec4(abs(normal.w) * 0.5,
-                     abs(fragPos.w) * 0.5,
-                     dot(abs(normal), vec4(1.0)) * 0.125,
-                     1.0);
+    // ambient
+    float ambientStrength = 0.3;
+    vec4 ambient = ambientStrength * vec4Pool[3];
+  	
+    // diffuse 
+    vec4 norm = normalize(normal);
+    vec4 lightDir = normalize(vec4Pool[2] - fragPos);
+    float diff = max(dot(norm, lightDir), 0.0);
+    vec4 diffuse = diff * vec4Pool[3];
+            
+    vec4 result = (ambient + diffuse) * vec4Pool[4];
+    FragColor = result;
 }

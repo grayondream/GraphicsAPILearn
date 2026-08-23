@@ -41,7 +41,7 @@ private:
                 // Calculate the normal for this vertex and normalize it
                 //glm::vec3 normalVec = glm::normalize(glm::vec3(x, y, z));
                 glm::vec3 normalVec = glm::vec3(x, y, z);
-                normals.push_back(Vector4DBase<float>{normalVec.x, normalVec.y, normalVec.z, 1.0});
+                normals.push_back(Vector4DBase<float>{normalVec.x, normalVec.y, normalVec.z, 0.0f});
 
                 // Calculate UV coordinates
                 float u = (float)j / sectorCount;

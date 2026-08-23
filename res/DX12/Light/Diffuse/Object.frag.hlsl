@@ -9,13 +9,6 @@ struct PSIn {
 };
 
 float4 PSMain(PSIn i) : SV_Target {
-    // TEMP PROBE: explicit 3D normalize + 3D dot
-    float3 n3 = normalize(i.normal.xyz);
-    float3 dv3 = gVec4Pool[2].xyz - i.fragPos.xyz;
-    float diff = saturate(dot(n3, normalize(dv3)));
-    return float4(diff.xxx * gVec4Pool[3].xyz, 1.0);
-
-    /* TEMP PROBE: original disabled
     // ambient
     float ambientStrength = 0.3;
     float4 ambient = ambientStrength * gVec4Pool[3];
@@ -23,10 +16,9 @@ float4 PSMain(PSIn i) : SV_Target {
     // diffuse
     float4 norm = normalize(i.normal);
     float4 lightDir = normalize(gVec4Pool[2] - i.fragPos);
-    float diff2 = max(dot(norm, lightDir), 0.0);
-    float4 diffuse = diff2 * gVec4Pool[3];
+    float diff = max(dot(norm, lightDir), 0.0);
+    float4 diffuse = diff * gVec4Pool[3];
 
     float4 result = (ambient + diffuse) * gVec4Pool[4];
     return result;
-    */
 }
