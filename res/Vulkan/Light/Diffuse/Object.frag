@@ -22,9 +22,9 @@ in vec4 normal;
 in vec4 fragPos;
 in vec4 objOriginColor;
 void main(){
-    // TEMP PROBE3: raw w components
-    FragColor = vec4(fragPos.w * 0.5,
-                     vec4Pool[2].w * 0.5,
-                     normalize(normal).w * 0.5 + 0.5,
+    // TEMP PROBE4: raw interpolated normal diagnostics
+    FragColor = vec4(abs(normal.w) * 0.5,
+                     abs(fragPos.w) * 0.5,
+                     dot(abs(normal), vec4(1.0)) * 0.125,
                      1.0);
 }
