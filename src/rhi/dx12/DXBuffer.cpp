@@ -163,6 +163,15 @@ bool DXBuffer::update(const void* data, size_t size, size_t offset) {
         }
         ++_ringHead;
         const uint32_t slot = _ringHead % kRingSlots;
+        // 回绕守卫（终审 F4）：写满一圈后开始覆写最老槽，而引用它的绘制命令要等
+        // present 才执行。kRingSlots=256 为覆盖 LightSource 批次的设计值，此处只
+        // 告警一次不阻断；正常样例单帧 update 远低于该上限，不应触发。
+        if (slot == 0 && !_ringWrapWarned) {
+            _ringWrapWarned = true;
+            LOGW("[DX12] UBO ring wrapped after {} updates: oldest slots are being "
+                 "overwritten while earlier draws may still reference them",
+                 _ringHead);
+        }
         const size_t dst = slot * _slotSize + offset;
         std::memcpy(static_cast<char*>(_mapped) + dst, data, size);
         return true;
