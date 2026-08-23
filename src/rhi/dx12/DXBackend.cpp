@@ -1461,7 +1461,7 @@ bool DXRenderer::prepareDraw(bool needsIndex) {
                 src.ptr += (unit + 1) * static_cast<SIZE_T>(_srvDescSize);
                 D3D12_CPU_DESCRIPTOR_HANDLE dst = visibleCpu;
                 dst.ptr += (window + unit + 1) * static_cast<SIZE_T>(_srvDescSize);
-                _device->CopyDescriptorsSimple(1, dst, src);
+                _device->CopyDescriptorsSimple(1, dst, src, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
             }
             D3D12_GPU_DESCRIPTOR_HANDLE tableBase = _srvHeap->GetGPUDescriptorHandleForHeapStart();
             tableBase.ptr += window * static_cast<SIZE_T>(_srvDescSize);
