@@ -278,7 +278,8 @@ uint32_t DXPipeline::stateHash() const {
     mix(static_cast<uint32_t>(_depthFunc));
     mix(_stencilTest ? 1u : 0u);
     mix(static_cast<uint32_t>(_stencilFunc));
-    mix(static_cast<uint32_t>(_stencilRef));
+    // _stencilRef 不混入：D3D12 参考值为 OMSetStencilRef 动态状态而非 PSO 状态，
+    // 入键只会产生冗余变体（运行时经 prepareDraw 无条件下发）
     mix(_stencilCompareMask);
     mix(_stencilWriteMask);
     mix(static_cast<uint32_t>(_stencilFail));

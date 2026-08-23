@@ -1439,6 +1439,10 @@ bool DXRenderer::prepareDraw(bool needsIndex) {
 
     _cmdList.ptr->SetGraphicsRootSignature(_rootSignature.ptr);
     _cmdList.ptr->SetPipelineState(pso);
+    // 模板参考值是命令流动态状态，PSO 内不含（对照 VKPipeline::applyDynamicState
+    // 的 setStencilReference）：无条件每 draw 下发，开销极低。此前缺失导致 GPU
+    // 恒用默认 ref=0，TemplateTest 等 ref≠0 用例语义错误
+    _cmdList.ptr->OMSetStencilRef(static_cast<float>(dxp->stencilRef()));
     // SRV 描述符堆 + 根表（param1，t0..t127 ↔ 快照窗内偏移）。border 寄存器
     // s2/s5/s8 不在静态表内、由采样器堆提供 → 两堆同绑；静态采样器随根签名
     // 生效不受 SetDescriptorHeaps 影响。每次 draw 重设堆：mipgen/blit 可能中途
