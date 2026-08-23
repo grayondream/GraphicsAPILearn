@@ -34,6 +34,14 @@ constexpr std::string_view EnumName() {
     const auto begin = pos + tag.size();
     const auto end = str.find(']', begin);
     return str.substr(begin, end - begin);
+#elif defined(_MSC_VER)
+    // MSVC: "...Detail::sig<Namespace::Name>(void)..."，取 <...> 内的符号名
+    // （限定前缀由调用侧 StripEnumPrefix 剥离）
+    const auto begin = str.find('<');
+    if (begin == str.npos) return str;
+    const auto end = str.rfind('>');
+    if (end == str.npos || end < begin) return str;
+    return str.substr(begin + 1, end - begin - 1);
 #else
     return str;
 #endif
