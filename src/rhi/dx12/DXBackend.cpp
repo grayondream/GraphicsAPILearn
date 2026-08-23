@@ -338,7 +338,8 @@ public:
     void clearColor(float r, float g, float b, float a) override {
         _clearColor[0] = r; _clearColor[1] = g; _clearColor[2] = b; _clearColor[3] = a;
         void* key = _renderTarget ? static_cast<void*>(_renderTarget.get()) : nullptr;
-        _clearColors[key] = {r, g, b, a};
+        // F6：连同 owner 弱引用一并记录，供读取侧甄别地址复用前的陈旧条目
+        _clearColors[key] = {std::weak_ptr<IRenderTarget>(_renderTarget), {r, g, b, a}};
         // GL 语义：清"调用时绑定"的目标。窗口 RT 已打开且无 pending 切换时直接清
         // （含深度/模板，同 GLBackend 的 COLOR|DEPTH|STENCIL 全清）
         if (_recording && !_omPending && _rtActive && !key) activateWindowTargets(true);
@@ -1002,10 +1003,16 @@ private:
         _rtActive = true;
     }
 
-    std::array<float, 4> clearColorFor(void* key) const {
+    std::array<float, 4> clearColorFor(void* key) {
         auto it = _clearColors.find(key);
-        return it != _clearColors.end() ? it->second
-                                        : std::array<float, 4>{0.0f, 0.0f, 0.0f, 1.0f};
+        if (it == _clearColors.end()) return {0.0f, 0.0f, 0.0f, 1.0f};
+        // F6：owner 已析构 → 地址复用残留的陈旧条目，剔除并回退默认色。
+        // swapchain 条目（key=nullptr）无 owner 可验，直接返回
+        if (key && it->second.owner.expired()) {
+            _clearColors.erase(it);
+            return {0.0f, 0.0f, 0.0f, 1.0f};
+        }
+        return it->second.color;
     }
 
     // 朝向约定与 VKRenderer::applyViewport 对齐（两后端最终有效行序一致）：
@@ -1127,8 +1134,13 @@ private:
     std::shared_ptr<IRenderTarget> _renderTarget{};
     float _clearColor[4]{0.0f, 0.0f, 0.0f, 1.0f};
     // clear 色按渲染目标分别记录（key=IRenderTarget*，swapchain 用 nullptr），
-    // 对齐 GL/VK 语义：clearColor 只影响"调用时绑定"的目标，避免多 pass 交叉污染
-    std::map<void*, std::array<float, 4>> _clearColors{};
+    // 对齐 GL/VK 语义：clearColor 只影响"调用时绑定"的目标，避免多 pass 交叉污染。
+    // F6：owner 弱引用识别陈旧条目——RT 销毁后新 RT 复用同一地址时不得继承旧清屏色
+    struct ClearColorEntry {
+        std::weak_ptr<IRenderTarget> owner{};
+        std::array<float, 4> color{0.0f, 0.0f, 0.0f, 1.0f};
+    };
+    std::map<void*, ClearColorEntry> _clearColors{};
     // 最近创建的 UBO（App 每样例一个，resetRenderState 清除）；持 shared_ptr
     // 以便 prepareDraw 里 dynamic_pointer_cast<DXBuffer> 取 ring 槽基址
     std::shared_ptr<IBuffer> _uniformBuffer{};
