@@ -13,9 +13,9 @@ namespace rhi {
 //   DSV/SRV 视图阶段取 typed 格式（同 DXTexture2D::createEmpty 约定）；
 // - 上传：DEFAULT 堆资源 + UPLOAD 暂存逐面 CopyTextureRegion（子资源索引 =
 //   mip + face*mipLevels），fence 同步（同 DXBuffer/DXTexture2D 模式）；
-// - mipmap：generateMipmap=true 分配标准链长，genCubeMipmaps 用 blit PSO 逐面
-//   逐级线性降采样（子资源级 PSHR↔RENDER_TARGET 往返），blit 能力经
-//   IDXBlitContext 注入（与 DXTexture2D mipgen 同一套 RS+PSO）；
+// - mipmap：generateMipmap=true 分配标准链长，genCubeMipmaps 用 mipdown_array
+//   PSO（Gather 角点等权盒平均）逐面逐级降采样（子资源级 PSHR↔RENDER_TARGET
+//   往返），blit 能力经 IDXBlitContext 注入；
 // - 渲染目标接入：颜色 cube 提供 rtvFace(face,mip)（独立 RTV 堆）、深度 cube
 //   提供 dsvFace(face)（独立 DSV 堆），DXRenderTarget::attachCubeFace 取句柄
 //   组 OM 目标；子资源状态转移由 Renderer/RT 编排（本类不持状态机）。
