@@ -24,8 +24,9 @@ public:
 //   （对齐 VKTexture2D 依赖 RhiImage 预展开 + 本端兜底）；
 // - mipmap：D3D12 无 GenerateMips 内建 API，用 blit PSO 渲到各 mip 层 RTV 手动线性
 //   降采样（子资源级状态切换 PSHR↔RENDER_TARGET），blit 能力经 IDXBlitContext 注入；
-// - MSAA（multisample=true）：按 samples 建 4X/8X 资源并 DENY_SHADER_RESOURCE
-//   （RTV-only，resolve 场景留 Task 8）；采样数经 CheckFeatureSupport 校验回落。
+// - MSAA（multisample=true）：按 samples 建 4X/8X 资源，仅 ALLOW_RENDER_TARGET
+//   （DENY_SHADER_RESOURCE 与其组合非法；RTV-only 由 isMsaa 守卫保证）；
+//   采样数经 CheckFeatureSupport 校验回落。
 // - 状态约定：非 MSAA 颜色常驻 PIXEL_SHADER_RESOURCE（bindTexture 的 SRV 直接可用），
 //   深度常驻 DEPTH_WRITE；MSAA 仅作 RTV 由 Task 8 渲染路径管理。
 class DXTexture2D : public ITexture2D {

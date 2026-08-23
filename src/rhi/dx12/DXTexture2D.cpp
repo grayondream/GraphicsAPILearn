@@ -222,16 +222,16 @@ bool DXTexture2D::createEmpty(const TextureDesc& desc, int width, int height) {
 
     D3D12_RESOURCE_FLAGS flags = depth ? D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL
                                        : D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
-    // RTV-only：MSAA 资源拒绝着色器读取（resolve 场景 Task 8 再放宽）
-    if (msaa) flags |= D3D12_RESOURCE_FLAG_DENY_SHADER_RESOURCE;
+    // 注意：D3D12 中 DENY_SHADER_RESOURCE 仅允许与 ALLOW_DEPTH_STENCIL 等组合，
+    // 与 ALLOW_RENDER_TARGET 同用会 E_INVALIDARG（调试层 #719）；MSAA 颜色资源
+    // 只带 ALLOW_RENDER_TARGET，SRV 由 bind 路径的 isMsaa 守卫保证不创建
 
     if (!createResource(static_cast<UINT>(width), static_cast<UINT>(height),
                         flags, sampleCount)) {
         return false;
     }
     // 资源以 COPY_DEST 创建，无上传数据时立即转入常驻态：深度=DEPTH_WRITE 供渲染
-    // 目标；非 MSAA 颜色=PSHR 供采样；MSAA 颜色带 DENY_SHADER_RESOURCE 标志，
-    // 不允许进入着色器资源态 → 落 RENDER_TARGET（Task 8 渲染路径管理）
+    // 目标；非 MSAA 颜色=PSHR 供采样；MSAA 颜色=RENDER_TARGET（渲染路径管理）
     const D3D12_RESOURCE_STATES finalState =
         depth ? D3D12_RESOURCE_STATE_DEPTH_WRITE
               : (msaa ? D3D12_RESOURCE_STATE_RENDER_TARGET
