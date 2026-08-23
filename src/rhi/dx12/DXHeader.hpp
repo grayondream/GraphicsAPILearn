@@ -9,6 +9,7 @@
 #endif
 #include <windows.h>
 #include <d3d12.h>
+#include <d3d12sdklayers.h>   // ID3D12Debug/ID3D12InfoQueue（调试层诊断）
 #include <dxgi1_6.h>
 #include <dxcapi.h>
 #include "base/Log.hpp"
@@ -19,9 +20,18 @@
 #include <unordered_map>
 
 #define DX_CHECK(hr, msg) \
-    do { HRESULT _hr = (hr); if (FAILED(_hr)) LOGE("[DX12] {} failed hr=0x{:08X}", msg, (uint32_t)_hr); } while (0)
+    do { HRESULT _hr = (hr); if (FAILED(_hr)) { \
+        LOGE("[DX12] {} failed hr=0x{:08X}", msg, (uint32_t)_hr); \
+        dxdiag::DumpMessages(msg); } } while (0)
 
 namespace rhi {
+namespace dxdiag {
+// 设备侧诊断：DXRenderer::init 注入 InfoQueue（可选调试层，见 DXBackend.cpp），
+// DX_CHECK 失败时把设备校验消息带出到应用日志（E_INVALIDARG 类问题的定位基石）
+void SetInfoQueue(ID3D12Device* device);
+void DumpMessages(const char* context);
+} // namespace dxdiag
+
 template <typename T>
 struct ComPtr {
     T* ptr{nullptr};

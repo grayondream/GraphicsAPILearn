@@ -10,9 +10,9 @@ struct PSIn {
 };
 
 float PSMain(PSIn i) : SV_Target {
-    float width = 0.0;
-    float height = 0.0;
-    gSsaoInput.GetDimensions(0, width, height);
+    uint width = 0;
+    uint height = 0;
+    gSsaoInput.GetDimensions(width, height);
     float2 texelSize = 1.0 / float2(width, height);
     float result = 0.0;
     [loop]

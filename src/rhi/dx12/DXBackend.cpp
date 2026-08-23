@@ -16,6 +16,7 @@
 #include "rhi/core/ISwapchain.hpp"
 
 #include <array>
+#include <cstdlib>   // std::getenv（调试层开关）
 #include <cstring>
 #include <d3dcompiler.h>   // D3DCreateBlob（DXIL blob 装载）
 #include <filesystem>
@@ -206,6 +207,16 @@ fs::path DxSourcePath(const char* rel) {
     return resRoot / "DX12" / rel;
 }
 
+// ---- 设备侧诊断（DXHeader.hpp 声明）----
+// DX_CHECK 失败时把 InfoQueue 消息带出到应用日志；配合环境变量
+// GRAPHICSLEARN_DX12_DEBUGLAYER=1（须先于建设备）可拿到完整校验细节
+namespace {
+ComPtr<ID3D12InfoQueue>& DxDiagQueue() {
+    static ComPtr<ID3D12InfoQueue> q;
+    return q;
+}
+} // namespace
+
 // 深度拷贝的 typed 格式（CopyTextureRegion 要求两端同格式；TYPELESS 资源给具体格式）
 DXGI_FORMAT DepthCopyFormat(DXGI_FORMAT resourceFormat) {
     switch (resourceFormat) {
@@ -227,6 +238,31 @@ D3D12_PRIMITIVE_TOPOLOGY ToDxTopology(PrimitiveType type) {
 }
 
 } // namespace
+
+// 匿名命名空间外定义（C2888：具名 ns 符号不得在匿名 ns 作用域内定义）
+void dxdiag::SetInfoQueue(ID3D12Device* device) {
+    if (!device) return;
+    ComPtr<ID3D12InfoQueue> got;
+    if (SUCCEEDED(device->QueryInterface(IID_PPV_ARGS(&got)))) {
+        DxDiagQueue() = std::move(got);
+    }
+}
+
+void dxdiag::DumpMessages(const char* context) {
+    ComPtr<ID3D12InfoQueue>& iq = DxDiagQueue();
+    if (!iq.ptr) return;
+    const UINT64 count = iq->GetNumStoredMessages();
+    for (UINT64 i = 0; i < count && i < 32; ++i) {
+        SIZE_T len = 0;
+        if (FAILED(iq->GetMessage(i, nullptr, &len)) || len == 0) continue;
+        std::vector<char> buf(len);
+        auto* msg = reinterpret_cast<D3D12_MESSAGE*>(buf.data());
+        if (SUCCEEDED(iq->GetMessage(i, msg, &len)) && msg->pDescription) {
+            LOGE("[DX12][dq] {}: {}", context, msg->pDescription);
+        }
+    }
+    iq->ClearStoredMessages();
+}
 
 class DXRenderer : public IRenderer {
 public:
@@ -594,7 +630,31 @@ private:
         desc.VS = {vs->GetBufferPointer(), vs->GetBufferSize()};
         desc.PS = {ps->GetBufferPointer(), ps->GetBufferSize()};
         desc.SampleMask = UINT_MAX;
-        // 其余状态零初始化即所需：Fill+无剔除、DepthEnable=FALSE、Blend 关闭
+        // 枚举字段零初始化非法（FillMode/CullMode/Blend*/CompareFunc 合法值从 1 起），
+        // 须显式填默认：SOLID+无剔除、DepthEnable=FALSE、混合关闭但写掩码全开
+        // （写掩码为 0 即使创建成功也不落像素）
+        D3D12_RASTERIZER_DESC& rs = desc.RasterizerState;
+        rs.FillMode = D3D12_FILL_MODE_SOLID;
+        rs.CullMode = D3D12_CULL_MODE_NONE;
+        rs.DepthClipEnable = TRUE;
+        D3D12_DEPTH_STENCIL_DESC& ds = desc.DepthStencilState;
+        ds.DepthEnable = FALSE;
+        ds.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ZERO;
+        ds.DepthFunc = D3D12_COMPARISON_FUNC_ALWAYS;
+        ds.StencilEnable = FALSE;
+        ds.StencilReadMask = D3D12_DEFAULT_STENCIL_READ_MASK;
+        ds.StencilWriteMask = D3D12_DEFAULT_STENCIL_WRITE_MASK;
+        const D3D12_DEPTH_STENCILOP_DESC sop{D3D12_STENCIL_OP_KEEP, D3D12_STENCIL_OP_KEEP,
+                                             D3D12_STENCIL_OP_KEEP, D3D12_COMPARISON_FUNC_ALWAYS};
+        ds.FrontFace = sop;
+        ds.BackFace = sop;
+        D3D12_BLEND_DESC& bd = desc.BlendState;
+        bd.AlphaToCoverageEnable = FALSE;
+        bd.IndependentBlendEnable = FALSE;
+        bd.RenderTarget[0] = {FALSE, FALSE, D3D12_BLEND_ONE, D3D12_BLEND_ZERO,
+                              D3D12_BLEND_OP_ADD, D3D12_BLEND_ONE, D3D12_BLEND_ZERO,
+                              D3D12_BLEND_OP_ADD, D3D12_LOGIC_OP_NOOP,
+                              D3D12_COLOR_WRITE_ENABLE_ALL};
         desc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
         desc.NumRenderTargets = 1;
         desc.RTVFormats[0] = rtvFormat;
@@ -1018,12 +1078,15 @@ private:
 
 bool DXRenderer::init(const std::shared_ptr<ISurface>& surface) {
     _surface = surface;
-    // IID_PPV_ARGS 宏展开为逗号分隔的两个实参，不能放进三目表达式；
-    // 调试层启用决策延后（Windows 原生可用，留后续任务验证期开启）。
-    ComPtr<ID3D12Debug> dbg;
-    if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&dbg)))) { dbg.ptr->Release(); dbg.ptr = nullptr; }
+    // 调试层（可选）：GRAPHICSLEARN_DX12_DEBUGLAYER=1 时启用，须先于设备创建；
+    // 配合 DX_CHECK 失败时的 InfoQueue 转储定位参数校验类错误
+    if (std::getenv("GRAPHICSLEARN_DX12_DEBUGLAYER") != nullptr) {
+        ComPtr<ID3D12Debug> dbg;
+        if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&dbg)))) dbg->EnableDebugLayer();
+    }
     DX_CHECK(D3D12CreateDevice(nullptr, D3D_FEATURE_LEVEL_12_0, IID_PPV_ARGS(&_device)), "create device");
     if (!_device.ptr) return false;
+    dxdiag::SetInfoQueue(_device.ptr);
     D3D12_COMMAND_QUEUE_DESC qd{}; qd.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
     DX_CHECK(_device->CreateCommandQueue(&qd, IID_PPV_ARGS(&_queue)), "create queue");
     DX_CHECK(_device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&_frameFence)), "fence");

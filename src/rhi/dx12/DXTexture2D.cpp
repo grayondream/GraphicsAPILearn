@@ -272,6 +272,11 @@ bool DXTexture2D::createResource(UINT width, UINT height,
                                               D3D12_RESOURCE_STATE_COPY_DEST, nullptr,
                                               IID_PPV_ARGS(&_resource)),
              "create texture resource");
+    if (!_resource.Get()) {
+        LOGE("[DX12] tex desc fmt={} {}x{} mip={} sampleCount={} quality={} flags=0x{:08X}",
+             static_cast<uint32_t>(_format), width, height, rd.MipLevels,
+             rd.SampleDesc.Count, rd.SampleDesc.Quality, static_cast<uint32_t>(rd.Flags));
+    }
     return _resource.Get() != nullptr;
 }
 
