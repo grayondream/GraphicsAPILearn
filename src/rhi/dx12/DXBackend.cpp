@@ -993,11 +993,13 @@ private:
                                         : std::array<float, 4>{0.0f, 0.0f, 0.0f, 1.0f};
     }
 
-    // GL 投影矩阵 y-up：D3D12 NDC 本就 y-up 且视口公式 sy=Y+(1-y_ndc)*H/2 已把
-    // +y 映到视口顶边——与 GL 呈现朝向天然一致，swapchain 无需任何翻转。
-    // （负高度是 Vulkan 专属技巧：VK NDC y-down 才需要它；误用会使直绘 swapchain
-    // 的样例整体上下镜像。fragcoord 系后处理链因读写同帧同朝向而自抵消，故此前
-    // 仅 Triangle/Rect 类直绘样例暴露。）离屏 RT 保持正高度视口（行为不变）
+    // 朝向约定与 VKRenderer::applyViewport 对齐（两后端最终有效行序一致）：
+    // D3D NDC y-up、正高度视口 sy=Y+(1-y_ndc)*H/2 本就把 +y 映到顶边——swapchain
+    // 直绘用正高度即与 GL 呈现朝向一致；离屏 RT 用负高度视口使 RT 行 0 ↔ y_ndc=-1，
+    // 与 VK offscreen 正高度（NDC y-down）的行序完全相同——quad 后处理链每 pass 的
+    // 行翻转次数、shadow 深度 uv=ndc*0.5+0.5 查找自洽性、cubemap 捕获方向均与 VK 对齐。
+    // 【历史】swapchain 曾误用 VK 式负高度翻转：D3D 非VK(y-down)不需要，致 Triangle/
+    // Rect 等直绘样例整体 Y 镜像，而 SSAO 类链因中间 pass 偶数次翻转恰好抵消而漏检。
     void applyViewport() {
         if (!_cmdList.ptr) return;
         int fbW = _swapchain ? _swapchain->width() : 0;
@@ -1017,7 +1019,8 @@ private:
         const float h = (_viewportSet && _viewport.height > 0)
                             ? static_cast<float>(_viewport.height)
                             : static_cast<float>(fbH);
-        D3D12_VIEWPORT vp{x, y, w, h, 0.0f, 1.0f};
+        const D3D12_VIEWPORT vp = offscreen ? D3D12_VIEWPORT{x, y + h, w, -h, 0.0f, 1.0f}
+                                            : D3D12_VIEWPORT{x, y, w, h, 0.0f, 1.0f};
         D3D12_RECT scissor{static_cast<LONG>(x), static_cast<LONG>(y),
                            static_cast<LONG>(x + w), static_cast<LONG>(y + h)};
         _cmdList.ptr->RSSetViewports(1, &vp);
