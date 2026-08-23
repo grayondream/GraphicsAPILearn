@@ -44,12 +44,21 @@ if(${ENABLE_VULKAN})
     set(VK_SHADER_OUTPUT "${CMAKE_BINARY_DIR}/res/Vulkan")
     set(GLSLANG_VALIDATOR "" CACHE FILEPATH "Path to glslangValidator")
     if(NOT GLSLANG_VALIDATOR)
-        find_program(_glslang_validator glslangValidator HINTS /usr/bin /usr/local/bin)
+        find_program(_glslang_validator glslangValidator HINTS
+            /usr/bin /usr/local/bin
+            "$ENV{VCPKG_ROOT}/installed/x64-windows/tools/glslang"
+            "$ENV{VCPKG_ROOT}/installed/${VCPKG_TARGET_TRIPLET}/tools/glslang")
         set(GLSLANG_VALIDATOR "${_glslang_validator}")
     endif()
-    if(NOT GLSLANG_VALIDATOR OR NOT EXISTS "${GLSLANG_VALIDATOR}")
-        message(FATAL_ERROR "glslangValidator not found - install glslang-tools")
+    # SPIR-V 由 vk_shaders 目标生成于 build/res/Vulkan；双副本工作流下 Windows 侧可无
+    # glslangValidator，直接复用 Linux 侧编译好的 .spv 产物树，仅 WARNING 不阻塞配置。
+    set(_vk_shader_target_available OFF)
+    if(GLSLANG_VALIDATOR AND EXISTS "${GLSLANG_VALIDATOR}")
+        set(_vk_shader_target_available ON)
+    else()
+        message(WARNING "glslangValidator not found - skip vk_shaders target, expect prebuilt .spv under ${VK_SHADER_OUTPUT} (dual-copy workflow)")
     endif()
+    if(_vk_shader_target_available)
     file(GLOB_RECURSE VK_GLSL_SOURCES "${VK_SHADER_SOURCE}/*.vert" "${VK_SHADER_SOURCE}/*.frag" "${VK_SHADER_SOURCE}/*.geom")
     foreach(src IN LISTS VK_GLSL_SOURCES)
         file(RELATIVE_PATH rel "${VK_SHADER_SOURCE}" "${src}")
@@ -72,6 +81,7 @@ if(${ENABLE_VULKAN})
     endforeach()
     if(VK_SPV_OUTPUTS)
         add_custom_target(vk_shaders ALL DEPENDS ${VK_SPV_OUTPUTS})
+    endif()
     endif()
     find_package(Vulkan REQUIRED)
     # 链接系统 libvulkan 而非 vcpkg 的 Vulkan loader：
