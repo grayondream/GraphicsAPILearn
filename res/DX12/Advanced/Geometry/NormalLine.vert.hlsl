@@ -19,7 +19,7 @@ struct VSOut {
 VSOut VSMain(VSIn i) {
     VSOut o;
     o.sv = mul(gView, mul(gModel, i.pos));
-    float3x3 nm = transpose(inverse(mul((float3x3)gView, (float3x3)gModel)));
+    float3x3 nm = transpose(Mat3Inverse(mul((float3x3)gView, (float3x3)gModel)));
     o.normal = normalize(mul(nm, i.aNormal.rgb).xyz);
     return o;
 }

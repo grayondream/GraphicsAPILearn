@@ -22,7 +22,7 @@ VSOut VSMain(VSIn i) {
     VSOut o;
     o.FragPos = mul(gModel, i.aPos).xyz;
     float3 n = FPOOL(34) > 0.5 ? -i.aNormal.xyz : i.aNormal.xyz;   // reverse_normals
-    float3x3 nm = transpose(inverse((float3x3)gModel));
+    float3x3 nm = transpose(Mat3Inverse((float3x3)gModel));
     o.Normal = mul(nm, n);
     o.TexCoords = i.aTexCoord;
     o.sv = mul(gProjection, mul(gView, mul(gModel, i.aPos)));

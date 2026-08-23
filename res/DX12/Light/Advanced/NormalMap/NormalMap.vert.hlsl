@@ -28,7 +28,7 @@ VSOut VSMain(VSIn i) {
     o.FragPos = mul(gModel, float4(i.aPos, 1.0)).xyz;
     o.TexCoords = i.aTexCoords;
 
-    float3x3 nm = transpose(inverse((float3x3)gModel));
+    float3x3 nm = transpose(Mat3Inverse((float3x3)gModel));
     float3 T = normalize(mul(nm, i.aTangent));
     float3 N = normalize(mul(nm, i.aNormal));
     T = normalize(T - dot(T, N) * N);

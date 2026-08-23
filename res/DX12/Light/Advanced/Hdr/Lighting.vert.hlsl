@@ -24,7 +24,7 @@ VSOut VSMain(VSIn i) {
 
     float3 n = FPOOL(34) > 0.5 ? -i.aNormal : i.aNormal;   // inverse_normals
 
-    float3x3 nm = transpose(inverse((float3x3)gModel));
+    float3x3 nm = transpose(Mat3Inverse((float3x3)gModel));
     o.Normal = normalize(mul(nm, n));
 
     o.sv = mul(gProjection, mul(gView, mul(gModel, float4(i.aPos, 1.0))));

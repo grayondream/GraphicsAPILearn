@@ -23,7 +23,7 @@ VSOut VSMain(VSIn i) {
     o.FragPos = mul(gModel, i.aPos).xyz;
     o.TexCoords = i.aTexCoord;
 
-    float3x3 nm = transpose(inverse((float3x3)gModel));
+    float3x3 nm = transpose(Mat3Inverse((float3x3)gModel));
     o.Normal = normalize(mul(nm, i.aNormal.xyz));
 
     o.sv = mul(gProjection, mul(gView, mul(gModel, i.aPos)));

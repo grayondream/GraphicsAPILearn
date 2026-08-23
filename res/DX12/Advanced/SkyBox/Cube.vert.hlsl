@@ -25,7 +25,7 @@ VSOut VSMain(VSIn i) {
     o.textureCoord = i.inTextureCoord;
     o.fragColor = i.inColor;
     float3x3 v3model = (float3x3)gModel;
-    o.normal = float4(mul(transpose(inverse(v3model)), i.aNormal.xyz), 1.0);
+    o.normal = float4(mul(transpose(Mat3Inverse(v3model)), i.aNormal.xyz), 1.0);
     o.position = float4(mul(v3model, i.pos.xyz), 1.0);
     return o;
 }

@@ -43,3 +43,16 @@ cbuffer UniformBlock : register(b0) {
 #include "_samplers.hlsli"
 
 #endif
+
+// HLSL 无内建 inverse()，3x3 伴随矩阵求逆（normal matrix 用）
+float3x3 Mat3Inverse(float3x3 m) {
+    float a = m[0][0], b = m[0][1], c = m[0][2];
+    float d = m[1][0], e = m[1][1], f = m[1][2];
+    float g = m[2][0], h = m[2][1], i = m[2][2];
+    float3x3 inv = {
+        (e*i - f*h), (c*h - b*i), (b*f - c*e),
+        (f*g - d*i), (a*i - c*g), (c*d - a*f),
+        (d*h - e*g), (b*g - a*h), (a*e - b*d)
+    };
+    return inv / determinant(m);
+}
