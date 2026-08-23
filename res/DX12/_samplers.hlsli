@@ -24,5 +24,8 @@ SamplerComparisonState gShadowCompare : register(s9);
 // 约定比 D3D12 高约 +0.28（跨 API cube-LOD 公式差异，实测参考输出恒为纯 mip1），
 // 以 MipLODBias 吸收，使 DX12 与参考逐像素对齐；不影响其余样例的 s6。
 SamplerState gSamplerCubeLodAlign : register(s10); // f=2 w=0 + MipLODBias 0.28
+// s11：2D 纹理 LOD 对齐（SkyBox 组 cube 物体的 dog.jpg 用）。同 s10 的约定差，
+// 2D 路径实测偏差更大（约 +0.45），单独设槽避免与 cubemap 对齐量互相牵制。
+SamplerState gSamplerTex2DLodAlign : register(s11); // f=2 w=0 + MipLODBias 0.45
 
 #endif

@@ -2,6 +2,8 @@
 // 纹理寄存器约定 t<unit+1>：bindTexture(_texture,0)→t1、bindTexture(_skyBoxTexture,1)→t2；
 // 槽位照抄：cameraPos=vec4Pool[1]、enableReflection=floatPool[36]、enableRefraction=floatPool[37]；
 // 折射率 1.00/1.52（玻璃）照抄。
+// 采样器：dog.jpg 用 gSamplerTex2DLodAlign(s11)、cubemap 用 gSamplerCubeLodAlign(s10)，
+// 对齐 GL/VK 参考实现的隐式 LOD 约定（见 _samplers.hlsli 注释）。
 #include "../../_uniform_block.hlsli"
 
 Texture2D gTextureSampler : register(t1);
@@ -19,13 +21,13 @@ float4 PSMain(PSIn i) : SV_Target {
     if (FPOOL(36) > 0.5) {   // enableReflection
         float3 I = normalize(i.position.xyz - gVec4Pool[1].xyz);
         float3 R = reflect(I, normalize(i.normal.xyz));
-        return float4(gSkyBoxSampler.Sample(gSamplerDefault, R).rgb, 1.0);
+        return float4(gSkyBoxSampler.Sample(gSamplerCubeLodAlign, R).rgb, 1.0);
     } else if (FPOOL(37) > 0.5) {   // enableRefraction
         float ratio = 1.00 / 1.52;
         float3 I = normalize(i.position.xyz - gVec4Pool[1].xyz);
         float3 R = refract(I, normalize(i.normal.xyz), ratio);
-        return float4(gSkyBoxSampler.Sample(gSamplerDefault, R).rgb, 1.0);
+        return float4(gSkyBoxSampler.Sample(gSamplerCubeLodAlign, R).rgb, 1.0);
     }
 
-    return gTextureSampler.Sample(gSamplerDefault, i.textureCoord);
+    return gTextureSampler.Sample(gSamplerTex2DLodAlign, i.textureCoord);
 }

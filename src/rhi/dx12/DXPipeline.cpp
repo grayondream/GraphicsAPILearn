@@ -188,11 +188,11 @@ const D3D12_STATIC_SAMPLER_DESC* StaticSamplers(size_t& count) {
     // （未覆盖时堆内预填 OPAQUE_WHITE，行为与旧静态表一致）。非 border 组合继续走根签名静态表。
     // 表按有效条目紧凑填充（寄存器编号仍为 f*3+w 与 9/10）：数组容量必须 ≥ 条目数，
     // 寄存器编号来自 MakeSampler 参数与数组下标无关
-    static const std::array<D3D12_STATIC_SAMPLER_DESC, 8> table = [] {
+    static const std::array<D3D12_STATIC_SAMPLER_DESC, 9> table = [] {
         constexpr TextureFilter filters[3] = {TextureFilter::Linear, TextureFilter::Nearest,
                                               TextureFilter::LinearMipLinear};
         constexpr TextureWrap wraps[2] = {TextureWrap::Repeat, TextureWrap::ClampToEdge};
-        std::array<D3D12_STATIC_SAMPLER_DESC, 8> t{};
+        std::array<D3D12_STATIC_SAMPLER_DESC, 9> t{};
         size_t n = 0;
         for (int f = 0; f < 3; ++f)
             for (int w = 0; w < 2; ++w)
@@ -205,6 +205,10 @@ const D3D12_STATIC_SAMPLER_DESC* StaticSamplers(size_t& count) {
         t[n] = MakeSampler(DxFilterOf(TextureFilter::LinearMipLinear),
                            DxAddressOf(TextureWrap::Repeat), 10);
         t[n].MipLODBias = 0.28f;
+        ++n;
+        t[n] = MakeSampler(DxFilterOf(TextureFilter::LinearMipLinear),
+                           DxAddressOf(TextureWrap::Repeat), 11);
+        t[n].MipLODBias = 0.45f;
         ++n;
         return t;
     }();
