@@ -20,9 +20,9 @@ in vec4 normal;
 in vec4 fragPos;
 in vec4 objOriginColor;
 void main(){
-    // TEMP PROBE2: 4D vs 3D side by side + w diagnostics
-    vec4 d4 = vec4Pool[2] - fragPos;
-    float dOrig = max(dot(normalize(normal), normalize(d4)), 0.0);
-    float dProbe = clamp(dot(normalize(normal.xyz), normalize(d4.xyz)), 0.0, 1.0);
-    FragColor = vec4(dOrig, dProbe, clamp(abs(fragPos.w) * 0.25 + abs(d4.w) * 0.25, 0.0, 1.0), 1.0);
+    // TEMP PROBE3: raw w components
+    FragColor = vec4(fragPos.w * 0.5,
+                     vec4Pool[2].w * 0.5,
+                     normalize(normal).w * 0.5 + 0.5,
+                     1.0);
 }
