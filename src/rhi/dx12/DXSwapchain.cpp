@@ -137,6 +137,10 @@ bool DXSwapchain::present() {
 void DXSwapchain::resize(int width, int height) {
     if (!_initialized || width <= 0 || height <= 0 ||
         (width == _width && height == _height)) return;
+    // 【终审 F5】当前为死代码（三后端 swapchain resize 均无调用点，行为一致）。
+    // 若将来接线，renderer 侧必须同步复位 _backBufferBound=false / _omPending=true
+    // （经 renderer 中转或回调）：否则新 backbuffer 从 PRESENT 出发却跳过
+    // PRESENT→RT 屏障，present 尾部还会对新缓冲发 RT→PRESENT 无效屏障。
     // ResizeBuffers 要求 GPU 空闲且无 backbuffer 引用
     waitForGpuIdle();
     destroySizeDependent();
@@ -145,7 +149,12 @@ void DXSwapchain::resize(int width, int height) {
              "ResizeBuffers");
     _width = width;
     _height = height;
-    createSizeDependent(width, height);
+    // 失败不再吞返回值：backbuffer/DSV 缺失时 activateWindowTargets 会因空指针
+    // 静默跳过窗口路径，此处 LOGE 留下定位线索
+    if (!createSizeDependent(width, height)) {
+        LOGE("[DX12] resize({}x{}): createSizeDependent failed; window targets unavailable",
+             width, height);
+    }
 }
 
 uint32_t DXSwapchain::currentIndex() const {
