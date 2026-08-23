@@ -19,7 +19,7 @@ endif()
 include_directories(${WINDOWS_SDK_ROOT})
 include_directories(${WINDOWS_SDK_ROOT}/winrt)
 
-if(ENABLE_DX11 OR ENABLE_DX12)
+if(ENABLE_DX12)
     include_directories(${DX_SDK_ROOT}/Include)
     link_directories(${DX_SDK_ROOT}/Lib/x64)
 endif()

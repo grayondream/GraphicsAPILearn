@@ -100,11 +100,6 @@ if(${ENABLE_VULKAN})
     endif()
 endif()
 
-if(${ENABLE_DX11})
-    message("Graphic API Enable D3D11")
-    target_compile_definitions(${PROJECT_NAME} PRIVATE ENABLE_DX11=1)
-endif()
-
 if(${ENABLE_DX12})
     message("Graphic API Enable D3D12")
     target_compile_definitions(${PROJECT_NAME} PRIVATE ENABLE_DX12=1)
@@ -167,20 +162,6 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
     gdi32.lib
     kernel32.lib
     )
-endif()
-
-# 仅 DX11 需要旧式 d3d11/d3dx11/d3dcompiler 导入库（d3dx11 已从现代 Windows SDK 移除，
-# 若 DX12 也进此分支会 LNK1104；DX12 的链接见上方 ENABLE_DX12 块）
-if(ENABLE_DX11)
-    target_link_libraries(${PROJECT_NAME}
-        user32.lib
-        gdi32.lib
-        kernel32.lib
-        d3d11.lib
-        d3dx11.lib
-        d3dcompiler.lib
-        dxguid.lib
-        )
 endif()
 
 if(ENABLE_OPENGL)
