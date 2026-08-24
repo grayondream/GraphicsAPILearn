@@ -250,3 +250,4 @@
 | 2026-08-24 | run_win.sh 落地 + 三后端 Windows 全量终验 | 验证 | scripts/run_win.sh（interop 驱动 E:\ 树 exe，-h 解析清单 tr -d \r 处理 CRLF——此前队尾 PBR_IBL_Specular 假 FAIL 即 CRLF 所致）；终验 **GL 46/46 + Vulkan 46/46 + DX12 46/46 三后端 Windows 真机全绿**，规格附录双副本工作流承诺闭环 |
 | 2026-08-24 | legacy DX11 死代码清除 | 重构 | 删 src/app/DX11（旧 Application 基类 4 样例，include 已删头文件不可构建）、src/native/DX11、src/utils/DX11 孤儿目录及全部 ENABLE_DX11 构建门（main.cpp 注册/三处 CMake glob/d3d11 旧式链接块/根 option）；GraphicsType::DX11 枚举保留。回归：Linux GL/VK 冒烟 ✓ + Windows MSVC 构建 rc=0 |
 | 2026-08-24 | ENABLE_DX12 默认关闭零侵入验收 | 验证 | Linux build-nodx（无 DX12 参数）cfg/build rc=0 零 dx12 产物日志；Windows build-nodx 同验 rc=0、无 dxc/dx_shaders 目标、exe 正常产出——规格 Task11-Step3"关闭时零行为变化"闭环 |
+| 2026-08-24 | 多配置构建目录无缝切换 | 增强 | AppDirs::ExePath（修宽字符转换 UB）+ VK/DX Shader 产物树按 exe 位置向上探测 res/<Backend>，旧固定 build/ 布局兜底；run_win.sh 支持 WIN_BUILD_DIR。实证：Windows/Linux 下任意命名目录（build-renamed）dx12/vk/gl 全部正常；Linux dx12 rc=1 为无 D3D12 运行时的预期行为 |
