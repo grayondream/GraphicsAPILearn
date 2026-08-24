@@ -7,7 +7,8 @@
 set -u
 GIT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 WIN_TREE="${WIN_TREE:-/mnt/e/workspace/GraphicsAPILearn}"
-EXE="$WIN_TREE/build/src/Release/renderLearn.exe"
+WIN_BUILD_DIR="${WIN_BUILD_DIR:-build}"
+EXE="$WIN_TREE/$WIN_BUILD_DIR/src/Release/renderLearn.exe"
 DUR=5
 
 args=("$@")
