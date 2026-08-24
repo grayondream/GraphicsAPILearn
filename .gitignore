@@ -4,4 +4,4 @@ build/
 .cache/
 imgui.ini
 PROGRESS.md
-docs/
+docs/build-nodx/
