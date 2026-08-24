@@ -1449,6 +1449,21 @@ bool DXRenderer::prepareDraw(bool needsIndex) {
     if (!_recording || !_cmdList.ptr) return false;
     auto dxp = std::dynamic_pointer_cast<DXPipeline>(_pipeline);
     if (!dxp) return false;
+    // TEMP: UBO 取证（RHI_DBG_CBV）——打印每 draw 的 ring 槽与 model 平移分量
+    {
+        static const bool dbg = std::getenv("RHI_DBG_CBV") != nullptr;
+        static UINT64 f = 0; static int n = 0;
+        if (dbg && _uniformBuffer) {
+            auto* ub = static_cast<DXBuffer*>(_uniformBuffer.get());
+            if (_frameFence.ptr && _frameFence->GetCompletedValue() != f) { f = _frameFence->GetCompletedValue(); n = 0; }
+            if (n < 12) {
+                const size_t base = ub->submittedBase();
+                const float* m = reinterpret_cast<const float*>(static_cast<const char*>(ub->mapped()) + base + 128 + 48);
+                LOGI("[CBVDBG] draw#{} slot={} tx=({:.2f},{:.2f},{:.2f})", n, base / (ub->slotSize() ? ub->slotSize() : 1), m[0], m[1], m[2]);
+                ++n;
+            }
+        }
+    }
     flushOmTargets();
 
     // PSO 取用：key 含当前 RT 的格式布局/采样数（MRT GBuffer 组、深度-only pass、
