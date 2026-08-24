@@ -32,24 +32,27 @@ VSOut VSMain(VSIn i) {
     float c = cos(angle);
     float s = sin(angle);
 
-    // 创建旋转矩阵（按列填充：col0=(c,0,s,0)、col2=(-s,0,c,0)，与 GLSL 构造逐列一致）
-    float4x4 rotationMatrix = float4x4(
+    // 创建旋转矩阵。GLSL mat4(col0,col1,col2,col3) 按列填充，而 HLSL float4x4 构造器
+    // 按【行】填充——逐参数直译会得到转置矩阵（实例变换整体错乱，岩石铺满全屏）。
+    // 统一 transpose() 包装使构造语义与 GLSL 逐列一致。
+    float4x4 rotationMatrix = transpose(float4x4(
         float4(c, 0.0, s, 0.0),
         float4(0.0, 1.0, 0.0, 0.0),
         float4(-s, 0.0, c, 0.0),
         float4(0.0, 0.0, 0.0, 1.0)
-    );
+    ));
 
     // 平移到中心点（单位阵 + 第 4 列 = radiusPos）
-    float4x4 translationMatrix = float4x4(
+    float4x4 translationMatrix = transpose(float4x4(
         float4(1.0, 0.0, 0.0, 0.0),
         float4(0.0, 1.0, 0.0, 0.0),
         float4(0.0, 0.0, 1.0, 0.0),
         float4(gVec4Pool[45].xyz, 1.0)
-    );
+    ));
 
-    float4x4 aInstanceMatrix = float4x4(i.aInstanceMatrix0, i.aInstanceMatrix1,
-                                        i.aInstanceMatrix2, i.aInstanceMatrix3);
+    // 实例缓冲里是 glm 列主序 mat4 的四列，构造器按行吃参数 → transpose 还原
+    float4x4 aInstanceMatrix = transpose(float4x4(i.aInstanceMatrix0, i.aInstanceMatrix1,
+                                                  i.aInstanceMatrix2, i.aInstanceMatrix3));
 
     // 计算新的实例矩阵
     float4x4 newInstanceMatrix = mul(translationMatrix, mul(rotationMatrix, aInstanceMatrix));
