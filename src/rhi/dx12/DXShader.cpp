@@ -1,4 +1,5 @@
 #include "rhi/dx12/DXShader.hpp"
+#include "base/AppDirs.hpp"
 #include "base/Log.hpp"
 #include <d3dcompiler.h>
 #include <cstring>
