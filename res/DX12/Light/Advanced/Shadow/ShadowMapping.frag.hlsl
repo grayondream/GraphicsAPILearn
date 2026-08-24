@@ -6,8 +6,6 @@
 // textureSize→GetDimensions；槽位照抄：viewPos=vec4Pool[0]、lightPos=vec4Pool[2]、
 // enableBias=floatPool[25]、enableSimplePCF=floatPool[40]、type=floatPool[15]、debug=floatPool[18]。
 #include "../../../_uniform_block.hlsli"
-#include "../../../_samplers.hlsli"
-// TEMP: 取证——输出裸深度/比较结果/最终shadow 三通道（取证后还原）
 
 Texture2D gDiffuseTexture : register(t1);
 Texture2D gShadowMap : register(t2);
@@ -30,8 +28,11 @@ float ShadowCalculation(float4 fragPosLightSpace, float3 inFragPos, float3 inNor
 {
     // perform perspective divide
     float3 projCoords = fragPosLightSpace.xyz / fragPosLightSpace.w;
-    // transform to [0,1] range
-    projCoords = projCoords * 0.5 + 0.5;
+    // transform to [0,1] range。xy：两 API 一致的 [-1,1]→[0,1]；z：DXBuffer 的 UBO
+    // 投影补丁已把 lightSpaceMatrix 的 z_ndc 映射到 D3D 裁剪空间 [0,1]（深度图存储值
+    // 与 GL 视口变换逐位一致），此处再 *0.5+0.5 会双重重映射使 ref 系统性偏大→全屏误阴影
+    projCoords.xy = projCoords.xy * 0.5 + 0.5;
+    projCoords.z = saturate(projCoords.z);
 
     uint shadowWidth, shadowHeight;
     gShadowMap.GetDimensions(shadowWidth, shadowHeight);
@@ -88,11 +89,6 @@ float4 PSMain(PSIn i) : SV_Target {
     float3 lighting = (ambient + (1.0 - shadow) * (diffuse + specular)) * color;
 
     float4 FragColor = float4(lighting, 1.0);
-#ifdef RHI_SHADOW_PROBE
-    float raw = gShadowMap.Sample(gSamplerNearestClamp, (i.FragPosLightSpace.xy / i.FragPosLightSpace.w) * 0.5.xx + 0.5.xx).r;
-    float lit = gShadowMap.SampleCmp(gShadowCompare, (i.FragPosLightSpace.xy / i.FragPosLightSpace.w) * 0.5.xx + 0.5.xx, saturate((i.FragPosLightSpace.z / i.FragPosLightSpace.w) * 0.5 + 0.5));
-    FragColor = float4(raw, lit, shadow, 1.0);
-#endif
     if (FPOOL(15) > 1.5) {   // type
         FragColor = float4(lightColor, 1.0);
     }
