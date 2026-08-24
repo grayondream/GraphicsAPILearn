@@ -222,6 +222,10 @@ void AppHost::renderTotalBar() {
     backendNames.emplace_back("Vulkan");
     backendTypes.emplace_back(GraphicsType::Vulkan);
 #endif
+#if ENABLE_DX12
+    backendNames.emplace_back("Direct3D 12");
+    backendTypes.emplace_back(GraphicsType::DX12);
+#endif
     int curBackend = 0;
     for (int i = 0; i < static_cast<int>(backendTypes.size()); ++i)
         if (backendTypes[i] == _backend) curBackend = i;
