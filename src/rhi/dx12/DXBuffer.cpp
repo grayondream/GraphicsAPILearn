@@ -186,6 +186,21 @@ bool DXBuffer::update(const void* data, size_t size, size_t offset) {
         }
         const size_t dst = slot * _slotSize + offset;
         std::memcpy(static_cast<char*>(_mapped) + dst, data, size);
+        // D3D12 裁剪空间 z∈[0,w]，GL 语义投影矩阵产出 z_ndc∈[-1,1]：负 z 段会被
+        // 光栅化整段裁掉（Shadow 光空间正交 near=1/far=7.5 时近半场景从深度图消失，
+        // 表现为无阴影）。在 UBO 槽内对投影类矩阵做 z 再映射 M'=R·M（z'=0.5z+0.5w），
+        // 经视口变换后的存储深度恰与 GL 视口 [-1,1]→[0,1] 的结果逐位一致。
+        // 覆盖 projection@0 与 extraMat4[0..6]（lightSpaceMatrix/点光 6 面 shadowMatrices，
+        // 全部为投影语义；[7..13] 自由槽不动）。列主序 glm 内存：M'[2][j]=0.5(M[2][j]+M[3][j])。
+        if (offset == 0 && size >= 1216) {
+            auto patch = [](unsigned char* m) {
+                float* f = reinterpret_cast<float*>(m);
+                for (int j = 0; j < 4; ++j) f[8 + 4 * j] = 0.5f * (f[8 + 4 * j] + f[12 + 4 * j]);
+            };
+            unsigned char* base = static_cast<unsigned char*>(_mapped) + dst;
+            patch(base);                                        // projection
+            for (int i = 0; i < 7; ++i) patch(base + 320 + 64 * i);   // extraMat4[0..6]
+        }
         return true;
     }
 
