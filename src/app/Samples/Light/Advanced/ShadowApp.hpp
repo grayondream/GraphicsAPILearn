@@ -40,7 +40,7 @@ private:
 private:
 	std::shared_ptr<rhi::IPipeline> _shadowProgram{}, _depthProgram{}, _debugProgram{};
 
-	bool _enableDepthMap{ std::getenv("RHI_DBG_DEPTHMAP") != nullptr };   // TEMP: 深度图调试取证
+	bool _enableDepthMap{};
 	bool _enableDebug{};
 	bool _enableShadowBias{};
 	bool _enableCullFace{};

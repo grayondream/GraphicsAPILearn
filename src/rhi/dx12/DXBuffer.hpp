@@ -53,10 +53,6 @@ private:
     uint32_t _windowUpdates{0};   // 当前在飞窗口内 update 计数（终审 F4 越限告警）
     void* _mapped{nullptr};   // uniform 的持久映射
 
-  public:
-    void* mapped() const { return _mapped; }        // TEMP: 取证
-    size_t slotSize() const { return _slotSize; }   // TEMP: 取证
-  private:
 
     bool _vbViewReady{false};
     D3D12_VERTEX_BUFFER_VIEW _vbView{};
