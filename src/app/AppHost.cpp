@@ -19,7 +19,6 @@
 #include "base/Log.hpp"
 #include "utils/EnumUtil.hpp"
 #include <imgui.h>
-#include <cstdlib>
 #include <chrono>
 #include <string>
 #include <string_view>
@@ -298,27 +297,6 @@ int AppHost::run() {
         m_window->endFrame();
 
         applyPendingChanges();
-        // TEMP: 热切换自动化验证钩子 RHI_SW_SEQ="帧:后端,帧:后端"（如 "30:DX12,60:GL"），验证后移除
-        {
-            static const char* seq = std::getenv("RHI_SW_SEQ");
-            static long frameNo = 0;
-            if (seq && *seq) {
-                ++frameNo;
-                std::string_view s(seq);
-                for (size_t pos = 0; pos < s.size();) {
-                    size_t colon = s.find(':', pos), comma = s.find(',', pos);
-                    if (colon == std::string_view::npos) break;
-                    long at = std::atol(std::string(s.substr(pos, colon - pos)).c_str());
-                    std::string_view be = s.substr(colon + 1, comma == std::string_view::npos ? s.size() - colon - 1 : comma - colon - 1);
-                    if (at == frameNo) {
-                        GraphicsType g = be == "GL" ? GraphicsType::GL : be == "Vulkan" ? GraphicsType::Vulkan : be == "DX12" ? GraphicsType::DX12 : _backend;
-                        LOGI("[RHI_SW] frame {} -> {}", frameNo, be);
-                        setBackend(g);
-                    }
-                    pos = (comma == std::string_view::npos) ? s.size() : comma + 1;
-                }
-            }
-        }
         std::this_thread::yield();
     }
     return 0;
