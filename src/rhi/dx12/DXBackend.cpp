@@ -629,6 +629,37 @@ private:
             td.wrapR = TextureWrap::ClampToBorder;
             TouchHeapSampler(td, nullptr);
         }
+        PrefillSpecialSamplers();
+    }
+
+    // 堆槽 9/10/11 预填特殊采样器（与 DXPipeline::StaticSamplers 的 s9/s10/s11 逐参一致）：
+    // D3D12 绑定 sampler 堆后 s# 从堆解析（静态表仅在无堆时兜底），堆内未初始化描述符
+    // 为未定义行为——Shadow 的 SampleCmp 读到垃圾采样器返回非二值分数，全屏误阴影。
+    void PrefillSpecialSamplers() {
+        if (!_samplerHeap.ptr) return;
+        auto dst = [&](UINT slot) {
+            D3D12_CPU_DESCRIPTOR_HANDLE h{_samplerHeap->GetCPUDescriptorHandleForHeapStart()};
+            h.ptr += static_cast<SIZE_T>(slot) * static_cast<SIZE_T>(_samplerDescSize);
+            return h;
+        };
+        D3D12_SAMPLER_DESC cmp{};
+        cmp.Filter = D3D12_FILTER_COMPARISON_MIN_MAG_MIP_POINT;
+        cmp.AddressU = cmp.AddressV = cmp.AddressW = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
+        cmp.ComparisonFunc = D3D12_COMPARISON_FUNC_LESS_EQUAL;
+        cmp.MaxAnisotropy = 1;
+        cmp.BorderColor[0] = cmp.BorderColor[1] = cmp.BorderColor[2] = cmp.BorderColor[3] = 1.0f;
+        cmp.MinLOD = 0; cmp.MaxLOD = D3D12_FLOAT32_MAX;
+        _device->CreateSampler(&cmp, dst(9));
+        for (const auto& [slot, bias] : std::array<std::pair<UINT, float>, 2>{{{10, 0.28f}, {11, 0.85f}}}) {
+            D3D12_SAMPLER_DESC lod{};
+            lod.Filter = D3D12_FILTER_MIN_MAG_LINEAR_MIP_POINT;
+            lod.AddressU = lod.AddressV = lod.AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+            lod.ComparisonFunc = D3D12_COMPARISON_FUNC_NEVER;
+            lod.MaxAnisotropy = 1;
+            lod.MipLODBias = bias;
+            lod.MinLOD = 0; lod.MaxLOD = D3D12_FLOAT32_MAX;
+            _device->CreateSampler(&lod, dst(slot));
+        }
     }
 
     // 全屏三角形 PSO 缓存（键=目标 RTV 格式）：无深度、无混合、无输入布局，
