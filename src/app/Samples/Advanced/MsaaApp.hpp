@@ -38,7 +38,10 @@ private:
 	std::shared_ptr<rhi::IRenderTarget> _msaaFbo{};
 	std::shared_ptr<rhi::IRenderTarget> _postFbo{};
 	bool _enableMsaa{ false };
-	bool _enableFrameBufferMssa{ false };
+	// 默认走 FrameBuffer MSAA（RHI 4x RT+resolve，三后端一致）。旧路径 drawGLMssa
+	// 依赖 GL 窗口多重采样（glEnable(GL_MULTISAMPLE)），DX12/VK 无对应机制
+	// （setMultisample 为 no-op、swapchain 固定 1x），默认开启会表现为"MSAA 无效果"
+	bool _enableFrameBufferMssa{ true };
 	rhi::UniformBlock _ubo{};
 	std::shared_ptr<rhi::IBuffer> _uboBuffer{};
 };
