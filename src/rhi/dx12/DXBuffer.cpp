@@ -195,7 +195,7 @@ bool DXBuffer::update(const void* data, size_t size, size_t offset) {
         if (offset == 0 && size >= 1216) {
             auto patch = [](unsigned char* m) {
                 float* f = reinterpret_cast<float*>(m);
-                for (int j = 0; j < 4; ++j) f[8 + 4 * j] = 0.5f * (f[8 + 4 * j] + f[12 + 4 * j]);
+                for (int j = 0; j < 4; ++j) f[4 * j + 2] = 0.5f * (f[4 * j + 2] + f[4 * j + 3]);
             };
             unsigned char* base = static_cast<unsigned char*>(_mapped) + dst;
             patch(base);                                        // projection
