@@ -251,3 +251,4 @@
 | 2026-08-24 | legacy DX11 死代码清除 | 重构 | 删 src/app/DX11（旧 Application 基类 4 样例，include 已删头文件不可构建）、src/native/DX11、src/utils/DX11 孤儿目录及全部 ENABLE_DX11 构建门（main.cpp 注册/三处 CMake glob/d3d11 旧式链接块/根 option）；GraphicsType::DX11 枚举保留。回归：Linux GL/VK 冒烟 ✓ + Windows MSVC 构建 rc=0 |
 | 2026-08-24 | ENABLE_DX12 默认关闭零侵入验收 | 验证 | Linux build-nodx（无 DX12 参数）cfg/build rc=0 零 dx12 产物日志；Windows build-nodx 同验 rc=0、无 dxc/dx_shaders 目标、exe 正常产出——规格 Task11-Step3"关闭时零行为变化"闭环 |
 | 2026-08-24 | 多配置构建目录无缝切换 | 增强 | AppDirs::ExePath（修宽字符转换 UB）+ VK/DX Shader 产物树按 exe 位置向上探测 res/<Backend>，旧固定 build/ 布局兜底；run_win.sh 支持 WIN_BUILD_DIR。实证：Windows/Linux 下任意命名目录（build-renamed）dx12/vk/gl 全部正常；Linux dx12 rc=1 为无 D3D12 运行时的预期行为 |
+| 2026-08-24 | ImGui DX12 overlay 复核 | 验证 | 定向区域统计证实 DX12 overlay 工作正常（total bar 区 std=44、样例窗区 std=22，暗色主题致此前"亮块"扫描误判）；发现 GL 在 Windows 的 dump 不含 imgui 内容（std=0），属 GL dump 路径独立时序假象非渲染缺陷，另案备查 |
