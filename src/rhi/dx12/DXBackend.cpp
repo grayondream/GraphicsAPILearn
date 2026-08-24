@@ -1480,6 +1480,8 @@ bool DXRenderer::prepareDraw(bool needsIndex) {
     if (!_recording || !_cmdList.ptr) return false;
     auto dxp = std::dynamic_pointer_cast<DXPipeline>(_pipeline);
     if (!dxp) return false;
+    flushOmTargets();
+
     // PSO 取用：key 含当前 RT 的格式布局/采样数（MRT GBuffer 组、深度-only pass、
     // MSAA 各自成键；窗口路径沿用 swapchain 格式）
     PSOKey key{};
