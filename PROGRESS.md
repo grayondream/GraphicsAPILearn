@@ -254,3 +254,4 @@
 | 2026-08-24 | ImGui DX12 overlay 复核 | 验证 | 定向区域统计证实 DX12 overlay 工作正常（total bar 区 std=44、样例窗区 std=22，暗色主题致此前"亮块"扫描误判）；发现 GL 在 Windows 的 dump 不含 imgui 内容（std=0），属 GL dump 路径独立时序假象非渲染缺陷，另案备查 |
 | 2026-08-24 | 总控条后端下拉补 DX12 项 | 修复 | renderTotalBar 的 Backend Combo 只列了 OpenGL/Vulkan（Task 9 漏项），-b dx12 可跑但 UI 无法热切；补 #if ENABLE_DX12 "Direct3D 12" 条目，Windows 构建 rc=0、总控条区 dump std=43 内容正常。用户目检下拉框即三后端齐 |
 | 2026-08-24 | UI 热切换 DX12 实证 + 钩子撤除 | 验证 | TEMP 钩子 RHI_SW_SEQ 自动化矩阵：GL→DX12→GL / VK→DX12→VK / DX12→GL→DX12（含 BlinnPhong ImGui 三次重初始化）全部 rc=124 零错误——下拉框选 Direct3D 12 的热路径正式可用；钩子验证后移除，双树+origin 同步 |
+| 2026-08-24 | 全量回归终验（后期改动后补跑） | 验证 | mipgen 盒平均/stencil ref/cubeface 快照/F3-F8 加固等全部后期改动之后：Windows 三后端 run_win.sh 各 46/46 + Linux GL 46/46 + VK 46/46（含环境性零失败本轮）；四方仓库同步无未决提交 |
