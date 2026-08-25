@@ -21,7 +21,8 @@ configure() {
 
 build() {
     echo "==> cmake build ..."
-    cmake --build "$BUILD_DIR" --parallel 32
+    # 并行度固定 8：更高并发在部分环境会拖垮交互（勿改回 nproc/32）
+    cmake --build "$BUILD_DIR" --parallel 8
     echo "==> build OK"
 }
 

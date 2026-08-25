@@ -6,8 +6,10 @@
 # 前置：Windows 树已 pull 且构建（build/src/Release/renderLearn.exe 存在）
 set -u
 GIT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+# WIN_TREE 按环境覆盖：export WIN_TREE=/mnt/<盘>/path/to/GraphicsAPILearn
 WIN_TREE="${WIN_TREE:-/mnt/e/workspace/GraphicsAPILearn}"
 WIN_BUILD_DIR="${WIN_BUILD_DIR:-build}"
+mkdir -p "${LOG_DIR:-/tmp/opencode}"
 EXE="$WIN_TREE/$WIN_BUILD_DIR/src/Release/renderLearn.exe"
 DUR=5
 
@@ -29,7 +31,7 @@ done
 
 run_one() {
     local app="$1"
-    timeout "$DUR" "$EXE" -b "$BACKEND" -a "$app" < /dev/null > "/tmp/opencode/rw_${BACKEND}_${app}.log" 2>&1
+    timeout "$DUR" "$EXE" -b "$BACKEND" -a "$app" < /dev/null > "${LOG_DIR:-/tmp/opencode}/rw_${BACKEND}_${app}.log" 2>&1
 }
 
 if [[ "$MODE" == "one" ]]; then
