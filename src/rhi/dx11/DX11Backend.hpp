@@ -51,6 +51,8 @@ public:
     // 调用方跳过本帧（后续帧自动重试）
     ID3D11RenderTargetView* acquireRtv(uint32_t index);
     ID3D11DepthStencilView* dsv();
+    // 已获取槽位的 backbuffer 裸纹理（dumpFrame 读回源；未获取槽位返回 nullptr）
+    ID3D11Texture2D* backBuffer(uint32_t index);
 
 private:
     bool createSizeDependent(int width, int height);   // 尽力预取各槽 RTV+深度 DSV
