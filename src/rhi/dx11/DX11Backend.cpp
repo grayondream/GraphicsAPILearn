@@ -26,7 +26,8 @@ static void WarnOnce(const char* message) {
     }
 }
 
-// ---- 设备侧诊断（DX11Header.hpp 声明）----
+// ---- 设备侧诊断（DX11Header.hpp 声明，dx11diag 命名空间避免与 DX12 的
+// rhi::dxdiag 同签名符号 LNK2005 冲突）----
 namespace {
 
 Dx11ComPtr<ID3D11InfoQueue>& DxDiagQueue() {
@@ -36,7 +37,7 @@ Dx11ComPtr<ID3D11InfoQueue>& DxDiagQueue() {
 
 } // namespace
 
-void dxdiag::SetInfoQueue(ID3D11Device* device) {
+void dx11diag::SetInfoQueue(ID3D11Device* device) {
     if (!device) return;
     Dx11ComPtr<ID3D11InfoQueue> got;
     if (SUCCEEDED(device->QueryInterface(IID_PPV_ARGS(&got)))) {
@@ -44,7 +45,7 @@ void dxdiag::SetInfoQueue(ID3D11Device* device) {
     }
 }
 
-void dxdiag::DumpMessages(const char* context) {
+void dx11diag::DumpMessages(const char* context) {
     Dx11ComPtr<ID3D11InfoQueue>& iq = DxDiagQueue();
     if (!iq.ptr) return;
     const UINT64 count = iq->GetNumStoredMessages();
@@ -220,9 +221,9 @@ private:
 
 } // namespace
 
-class DXRenderer : public IRenderer {
+class DX11Renderer : public IRenderer {
 public:
-    ~DXRenderer() override { shutdown(); }
+    ~DX11Renderer() override { shutdown(); }
 
     bool init(const std::shared_ptr<ISurface>& surface) override;
     void shutdown() override;
@@ -382,7 +383,7 @@ private:
     // 公共绘制前奏：着色器/输入装配/拓扑/顶点缓冲/cbuffer b0
     bool prepareDraw(bool needsIndex);
 
-    // RHI_DUMP_FRAME 帧导出（单次，对齐 DXRenderer::dumpFrame）：staging 纹理读回
+    // RHI_DUMP_FRAME 帧导出（单次，对齐 DX11Renderer::dumpFrame）：staging 纹理读回
     // 当前 backbuffer 写 PPM(P6)。时序=present() 内、Present 之前；BGRA 内存序需
     // 读回换序为 RGB（DX12 为 RGBA8 直落盘，此处不同）
     void dumpFrame();
@@ -412,7 +413,7 @@ private:
     bool _dumpDone{false};
 };
 
-bool DXRenderer::init(const std::shared_ptr<ISurface>& surface) {
+bool DX11Renderer::init(const std::shared_ptr<ISurface>& surface) {
     _surface = surface;
     // BGRA 支持恒开（交换链格式 B8G8R8A8_UNORM 需要）；调试层经环境变量可选：
     // GRAPHICSLEARN_DX11_DEBUGLAYER=1 时启用，须先于建设备；SDK Layers 未安装时
@@ -434,7 +435,7 @@ bool DXRenderer::init(const std::shared_ptr<ISurface>& surface) {
     }
     DX11_CHECK(hr, "create device");
     if (!_device.ptr || !_context.ptr) return false;
-    dxdiag::SetInfoQueue(_device.ptr);
+    dx11diag::SetInfoQueue(_device.ptr);
     if (_featureLevel < D3D_FEATURE_LEVEL_11_0) {
         LOGE("[DX11] feature level 11_0 unsupported (got 0x{:x})", static_cast<unsigned>(_featureLevel));
         return false;
@@ -451,7 +452,7 @@ bool DXRenderer::init(const std::shared_ptr<ISurface>& surface) {
     return true;
 }
 
-void DXRenderer::createDefaultStates() {
+void DX11Renderer::createDefaultStates() {
     D3D11_RASTERIZER_DESC rs{};
     rs.FillMode = D3D11_FILL_SOLID;
     rs.CullMode = D3D11_CULL_NONE;   // GL 默认无剔除（Triangle/Rect 依赖此语义）
@@ -490,7 +491,7 @@ void DXRenderer::createDefaultStates() {
     DX11_CHECK(_device->CreateBlendState(&bs, &_blendDefault), "create default blend state");
 }
 
-void DXRenderer::shutdown() {
+void DX11Renderer::shutdown() {
     _uniformBuffer = nullptr;
     _pipeline = nullptr;
     _indexBuffer = nullptr;
@@ -506,13 +507,13 @@ void DXRenderer::shutdown() {
     _surface.reset();
 }
 
-bool DXRenderer::present() {
+bool DX11Renderer::present() {
     if (!_swapchain || !_swapchain->initialized()) return false;
     dumpFrame();   // 对齐 VK/DX12 口径：帧内容已入 backbuffer、Present 前
     return _swapchain->present();   // Present(1,0)
 }
 
-void DXRenderer::bindWindowTargets(bool doClear) {
+void DX11Renderer::bindWindowTargets(bool doClear) {
     if (!_swapchain || !_swapchain->initialized() || !_context.ptr) return;
     ID3D11RenderTargetView* rtv = _swapchain->rtv(_swapchain->currentIndex());
     ID3D11DepthStencilView* dsv = _swapchain->dsv();
@@ -527,7 +528,7 @@ void DXRenderer::bindWindowTargets(bool doClear) {
     _windowBound = true;
 }
 
-void DXRenderer::clearWindowTargets() {
+void DX11Renderer::clearWindowTargets() {
     ID3D11RenderTargetView* rtv = _swapchain->rtv(_swapchain->currentIndex());
     ID3D11DepthStencilView* dsv = _swapchain->dsv();
     if (rtv) _context->ClearRenderTargetView(rtv, _clearColor);
@@ -537,7 +538,7 @@ void DXRenderer::clearWindowTargets() {
 // 朝向约定（终验教训同 DX12）：D3D NDC y-up，swapchain 直绘用正高度视口即与 GL
 // 呈现朝向一致。【历史】VK 式负高度翻转在 D3D 是错的——非 VK(y-down) 不需要，
 // 会致 Triangle/Rect 等直绘图元整体 Y 镜像。
-void DXRenderer::applyViewport() {
+void DX11Renderer::applyViewport() {
     if (!_context.ptr) return;
     const int fbW = _swapchain ? _swapchain->width() : 0;
     const int fbH = _swapchain ? _swapchain->height() : 0;
@@ -553,7 +554,7 @@ void DXRenderer::applyViewport() {
     _context->RSSetViewports(1, &vp);
 }
 
-bool DXRenderer::prepareDraw(bool needsIndex) {
+bool DX11Renderer::prepareDraw(bool needsIndex) {
     if (!_context.ptr || !_pipeline) return false;
     auto p = std::dynamic_pointer_cast<DX11Pipeline>(_pipeline);
     if (!p || !p->valid()) return false;
@@ -612,7 +613,7 @@ bool DXRenderer::prepareDraw(bool needsIndex) {
 // B8G8R8A8_UNORM，内存字节序 B,G,R,A → 写 PPM 时换序为 RGB（VK/DX12 的 RGBA8
 // 无需换序，此处口径差异已对齐 frame_compare 参照）。行序 top-down 与 VK/DX12
 // dump 输出口径一致，无翻转。
-void DXRenderer::dumpFrame() {
+void DX11Renderer::dumpFrame() {
     const char* dumpPath = std::getenv("RHI_DUMP_FRAME");
     if (!dumpPath || _dumpDone || !_swapchain || !_swapchain->initialized()) return;
     const char* skipEnv = std::getenv("RHI_DUMP_SKIP");
@@ -688,7 +689,7 @@ void DXRenderer::dumpFrame() {
     LOGI("dumpFrame: pixels black={} nonblack={}", black, nonblack);
 }
 
-std::shared_ptr<IRenderer> createDX11Renderer() { return std::make_shared<DXRenderer>(); }
+std::shared_ptr<IRenderer> createDX11Renderer() { return std::make_shared<DX11Renderer>(); }
 
 // ImGui overlay 初始化信息桥（Task 6 消费）：本任务按 brief 约定恒返回 false
 bool GetDX11ImGuiInitInfo(const std::shared_ptr<IRenderer>& renderer, DX11ImGuiInitInfo& out) {

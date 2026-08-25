@@ -23,15 +23,15 @@
 #define DX11_CHECK(hr, msg) \
     do { HRESULT _hr = (hr); if (FAILED(_hr)) { \
         LOGE("[DX11] {} failed hr=0x{:08X}", msg, static_cast<uint32_t>(_hr)); \
-        dxdiag::DumpMessages(msg); } } while (0)
+        dx11diag::DumpMessages(msg); } } while (0)
 
 namespace rhi {
-namespace dxdiag {
+namespace dx11diag {
 // 设备侧诊断：DXRenderer::init 注入 InfoQueue（可选调试层，见 DX11Backend.cpp 的
 // GRAPHICSLEARN_DX11_DEBUGLAYER），DX11_CHECK 失败时把设备校验消息带出到应用日志
 void SetInfoQueue(ID3D11Device* device);
 void DumpMessages(const char* context);
-} // namespace dxdiag
+} // namespace dx11diag
 
 template <typename T>
 struct Dx11ComPtr {
