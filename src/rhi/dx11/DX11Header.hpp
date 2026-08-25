@@ -133,6 +133,26 @@ inline D3D11_STENCIL_OP Dx11StencilOp(StencilOp op) {
     return D3D11_STENCIL_OP_KEEP;
 }
 
+// filter/wrap → D3D11 采样器描述映射（对照 DX12 的 DxFilterOf/DxAddressOf；
+// 寄存器编号约定 f*3+w 见 res/DX11/_samplers.hlsli）
+inline D3D11_FILTER Dx11FilterOf(TextureFilter filter) {
+    switch (filter) {
+        case TextureFilter::Linear:          return D3D11_FILTER_MIN_MAG_LINEAR_MIP_POINT;
+        case TextureFilter::Nearest:         return D3D11_FILTER_MIN_MAG_MIP_POINT;
+        case TextureFilter::LinearMipLinear: return D3D11_FILTER_MIN_MAG_MIP_LINEAR;
+    }
+    return D3D11_FILTER_MIN_MAG_LINEAR_MIP_POINT;
+}
+
+inline D3D11_TEXTURE_ADDRESS_MODE Dx11AddressOf(TextureWrap wrap) {
+    switch (wrap) {
+        case TextureWrap::Repeat:        return D3D11_TEXTURE_ADDRESS_WRAP;
+        case TextureWrap::ClampToEdge:   return D3D11_TEXTURE_ADDRESS_CLAMP;
+        case TextureWrap::ClampToBorder: return D3D11_TEXTURE_ADDRESS_BORDER;
+    }
+    return D3D11_TEXTURE_ADDRESS_WRAP;
+}
+
 inline D3D11_BLEND Dx11Blend(BlendFactor factor) {
     switch (factor) {
         case BlendFactor::Zero:             return D3D11_BLEND_ZERO;

@@ -7,7 +7,10 @@
 #include "rhi/core/IShader.hpp"
 #include "rhi/core/IPipeline.hpp"
 #include "rhi/core/IBuffer.hpp"
+#include "rhi/core/ITexture2D.hpp"
+#include <array>
 #include <map>
+#include <unordered_map>
 
 namespace rhi {
 
@@ -97,10 +100,66 @@ private:
     std::string _log{};
 };
 
+// ---- 2D 纹理（实现于 DX11Texture2D.cpp）----
+// - 上传：STAGING 纹理 Map+行拷贝 → CopySubresourceRegion 写 DEFAULT 资源 mip0
+//   （brief 指定路径）；generateMipmap=true 时 D3D11 有内建 GenerateMips（DX12 无，
+//   手动 blit 降采样是 DX12 特有限制），资源带 MISC_GENERATE_MIPS+RT 绑定标志；
+//   非 filterable 格式（RGBA32F 等）钳 mip0 并告警（对齐 DX12 兜底语义）；
+// - createEmpty：颜色=RT|SRV 绑定；深度=TYPELESS 资源族 + BIND_DEPTH_STENCIL|
+//   BIND_SHADER_RESOURCE，DSV/SRV 视图各取 typed 格式（R32_TYPELESS→D32_FLOAT/
+//   R32_FLOAT、R24G8_TYPELESS→D24_UNORM_S8_UINT/R24_UNORM_X8_TYPELESS）——
+//   D3D11 深度+采样双绑定必须 TYPELESS 资源，Dx11FormatOf 的 typed 直传仅适用于
+//   纯 DSV 用途，此处按视图口径展开（同 DX12 srvFormat 决策）；
+// - SRV 在 init 成功时创建一次（覆盖全 mip 链），bindTexture 把它写入 Renderer
+//   共享槽位 t<unit+1>（槽 0 预留 ImGui）。
+class DX11Texture2D : public ITexture2D {
+public:
+    // device/context 归 Renderer 所有，此处仅借用
+    DX11Texture2D(ID3D11Device* device, ID3D11DeviceContext* context);
+    ~DX11Texture2D() override;
+
+    bool init(const TextureDataView2D& data) override;                  // 旧签名：默认 RGBA8 desc
+    bool init(const TextureDesc& desc, const TextureDataView2D& data) override;
+    bool createEmpty(const TextureDesc& desc, int width, int height) override;
+    void bind(unsigned int unit) override {}                            // 绑定=Renderer 写共享槽位
+    void* handle() override { return _texture.ptr; }
+    bool valid() const override { return _valid; }
+    void release() override;
+
+    // ---- Renderer 访问器 ----
+    ID3D11ShaderResourceView* srv() const { return _srv.Get(); }
+    UINT mipLevels() const { return _mipLevels; }
+    bool isMsaa() const { return _msaa; }                               // RTV-only，不可建 SRV
+    // 采样语义（bind 路径取 f*3+w 采样器槽位；borderColor 仅白/黑可静态表达）
+    const TextureDesc& samplerParams() const { return _params; }
+    const std::array<float, 4>& borderColor() const { return _borderColor; }
+    void setBorderColor(const float bc[4]);
+
+private:
+    bool uploadAndGenMips(const TextureDesc& desc, const TextureDataView2D& data);
+
+    ID3D11Device* _device{nullptr};
+    ID3D11DeviceContext* _context{nullptr};
+
+    Dx11ComPtr<ID3D11Texture2D> _texture{};
+    Dx11ComPtr<ID3D11ShaderResourceView> _srv{};
+    DXGI_FORMAT _format{DXGI_FORMAT_UNKNOWN};     // 资源存储格式（深度为 TYPELESS 族）
+    DXGI_FORMAT _srvFormat{DXGI_FORMAT_UNKNOWN};  // SRV 视图 typed 格式
+    UINT _mipLevels{1};
+    int _width{0};
+    int _height{0};
+    bool _msaa{false};
+    bool _valid{false};
+
+    TextureDesc _params{};                      // 创建时的采样语义（filter/wrap）
+    std::array<float, 4> _borderColor{{1.0f, 1.0f, 1.0f, 1.0f}};  // ClampToBorder 边框色
+};
+
 // ---- 最小管线（实现于 DX11Pipeline.cpp）----
-// 本任务只 VS/PS(+GS)/InputLayout/Topology；深度/模板/混合等状态对象 Task 3 补全，
-// 届时状态 setter 存储的成员将参与 D3D11 状态对象构建。uniform 走显式 UBO
-// （cbuffer b0），pipeline 侧 setter 一律 no-op（同 DX12/VK 约定）。
+// VS/PS(+GS)/InputLayout/Topology + RS/Blend/DS 状态对象缓存（Task 2）：
+// 状态 setter 存成员，draw 时按 stateHash() 查懒建缓存并全量下发——DX11 即时
+// 上下文无状态泄漏风险（对齐 DX12 "prepareDraw 自愈重设" 注释语义）。
+// uniform 走显式 UBO（cbuffer b0），pipeline 侧 setter 一律 no-op（同 DX12/VK 约定）。
 class DX11Pipeline : public IPipeline {
 public:
     // device 归 Renderer 所有，此处仅借用；InputLayout 在构造期由 VS 字节码创建
@@ -151,11 +210,25 @@ public:
     // IASetInputLayout + VSSetShader/PSSetShader(+GSSetShader)，prepareDraw 消费。
     // 非 const：着色器对象（ID3D11VertexShader 等）按字节码懒创建并缓存
     void bindShaders(ID3D11DeviceContext* ctx);
-    // Task 3 状态对象化前模板参考值先经成员透出（OMSetStencilRef 属即时上下文状态）
+    // RS/Blend/DS 状态对象按 stateHash 懒建缓存后全量下发（RSSetState +
+    // OMSetDepthStencilState(stencilRef) + OMSetBlendState），prepareDraw 每 draw 调用
+    void bindStates(ID3D11DeviceContext* ctx);
+    // 状态指纹（与 DX12 同字段口径：混合/深度/模板/剔除/朝向/多态/拓扑；
+    // 差异点：_stencilRef 参与键——DX11 无独立 ref 绑定通道，ref 变化必须换状态对象）
+    uint32_t stateHash() const;
     int stencilRef() const { return _stencilRef; }
 
 private:
     void ensureShaderObjects();   // VS/PS/GS 字节码 → D3D11 着色器对象（一次）
+
+    // 状态对象三元组缓存值（生命周期随 pipeline，析构经 Dx11ComPtr 释放）
+    struct StateObjects {
+        Dx11ComPtr<ID3D11RasterizerState> rs{};
+        Dx11ComPtr<ID3D11DepthStencilState> ds{};
+        Dx11ComPtr<ID3D11BlendState> blend{};
+    };
+    // stateHash → 状态对象；未命中时按当前成员构建（对照 DXPipeline::pipelineFor）
+    StateObjects& statesFor(uint32_t hash);
 
     ID3D11Device* _device{nullptr};
     Dx11ComPtr<ID3D11InputLayout> _inputLayout{};
@@ -188,6 +261,8 @@ private:
     bool _pointSizeEnable{false};
     bool _multisample{false};
     PrimitiveType _primitive{PrimitiveType::TriangleList};
+
+    std::unordered_map<uint32_t, StateObjects> _stateCache{};
 };
 
 } // namespace rhi

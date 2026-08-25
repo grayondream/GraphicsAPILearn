@@ -16,6 +16,24 @@ DXGI_FORMAT ToDx11VertexFormat(VertexElement::Format format) {
     return DXGI_FORMAT_R32G32B32_FLOAT;
 }
 
+// D3D11 无 point 填充模式：以 Fill 承载并只警告一次（对照 DXPipeline::WarnPointFillOnce）
+void WarnPointFillOnce() {
+    static bool warned = false;
+    if (!warned) {
+        warned = true;
+        LOGW("[DX11] PolygonMode::Point not supported by D3D11 fill modes; using Solid");
+    }
+}
+
+// D3D11 无双面同时剔除（GL FrontAndBack=全剔除）：退化为仅剔背面并只警告一次
+void WarnFrontAndBackOnce() {
+    static bool warned = false;
+    if (!warned) {
+        warned = true;
+        LOGW("[DX11] CullFace::FrontAndBack unsupported by D3D11; culling Back only");
+    }
+}
+
 } // namespace
 
 DX11Pipeline::DX11Pipeline(ID3D11Device* device, const VertexLayout& layoutIn,
@@ -87,6 +105,116 @@ void DX11Pipeline::bindShaders(ID3D11DeviceContext* ctx) {
     ctx->PSSetShader(_ps.Get(), nullptr, 0);
     // 无 GS 时传 nullptr 合法（显式解绑该阶段）
     ctx->GSSetShader(_gs.Get(), nullptr, 0);
+}
+
+// 状态指纹：与 DX12 DXPipeline::stateHash 同字段口径（FNV-1a 逐项混入）。
+// 差异点：_stencilRef 参与键——DX11 无 DX12 OMSetStencilRef 式独立 ref 下发，
+// ref 变化必须落到不同的状态对象（OMSetDepthStencilState 第二参数随对象一起换）。
+uint32_t DX11Pipeline::stateHash() const {
+    uint32_t h = 2166136261u;
+    auto mix = [&h](uint32_t v) { h ^= v; h *= 16777619u; };
+    mix(_blend ? 1u : 0u);
+    mix(static_cast<uint32_t>(_blendSrc));
+    mix(static_cast<uint32_t>(_blendDst));
+    mix(_depthTest ? 1u : 0u);
+    mix(_depthMask ? 1u : 0u);
+    mix(static_cast<uint32_t>(_depthFunc));
+    mix(_stencilTest ? 1u : 0u);
+    mix(static_cast<uint32_t>(_stencilFunc));
+    mix(static_cast<uint32_t>(_stencilRef));
+    mix(_stencilCompareMask);
+    mix(_stencilWriteMask);
+    mix(static_cast<uint32_t>(_stencilFail));
+    mix(static_cast<uint32_t>(_stencilDepthFail));
+    mix(static_cast<uint32_t>(_stencilPass));
+    mix(_cullEnable ? 1u : 0u);
+    mix(static_cast<uint32_t>(_cullFace));
+    mix(_frontFaceCCW ? 1u : 0u);
+    mix(static_cast<uint32_t>(_polygonMode));
+    mix(_multisample ? 1u : 0u);
+    mix(static_cast<uint32_t>(_primitive));
+    return h;
+}
+
+// 未命中按当前成员构建 RS/DS/Blend 三元组。字段翻译口径对照
+// src/rhi/dx12/DXPipeline.cpp createGraphicsPipeline（RS/BlendState/DepthStencilState）
+// 逐字段一致——两代 API 拆成独立状态对象但语义相同。
+DX11Pipeline::StateObjects& DX11Pipeline::statesFor(uint32_t hash) {
+    auto it = _stateCache.find(hash);
+    if (it != _stateCache.end()) return it->second;
+
+    StateObjects st{};
+
+    // ---- 光栅化（对照 psoDesc.RasterizerState）----
+    D3D11_RASTERIZER_DESC rs{};
+    rs.FillMode = D3D11_FILL_SOLID;
+    switch (_polygonMode) {
+        case PolygonMode::Line:  rs.FillMode = D3D11_FILL_WIREFRAME; break;
+        case PolygonMode::Point:
+            WarnPointFillOnce();
+            [[fallthrough]];
+        default:                 rs.FillMode = D3D11_FILL_SOLID; break;
+    }
+    if (!_cullEnable) rs.CullMode = D3D11_CULL_NONE;
+    else if (_cullFace == CullFace::Front) rs.CullMode = D3D11_CULL_FRONT;
+    else {
+        if (_cullFace == CullFace::FrontAndBack)
+            WarnFrontAndBackOnce();
+        rs.CullMode = D3D11_CULL_BACK;
+    }
+    rs.FrontCounterClockwise = _frontFaceCCW ? TRUE : FALSE;   // GL 惯例 CCW 正面
+    rs.DepthBias = 0;
+    rs.DepthBiasClamp = 0.0f;
+    rs.SlopeScaledDepthBias = 0.0f;
+    rs.DepthClipEnable = TRUE;
+    rs.MultisampleEnable = FALSE;
+    rs.AntialiasedLineEnable = FALSE;
+    DX11_CHECK(_device->CreateRasterizerState(&rs, &st.rs), "create rasterizer state");
+
+    // ---- 深度/模板（对照 psoDesc.DepthStencilState）----
+    // GL 语义对齐（同 VKPipeline）：测试关、写开时仍需写深度 → 强制开测试 + ALWAYS
+    D3D11_DEPTH_STENCIL_DESC ds{};
+    ds.DepthEnable = (_depthTest || _depthMask) ? TRUE : FALSE;
+    ds.DepthWriteMask = _depthMask ? D3D11_DEPTH_WRITE_MASK_ALL : D3D11_DEPTH_WRITE_MASK_ZERO;
+    ds.DepthFunc = _depthTest ? Dx11Compare(_depthFunc) : D3D11_COMPARISON_ALWAYS;
+    ds.StencilEnable = _stencilTest ? TRUE : FALSE;
+    ds.StencilReadMask = static_cast<UINT8>(_stencilCompareMask);
+    ds.StencilWriteMask = static_cast<UINT8>(_stencilWriteMask);
+    const D3D11_DEPTH_STENCILOP_DESC sop{
+        Dx11StencilOp(_stencilFail), Dx11StencilOp(_stencilDepthFail),
+        Dx11StencilOp(_stencilPass), Dx11Compare(_stencilFunc)};
+    ds.FrontFace = sop;
+    ds.BackFace = sop;   // 接口为单面模板状态，前后同配（同 VK/DX12）
+    DX11_CHECK(_device->CreateDepthStencilState(&ds, &st.ds), "create depth stencil state");
+
+    // ---- 混合（对照 psoDesc.BlendState，GL SrcAlpha/OneMinusSrcAlpha 语义）----
+    D3D11_BLEND_DESC bd{};
+    bd.AlphaToCoverageEnable = FALSE;
+    bd.IndependentBlendEnable = FALSE;
+    bd.RenderTarget[0].BlendEnable = _blend ? TRUE : FALSE;
+    bd.RenderTarget[0].SrcBlend = Dx11Blend(_blendSrc);
+    bd.RenderTarget[0].DestBlend = Dx11Blend(_blendDst);
+    bd.RenderTarget[0].BlendOp = D3D11_BLEND_OP_ADD;
+    bd.RenderTarget[0].SrcBlendAlpha = Dx11Blend(_blendSrc);
+    bd.RenderTarget[0].DestBlendAlpha = Dx11Blend(_blendDst);
+    bd.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
+    bd.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
+    DX11_CHECK(_device->CreateBlendState(&bd, &st.blend), "create blend state");
+    if (!st.rs.Get() || !st.ds.Get() || !st.blend.Get()) {
+        LOGE("[DX11] state objects incomplete rs={} ds={} blend={}",
+             static_cast<void*>(st.rs.Get()), static_cast<void*>(st.ds.Get()),
+             static_cast<void*>(st.blend.Get()));
+    }
+
+    return _stateCache.emplace(hash, std::move(st)).first->second;
+}
+
+// 每 draw 全量下发（即时上下文无状态泄漏风险，对齐 DX12 "prepareDraw 自愈重设"）
+void DX11Pipeline::bindStates(ID3D11DeviceContext* ctx) {
+    const StateObjects& st = statesFor(stateHash());
+    ctx->RSSetState(st.rs.Get());
+    ctx->OMSetDepthStencilState(st.ds.Get(), static_cast<UINT>(_stencilRef));
+    ctx->OMSetBlendState(st.blend.Get(), nullptr, 0xFFFFFFFFu);
 }
 
 } // namespace rhi

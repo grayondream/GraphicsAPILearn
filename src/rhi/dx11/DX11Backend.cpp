@@ -251,8 +251,8 @@ public:
         return buf;
     }
     std::shared_ptr<ITexture2D> createTexture2D() override {
-        WarnOnce("createTexture2D: not implemented yet (later task); returning null stub");
-        return std::make_shared<DXNullTexture2D>();
+        if (!_device.ptr) { LOGE("[DX11] createTexture2D before init"); return std::make_shared<DXNullTexture2D>(); }
+        return std::make_shared<DX11Texture2D>(_device.ptr, _context.ptr);
     }
     std::shared_ptr<ITexture3D> createTexture3D() override {
         WarnOnce("createTexture3D: not implemented yet (later task); returning null stub");
@@ -302,16 +302,14 @@ public:
         WarnOnce("setRenderTarget: offscreen targets not implemented yet; ignored");
     }
     void bindTexture(const std::shared_ptr<ITexture2D>& texture, unsigned int unit) override {
-        (void)texture; (void)unit;
-        WarnOnce("bindTexture: texture binding not implemented yet (later task)");
+        BindTexture2D(texture.get(), unit);
     }
     void bindTexture(const std::shared_ptr<ITexture3D>& texture, unsigned int unit) override {
         (void)texture; (void)unit;
         WarnOnce("bindTexture: cubemap binding not implemented yet (later task)");
     }
     void bindTexture(rhi::ITexture2D* texture, unsigned int unit) override {
-        (void)texture; (void)unit;
-        WarnOnce("bindTexture: texture binding not implemented yet (later task)");
+        BindTexture2D(texture, unit);
     }
     void draw(uint32_t vertexCount, uint32_t firstVertex) override {
         if (!prepareDraw(false)) return;
@@ -360,6 +358,7 @@ public:
         _indexBuffer = nullptr;
         _vertexBuffers = {};
         _uniformBuffer = nullptr;
+        _srvSlots.fill(nullptr);   // 纹理 SRV 槽位随上一样例销毁，先清防悬垂
         _windowBound = false;
         _viewportSet = false;
         _viewport = {};
@@ -369,9 +368,17 @@ public:
 
 private:
     // GL 默认状态对齐（GL 默认深度关/剔除关/混合关）：窗口目标激活后统一下发。
-    // Task 3 状态对象化后由管线状态替代，本任务保证 Triangle/Rect 不受 D3D11
-    // 出厂默认（CullMode=BACK、DepthEnable=TRUE）影响而误剔除/误遮挡
+    // prepareDraw 按管线状态对象每 draw 覆盖，本函数保证 draw 前的 clear 阶段
+    // 不受 D3D11 出厂默认（CullMode=BACK、DepthEnable=TRUE）影响
     void createDefaultStates();
+
+    // 采样器全槽预建（Task 2.4）：0-8=f*3+w 组合（border 白）、9=比较采样器
+    // LESS_EQUAL+Border 白、10/11=LOD bias 0 预留（DX12 NVIDIA 对齐采样器的占位）
+    bool createSamplers();
+
+    // bindTexture 公共实现：纹理 SRV 写入共享槽位 unit+1（槽 0 预留 ImGui，
+    // 与 HLSL t<unit+1> 寄存器约定一致）；prepareDraw 每 draw 全量 PSSetShaderResources
+    void BindTexture2D(rhi::ITexture2D* texture, unsigned int unit);
 
     // OMSetRenderTargets(窗口 RTV+DSV) → 默认状态 → 可选清屏 → 视口
     void bindWindowTargets(bool doClear);
@@ -380,7 +387,7 @@ private:
     // 正高度视口直绘（D3D NDC y-up，勿照搬 VK 负高度翻转——Rect 曾因此整体镜像）
     void applyViewport();
 
-    // 公共绘制前奏：着色器/输入装配/拓扑/顶点缓冲/cbuffer b0
+    // 公共绘制前奏（Task 2.2 全量重设，实现见下方定义处注释）
     bool prepareDraw(bool needsIndex);
 
     // RHI_DUMP_FRAME 帧导出（单次，对齐 DX11Renderer::dumpFrame）：staging 纹理读回
@@ -400,6 +407,13 @@ private:
     Dx11ComPtr<ID3D11RasterizerState> _rasterDefault;
     Dx11ComPtr<ID3D11DepthStencilState> _depthDefault;
     Dx11ComPtr<ID3D11BlendState> _blendDefault;
+
+    // 采样器全槽预建（寄存器编号=f*3+w 与 res/DX11/_samplers.hlsli 别名一致）+
+    // 纹理 SRV 共享槽位表（槽 0 预留 ImGui，槽 i ↔ t<i>）
+    static constexpr uint32_t kSamplerSlots = 12;   // 0..8 组合 + s9 比较 + s10/s11 预留
+    static constexpr uint32_t kSrvSlots = 16;       // t0 预留 ImGui，t1..t15 = unit 0..14
+    std::array<Dx11ComPtr<ID3D11SamplerState>, kSamplerSlots> _samplers{};
+    std::array<ID3D11ShaderResourceView*, kSrvSlots> _srvSlots{};
 
     // 主循环状态机
     bool _windowBound{false};     // 当前 OM 目标为窗口 backbuffer
@@ -442,6 +456,10 @@ bool DX11Renderer::init(const std::shared_ptr<ISurface>& surface) {
     }
 
     createDefaultStates();
+    if (!createSamplers()) {
+        LOGE("[DX11] sampler creation failed");
+        return false;
+    }
 
     _swapchain = std::make_shared<DX11Swapchain>();
     if (!_swapchain->init(_device.ptr, surface)) {
@@ -452,8 +470,106 @@ bool DX11Renderer::init(const std::shared_ptr<ISurface>& surface) {
     return true;
 }
 
-void DX11Renderer::createDefaultStates() {
-    D3D11_RASTERIZER_DESC rs{};
+// 采样器全槽预建（Task 2.4）。槽位布局（寄存器编号与 _samplers.hlsli 别名一致）：
+//   0..8 = f*3+w 组合（f: Linear=0/Nearest=1/LinearMipLinear=2 × w: Repeat=0/
+//          ClampToEdge=1/ClampToBorder=2），border 槽位统一白边框；
+//   9    = 硬件比较采样器 COMPARISON_MIN_MAG_MIP_POINT + LESS_EQUAL + Border 白
+//          （shadow map 专用，gShadowCompare）；
+//   10/11= LinearMipLinear+Repeat 的 LOD bias 占位（DX12 为 NVIDIA 隐式 LOD 对齐
+//          设 bias 0.28/0.85；brief 指定 DX11 预留 0）。
+// D3D11 采样器状态不可变：borderColor 仅白/黑两档可静态表达，动态色延后
+// （bindTexture 路径对非白/黑告警回退白，同 DX12 静态表语义）。
+bool DX11Renderer::createSamplers() {
+    constexpr TextureFilter filters[3] = {TextureFilter::Linear, TextureFilter::Nearest,
+                                          TextureFilter::LinearMipLinear};
+    for (int slot = 0; slot < 9; ++slot) {
+        const int f = slot / 3;
+        const int w = slot % 3;
+        const TextureWrap wrap = static_cast<TextureWrap>(w);
+        D3D11_SAMPLER_DESC sd{};
+        sd.Filter = Dx11FilterOf(filters[f]);
+        sd.AddressU = Dx11AddressOf(wrap);
+        sd.AddressV = Dx11AddressOf(wrap);
+        sd.AddressW = Dx11AddressOf(wrap);
+        sd.MipLODBias = 0.0f;
+        sd.MaxAnisotropy = 1;   // 非各向异性过滤时必须为 1
+        sd.ComparisonFunc = D3D11_COMPARISON_NEVER;
+        // ClampToBorder 统一白边框（越界=最远深度=受光，阴影采样依赖此语义）
+        const bool border = wrap == TextureWrap::ClampToBorder;
+        sd.BorderColor[0] = border ? 1.0f : 0.0f;
+        sd.BorderColor[1] = border ? 1.0f : 0.0f;
+        sd.BorderColor[2] = border ? 1.0f : 0.0f;
+        sd.BorderColor[3] = border ? 1.0f : 0.0f;
+        sd.MinLOD = 0;
+        sd.MaxLOD = D3D11_FLOAT32_MAX;
+        DX11_CHECK(_device->CreateSamplerState(&sd, &_samplers[slot]), "create sampler state");
+        if (!_samplers[slot].Get()) return false;
+    }
+    {
+        D3D11_SAMPLER_DESC sd{};
+        sd.Filter = D3D11_FILTER_COMPARISON_MIN_MAG_MIP_POINT;
+        sd.AddressU = D3D11_TEXTURE_ADDRESS_BORDER;
+        sd.AddressV = D3D11_TEXTURE_ADDRESS_BORDER;
+        sd.AddressW = D3D11_TEXTURE_ADDRESS_BORDER;
+        sd.MipLODBias = 0.0f;
+        sd.MaxAnisotropy = 1;
+        sd.ComparisonFunc = D3D11_COMPARISON_LESS_EQUAL;
+        sd.BorderColor[0] = 1.0f;   // 越界=far=受光
+        sd.BorderColor[1] = 1.0f;
+        sd.BorderColor[2] = 1.0f;
+        sd.BorderColor[3] = 1.0f;
+        sd.MinLOD = 0;
+        sd.MaxLOD = D3D11_FLOAT32_MAX;
+        DX11_CHECK(_device->CreateSamplerState(&sd, &_samplers[9]), "create comparison sampler");
+        if (!_samplers[9].Get()) return false;
+    }
+    for (int slot : {10, 11}) {   // LOD bias 预留位（bias=0）
+        D3D11_SAMPLER_DESC sd{};
+        sd.Filter = Dx11FilterOf(TextureFilter::LinearMipLinear);
+        sd.AddressU = D3D11_TEXTURE_ADDRESS_WRAP;
+        sd.AddressV = D3D11_TEXTURE_ADDRESS_WRAP;
+        sd.AddressW = D3D11_TEXTURE_ADDRESS_WRAP;
+        sd.MipLODBias = 0.0f;
+        sd.MaxAnisotropy = 1;
+        sd.ComparisonFunc = D3D11_COMPARISON_NEVER;
+        sd.MinLOD = 0;
+        sd.MaxLOD = D3D11_FLOAT32_MAX;
+        DX11_CHECK(_device->CreateSamplerState(&sd, &_samplers[slot]),
+                   "create reserved sampler");
+        if (!_samplers[slot].Get()) return false;
+    }
+    return true;
+}
+
+// bindTexture 公共实现（对照 DX12 BindTexture2D）：SRV 写共享槽位 unit+1，
+// 槽 0 预留 ImGui。SRV 由纹理对象 init 时创建并持有，此处仅借用指针——
+// 样例切换经 resetRenderState 清槽防悬垂。
+void DX11Renderer::BindTexture2D(rhi::ITexture2D* texture, unsigned int unit) {
+    if (!texture) return;
+    if (unit + 1 >= kSrvSlots) {
+        WarnOnce("bindTexture unit out of SRV slot range; ignored");
+        return;
+    }
+    auto* tex = dynamic_cast<DX11Texture2D*>(texture);
+    if (!tex || !tex->valid()) return;
+    if (!tex->srv()) {
+        WarnOnce("bindTexture: texture has no SRV (MSAA RTV-only?); ignored");
+        return;
+    }
+    _srvSlots[unit + 1] = tex->srv();
+    // borderColor 记录口径：静态采样器表仅表达白/黑两档，其余色 WARN 回退白
+    static const std::array<float, 4> kWhite{{1.0f, 1.0f, 1.0f, 1.0f}};
+    static const std::array<float, 4> kBlack{{0.0f, 0.0f, 0.0f, 1.0f}};
+    const auto& bc = tex->borderColor();
+    const bool whiteOrBlack =
+        std::memcmp(bc.data(), kWhite.data(), sizeof(float) * 4) == 0 ||
+        std::memcmp(bc.data(), kBlack.data(), sizeof(float) * 4) == 0;
+    if (!whiteOrBlack) {
+        WarnOnce("borderColor not white/black unsupported by static sampler table; using white");
+    }
+}
+
+void DX11Renderer::createDefaultStates() {    D3D11_RASTERIZER_DESC rs{};
     rs.FillMode = D3D11_FILL_SOLID;
     rs.CullMode = D3D11_CULL_NONE;   // GL 默认无剔除（Triangle/Rect 依赖此语义）
     rs.FrontCounterClockwise = TRUE; // GL 惯例 CCW 正面（CULL_NONE 下仅语义声明）
@@ -496,6 +612,8 @@ void DX11Renderer::shutdown() {
     _pipeline = nullptr;
     _indexBuffer = nullptr;
     _vertexBuffers = {};
+    _srvSlots.fill(nullptr);
+    for (auto& s : _samplers) s.Reset();
     _windowBound = false;
     _rasterDefault.Reset();
     _depthDefault.Reset();
@@ -556,12 +674,30 @@ void DX11Renderer::applyViewport() {
     _context->RSSetViewports(1, &vp);
 }
 
+// 公共绘制前奏（Task 2.2 draw 路径全量）：每次 draw 全量重设 OM 目标/状态对象/
+// 视口/着色器/输入装配/cbuffer——DX11 即时上下文无状态泄漏风险，对齐 DX12
+// "prepareDraw 自愈重设" 注释语义。顺序要点：OMSetRenderTargets 会解绑与 RT
+// 冲突的 SRV，故 SRV 绑定必须在其之后。
 bool DX11Renderer::prepareDraw(bool needsIndex) {
     if (!_context.ptr || !_pipeline) return false;
     auto p = std::dynamic_pointer_cast<DX11Pipeline>(_pipeline);
     if (!p || !p->valid()) return false;
 
+    // OM 目标自愈重绑（窗口路径；离屏 RT Task 3 接入后在此分支扩展）
+    if (_windowBound && _swapchain && _swapchain->initialized()) {
+        const uint32_t idx = _swapchain->currentIndex();
+        ID3D11RenderTargetView* rtv = _swapchain->acquireRtv(idx);
+        ID3D11DepthStencilView* dsv = _swapchain->dsv();
+        if (rtv) {
+            ID3D11RenderTargetView* rtvs[1] = {rtv};
+            _context->OMSetRenderTargets(1, rtvs, dsv);
+        }
+    }
+
     p->bindShaders(_context.ptr);
+    p->bindStates(_context.ptr);   // RSSetState + OMSetDepthStencilState(ref) + OMSetBlendState
+    applyViewport();               // RSSetViewports 每 draw 重发
+
     _context->IASetPrimitiveTopology(ToDx11Topology(p->primitiveType()));
 
     // VB 按 layout.binding 分槽装配，stride 取自该 binding 的顶点元素步长
@@ -608,6 +744,13 @@ bool DX11Renderer::prepareDraw(bool needsIndex) {
             _context->PSSetConstantBuffers(0, 1, cbs);
         }
     }
+
+    // 纹理采样：SRV 槽位 t<unit+1>（槽 0 预留 ImGui）+ 采样器全槽绑定。
+    // 本仓库全部纹理采样在 PS（同 DX12 根表 PIXEL 可见性口径）
+    _context->PSSetShaderResources(0, kSrvSlots, _srvSlots.data());
+    std::array<ID3D11SamplerState*, kSamplerSlots> samplers{};
+    for (uint32_t i = 0; i < kSamplerSlots; ++i) samplers[i] = _samplers[i].Get();
+    _context->PSSetSamplers(0, kSamplerSlots, samplers.data());
     return true;
 }
 
