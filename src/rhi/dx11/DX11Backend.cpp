@@ -318,19 +318,24 @@ public:
         return buf;
     }
     std::shared_ptr<ITexture3D> createTexture3D() override {
-        WarnOnce("createTexture3D: not implemented yet (later task); returning null stub");
-        return std::make_shared<DXNullTexture3D>();
+        if (!_device.ptr) { LOGE("[DX11] createTexture3D before init"); return std::make_shared<DXNullTexture3D>(); }
+        return std::make_shared<DX11Texture3D>(_device.ptr, _context.ptr);
     }
     std::shared_ptr<IRenderTarget> createRenderTarget() override {
-        WarnOnce("createRenderTarget: not implemented yet (later task); returning null stub");
-        return std::make_shared<DXNullRenderTarget>();
+        if (!_device.ptr) { LOGE("[DX11] createRenderTarget before init"); return std::make_shared<DXNullRenderTarget>(); }
+        return std::make_shared<DX11RenderTarget>(_device.ptr, _context.ptr);
     }
     std::shared_ptr<ISwapchain> getSwapchain() override { return _swapchain; }
 
     // ---- 帧控制 ----
     void beginFrame() override {
-        // 窗口目标绑定 + Clear RTV/DSV + 视口缓存下发（clearColor 语义同 GL 默认帧缓冲全清）
+        // 窗口目标绑定 + Clear RTV/DSV + 视口缓存下发（clearColor 语义同 GL 默认帧缓冲全清）。
+        // 每帧从窗口目标重新开始（同 DX12 beginFrame=setRenderTarget(nullptr) 口径）：
+        // 上一样例/上帧遗留的离屏挂接状态不跨帧
         if (!_swapchain || !_swapchain->initialized()) return;
+        _renderTarget = nullptr;
+        _activeOffscreen.reset();
+        _omPending = false;
         bindWindowTargets(true);
     }
     void endFrame() override {}   // 即时上下文无帧命令收尾（brief 指定空实现）
@@ -339,9 +344,13 @@ public:
     // ---- 状态与绘制 ----
     void clearColor(float r, float g, float b, float a) override {
         _clearColor[0] = r; _clearColor[1] = g; _clearColor[2] = b; _clearColor[3] = a;
-        // GL 语义：清"调用时绑定"的目标——窗口 RT 已绑定时立即生效（含深度/模板，
-        // 同 GLBackend COLOR|DEPTH|STENCIL 全清）；beginFrame 的常规清屏不在此路径
-        if (_windowBound) clearWindowTargets();
+        void* key = _renderTarget ? static_cast<void*>(_renderTarget.get()) : nullptr;
+        // F6 同款：连同 owner 弱引用一并记录，供读取侧甄别地址复用前的陈旧条目
+        _clearColors[key] = {std::weak_ptr<IRenderTarget>(_renderTarget), {r, g, b, a}};
+        // GL 语义：清"调用时绑定"的目标。窗口已激活且无 pending 切换时立即生效
+        // （含深度/模板，同 GLBackend COLOR|DEPTH|STENCIL 全清）；离屏目标的清屏
+        // 由 flushOmTargets 按 key 记录色执行（App 模式=setRenderTarget→clearColor→draw）
+        if (!_omPending && _windowBound && !key) clearWindowTargets();
     }
     void setViewport(const Viewport& vp) override {
         _viewport = vp;
@@ -355,21 +364,24 @@ public:
     }
     void setIndexBuffer(const std::shared_ptr<IBuffer>& buffer) override { _indexBuffer = buffer; }
     void setRenderTarget(const std::shared_ptr<IRenderTarget>& target) override {
-        // null=窗口路径：立即重绑并清屏（对齐 VK 每次 RP 重开 loadOp=Clear、
-        // DX12 flushOmTargets(null)=activateWindowTargets(true) 的语义）；
-        // 离屏 RT 属后续任务，先警告忽略
+        // VK 每次 RP 重开均清屏、DX12 flushOmTargets 同样"重复激活走完整 EndPass→
+        // BeginPass 往返"；DX11 即时上下文无 pass/屏障概念，等价语义=setRenderTarget
+        // 必置 pending，每 draw 前经 flushOmTargets 落地完整 OMSetRenderTargets+ClearAll。
+        // null=窗口路径：立即重绑并清屏（对齐 DX12 flushOmTargets(null)=activateWindowTargets(true)）
+        _renderTarget = target;
         if (!target) {
+            _omPending = false;
+            _activeOffscreen.reset();
             if (_swapchain && _swapchain->initialized()) bindWindowTargets(true);
             return;
         }
-        WarnOnce("setRenderTarget: offscreen targets not implemented yet; ignored");
+        _omPending = true;
     }
     void bindTexture(const std::shared_ptr<ITexture2D>& texture, unsigned int unit) override {
         BindTexture2D(texture.get(), unit);
     }
     void bindTexture(const std::shared_ptr<ITexture3D>& texture, unsigned int unit) override {
-        (void)texture; (void)unit;
-        WarnOnce("bindTexture: cubemap binding not implemented yet (later task)");
+        BindTexture3D(texture.get(), unit);
     }
     void bindTexture(rhi::ITexture2D* texture, unsigned int unit) override {
         BindTexture2D(texture, unit);
@@ -391,10 +403,53 @@ public:
         if (!prepareDraw(false)) return;
         _context->DrawInstanced(vertexCount, instanceCount, firstVertex, 0);
     }
+    // blitFramebuffer 雏形（Task 4，Color mask；对照 DX12 DoBlitColor/DoResolveColor）：
+    // - src MSAA → ResolveSubresource（两端存储格式必须一致，无格式转换能力）；
+    // - 非 MSAA → CopySubresourceRegion 整子资源转移（同尺寸 RT 全量拷贝；跨尺寸
+    //   缩放 blit 按需后续扩展）。
+    // 契约同 DX12 UnbindAllOm：src/dst 不得处于活动 OM——先解绑再拷贝，结尾恢复窗口
+    // 绑定（对齐 GL blitFramebuffer 结尾 glBindFramebuffer(GL_FRAMEBUFFER,0) 不清屏语义）
     void blitFramebuffer(const std::shared_ptr<IRenderTarget>& src,
                          const std::shared_ptr<IRenderTarget>& dst, BlitMask mask) override {
-        (void)src; (void)dst; (void)mask;
-        WarnOnce("blitFramebuffer: not implemented yet (later task)");
+        if (!src || !dst || !_context.ptr) {
+            WarnOnce("blitFramebuffer: src/dst required (window-depth path is a later task)");
+            return;
+        }
+        const bool doColor = (static_cast<uint8_t>(mask) & static_cast<uint8_t>(BlitMask::Color)) != 0;
+        if (!doColor) {
+            WarnOnce("blit depth: not implemented yet (later task)");
+            return;
+        }
+        auto* sTex = dynamic_cast<DX11Texture2D*>(src->colorTexture2D(0));
+        auto* dTex = dynamic_cast<DX11Texture2D*>(dst->colorTexture2D(0));
+        if (!sTex || !dTex || !sTex->valid() || !dTex->valid()) {
+            WarnOnce("blit color: RT attachments unavailable");
+            return;
+        }
+        auto* sRes = static_cast<ID3D11Resource*>(sTex->handle());
+        auto* dRes = static_cast<ID3D11Resource*>(dTex->handle());
+        if (!sRes || !dRes) return;
+
+        _context->OMSetRenderTargets(0, nullptr, nullptr);
+        _activeOffscreen.reset();
+        _windowBound = false;
+
+        if (sTex->isMsaa()) {
+            if (sTex->storageFormat() != dTex->storageFormat()) {
+                LOGW("[DX11] msaa resolve: format mismatch {} vs {} rejected",
+                     static_cast<int>(sTex->storageFormat()), static_cast<int>(dTex->storageFormat()));
+                return;
+            }
+            _context->ResolveSubresource(dRes, 0, sRes, 0, sTex->storageFormat());
+        } else {
+            _context->CopySubresourceRegion(dRes, 0, 0, 0, 0, sRes, 0, nullptr);
+        }
+
+        // 对齐 GL 语义：blit 结尾窗口已绑定（不清屏），后续 draw 直接可用
+        _renderTarget = nullptr;
+        _omPending = false;
+        bindWindowTargets(false);
+        applyViewport();
     }
     BackendCapabilities backendCapabilities() override {
         BackendCapabilities caps{};
@@ -421,6 +476,10 @@ public:
         _indexBuffer = nullptr;
         _vertexBuffers = {};
         _uniformBuffer = nullptr;
+        _renderTarget = nullptr;
+        _activeOffscreen.reset();
+        _omPending = false;
+        _clearColors.clear();
         _srvSlots.fill(nullptr);   // 纹理 SRV 槽位随上一样例销毁，先清防悬垂
         // 采样器换装复位白档（上一样例的黑边框绑定不得泄漏到下一样例）
         for (uint32_t i = 0; i < kSamplerSlots; ++i) _activeSamplers[i] = _samplers[i].Get();
@@ -445,6 +504,8 @@ private:
     // bindTexture 公共实现：纹理 SRV 写入共享槽位 unit+1（槽 0 预留 ImGui，
     // 与 HLSL t<unit+1> 寄存器约定一致）；prepareDraw 每 draw 全量 PSSetShaderResources
     void BindTexture2D(rhi::ITexture2D* texture, unsigned int unit);
+    // cubemap/3D 纹理 SRV 同样写入共享槽位 unit+1（TEXTURECUBE 视图，阴影 cube 采样）
+    void BindTexture3D(rhi::ITexture3D* texture, unsigned int unit);
     // ClampToBorder 纹理按 borderColor 白/黑精确选装对应寄存器位的采样器状态
     // （D3D11 采样器状态不可变+HLSL s# 寄存器静态绑定，同 draw 同组合异色仍不可
     // 表达——与 DX12 动态采样器堆的已记录限制一致）；非白/黑 WARN 回退白
@@ -454,7 +515,16 @@ private:
     void bindWindowTargets(bool doClear);
     void clearWindowTargets();
 
-    // 正高度视口直绘（D3D NDC y-up，勿照搬 VK 负高度翻转——Rect 曾因此整体镜像）
+    // pending RT 变更落地（Task 4，DX12 flushOmTargets 等价物）：null=窗口路径；
+    // 离屏 RT 走 OMSetRenderTargets(RTV 数组+DSV)+按目标清屏。每个 draw 前必须落地
+    // （DX12 教训：该函数必须存在于每 draw 前）
+    void flushOmTargets();
+    // 按目标 key 取记录的清屏色（owner 弱引用甄别地址复用前的陈旧条目，同 DX12 F6）
+    std::array<float, 4> clearColorFor(void* key);
+
+    // 正高度视口直绘（D3D NDC y-up，勿照搬 VK 负高度翻转——Rect 曾因此整体镜像）。
+    // 离屏 RT 分支例外：负高度视口使 RT 行 0 ↔ y_ndc=-1，对齐 GL FBO/VK offscreen
+    // 行序（DX12 终验结论，实现处注释详述）
     void applyViewport();
 
     // 公共绘制前奏（Task 2.2 全量重设，实现见下方定义处注释）
@@ -496,7 +566,20 @@ private:
     std::array<std::shared_ptr<IBuffer>, 16> _vertexBuffers{};
     std::shared_ptr<IBuffer> _indexBuffer{};
     std::shared_ptr<IBuffer> _uniformBuffer{};
-    float _clearColor[4]{0.0f, 0.0f, 0.0f, 1.0f};
+    float _clearColor[4]{0.0f, 0.0f, 0.0f, 1.0f};   // 最近一次 clearColor 色（记录性；
+                                                    // 清屏实际取 _clearColors 按 key 记录值）
+
+    // 离屏 RT 状态机（Task 4，对齐 DX12 flushOmTargets 编排）：
+    // _renderTarget=最近 setRenderTarget 传入的目标（null=窗口）；_omPending 标记
+    // 待落地，prepareDraw 每 draw 前消费；_clearColors 按目标 key 记录清屏色
+    std::shared_ptr<IRenderTarget> _renderTarget{};
+    std::shared_ptr<DX11RenderTarget> _activeOffscreen{};
+    bool _omPending{false};
+    struct ClearColorEntry {
+        std::weak_ptr<IRenderTarget> owner{};
+        std::array<float, 4> color{{0.0f, 0.0f, 0.0f, 1.0f}};
+    };
+    std::map<void*, ClearColorEntry> _clearColors{};
 
     // RHI_DUMP_FRAME 帧导出（一次性）
     bool _dumpDone{false};
@@ -694,6 +777,23 @@ void DX11Renderer::BindTexture2D(rhi::ITexture2D* texture, unsigned int unit) {
     }
 }
 
+// cubemap/3D 纹理 SRV 写共享槽位 unit+1（TEXTURECUBE/TEXTURE3D 视图由纹理对象
+// init 时创建并持有）。槽位守卫与悬垂防护同 BindTexture2D
+void DX11Renderer::BindTexture3D(rhi::ITexture3D* texture, unsigned int unit) {
+    if (!texture) return;
+    if (static_cast<uint64_t>(unit) + 1 >= kSrvSlots) {
+        WarnOnce("bindTexture unit out of SRV slot range; ignored");
+        return;
+    }
+    auto* tex = dynamic_cast<DX11Texture3D*>(texture);
+    if (!tex || !tex->valid()) return;
+    if (!tex->srv()) {
+        WarnOnce("bindTexture: texture has no SRV; ignored");
+        return;
+    }
+    _srvSlots[unit + 1] = tex->srv();
+}
+
 void DX11Renderer::createDefaultStates() {
     D3D11_RASTERIZER_DESC rs{};
     rs.FillMode = D3D11_FILL_SOLID;
@@ -738,6 +838,10 @@ void DX11Renderer::shutdown() {
     _pipeline = nullptr;
     _indexBuffer = nullptr;
     _vertexBuffers = {};
+    _renderTarget = nullptr;
+    _activeOffscreen.reset();
+    _omPending = false;
+    _clearColors.clear();
     _srvSlots.fill(nullptr);
     for (auto& s : _samplers) s.Reset();
     for (auto& s : _samplersBlack) s.Reset();
@@ -777,19 +881,74 @@ void DX11Renderer::bindWindowTargets(bool doClear) {
 }
 
 void DX11Renderer::clearWindowTargets() {
+    // 清屏色取"窗口目标记录值"而非裸 _clearColor 成员：样例在离屏 pass 中
+    // clearColor(白/黑) 会改写成员，而窗口背景必须保持宿主每帧记录的
+    // clearColor(0.1 灰)——对齐 DX12 activateWindowTargets 的 clearColorFor(null) 口径
+    const std::array<float, 4> cc = clearColorFor(nullptr);
     ID3D11RenderTargetView* rtv = _swapchain->acquireRtv(_swapchain->currentIndex());
     ID3D11DepthStencilView* dsv = _swapchain->dsv();
-    if (rtv) _context->ClearRenderTargetView(rtv, _clearColor);
+    if (rtv) _context->ClearRenderTargetView(rtv, cc.data());
     if (dsv) _context->ClearDepthStencilView(dsv, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);
+}
+
+// pending RT 变更落地（DX12 flushOmTargets 等价物）：null=窗口路径；离屏 RT 走
+// MRT OMSetRenderTargets+按目标清屏。attachCubeFace 逐面挂接的换面安全由调用方
+// setRenderTarget 恒置 _omPending 保证——重复激活同样走完整重绑+清屏往返（D3D11
+// 无资源状态，DX12 的 EndPass→BeginPass 屏障往返在此坍缩为直接 OM 切换）
+void DX11Renderer::flushOmTargets() {
+    if (!_omPending || !_context.ptr) return;
+    _omPending = false;
+    auto next = std::dynamic_pointer_cast<DX11RenderTarget>(_renderTarget);
+    if (_renderTarget && (!next || !next->valid())) {
+        WarnOnce("offscreen render target invalid; routing to window");
+        next = nullptr;
+        _renderTarget = nullptr;
+    }
+    if (!next) {
+        _activeOffscreen.reset();
+        if (_swapchain && _swapchain->initialized()) bindWindowTargets(true);
+        return;
+    }
+    _activeOffscreen = next;
+    ID3D11RenderTargetView* rtvs[8] = {};
+    const UINT n = next->FillRtvs(rtvs, 8);   // 纯深度 pass（点光阴影面）n=0 合法
+    ID3D11DepthStencilView* dsv = next->ActiveDsv();
+    _context->OMSetRenderTargets(n, n > 0 ? rtvs : nullptr, dsv);
+    next->ClearAll(_context.ptr, clearColorFor(next.get()));
+    applyViewport();
+}
+
+std::array<float, 4> DX11Renderer::clearColorFor(void* key) {
+    auto it = _clearColors.find(key);
+    if (it == _clearColors.end()) return {0.0f, 0.0f, 0.0f, 1.0f};
+    // owner 已析构 → 地址复用残留的陈旧条目，剔除并回退默认色。
+    // swapchain 条目（key=nullptr）无 owner 可验，直接返回（同 DX12 F6）
+    if (key && it->second.owner.expired()) {
+        _clearColors.erase(it);
+        return {0.0f, 0.0f, 0.0f, 1.0f};
+    }
+    return it->second.color;
 }
 
 // 朝向约定（终验教训同 DX12）：D3D NDC y-up，swapchain 直绘用正高度视口即与 GL
 // 呈现朝向一致。【历史】VK 式负高度翻转在 D3D 是错的——非 VK(y-down) 不需要，
 // 会致 Triangle/Rect 等直绘图元整体 Y 镜像。
+// 离屏 RT 分支（DX12 终验结论，2bc80bf/fef0c12）：负高度视口 {x, y+h, w, -h} 使
+// RT 行 0 ↔ y_ndc=-1，与 GL FBO/VK offscreen 的纹理行序一致——阴影深度 uv=
+// ndc*0.5+0.5 查找自洽、后处理链每 pass 行翻转次数与 cubemap 捕获方向三端对齐。
+// 已知残留（同 DX12 记录）：负高度翻转屏幕空间 winding，离屏 pass 中启用的剔除
+// 方向随之反转；对当前阴影组视觉无实质影响，与 DX12 保持一致不另作补偿。
 void DX11Renderer::applyViewport() {
     if (!_context.ptr) return;
-    const int fbW = _swapchain ? _swapchain->width() : 0;
-    const int fbH = _swapchain ? _swapchain->height() : 0;
+    int fbW = _swapchain ? _swapchain->width() : 0;
+    int fbH = _swapchain ? _swapchain->height() : 0;
+    const bool offscreen = _activeOffscreen != nullptr;
+    if (offscreen) {
+        int rw = 0, rh = 0;
+        _activeOffscreen->renderDims(rw, rh);
+        if (rw > 0) fbW = rw;
+        if (rh > 0) fbH = rh;
+    }
     const float x = _viewportSet ? static_cast<float>(_viewport.x) : 0.0f;
     const float y = _viewportSet ? static_cast<float>(_viewport.y) : 0.0f;
     const float w = (_viewportSet && _viewport.width > 0)
@@ -798,7 +957,8 @@ void DX11Renderer::applyViewport() {
     const float h = (_viewportSet && _viewport.height > 0)
                         ? static_cast<float>(_viewport.height)
                         : static_cast<float>(fbH);
-    const D3D11_VIEWPORT vp{x, y, w, h, 0.0f, 1.0f};
+    const D3D11_VIEWPORT vp = offscreen ? D3D11_VIEWPORT{x, y + h, w, -h, 0.0f, 1.0f}
+                                        : D3D11_VIEWPORT{x, y, w, h, 0.0f, 1.0f};
     _context->RSSetViewports(1, &vp);
 }
 
@@ -811,8 +971,12 @@ bool DX11Renderer::prepareDraw(bool needsIndex) {
     auto p = std::dynamic_pointer_cast<DX11Pipeline>(_pipeline);
     if (!p || !p->valid()) return false;
 
-    // OM 目标自愈重绑（窗口路径；离屏 RT Task 3 接入后在此分支扩展）
-    if (_windowBound && _swapchain && _swapchain->initialized()) {
+    // OM 目标落地/自愈重绑：pending RT 变更（离屏 RT 或窗口重绑+清屏）每 draw 前
+    // 必须先行落地——OMSetRenderTargets 会解绑与 RT 冲突的 SRV，故其必须位于
+    // PSSetShaderResources 之前（DX12 教训：flushOmTargets 缺失即全黑）
+    if (_omPending) {
+        flushOmTargets();
+    } else if (_windowBound && _swapchain && _swapchain->initialized()) {
         const uint32_t idx = _swapchain->currentIndex();
         ID3D11RenderTargetView* rtv = _swapchain->acquireRtv(idx);
         ID3D11DepthStencilView* dsv = _swapchain->dsv();

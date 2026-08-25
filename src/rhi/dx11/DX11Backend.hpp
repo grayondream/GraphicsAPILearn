@@ -8,9 +8,12 @@
 #include "rhi/core/IPipeline.hpp"
 #include "rhi/core/IBuffer.hpp"
 #include "rhi/core/ITexture2D.hpp"
+#include "rhi/core/ITexture3D.hpp"
+#include "rhi/core/IRenderTarget.hpp"
 #include <array>
 #include <map>
 #include <unordered_map>
+#include <vector>
 
 namespace rhi {
 
@@ -130,6 +133,7 @@ public:
     ID3D11ShaderResourceView* srv() const { return _srv.Get(); }
     UINT mipLevels() const { return _mipLevels; }
     bool isMsaa() const { return _msaa; }                               // RTV-only，不可建 SRV
+    DXGI_FORMAT storageFormat() const { return _format; }               // 资源存储格式（深度为 TYPELESS 族）
     // 采样语义（bind 路径取 f*3+w 采样器槽位；borderColor 仅白/黑可静态表达）
     const TextureDesc& samplerParams() const { return _params; }
     const std::array<float, 4>& borderColor() const { return _borderColor; }
@@ -153,6 +157,70 @@ private:
 
     TextureDesc _params{};                      // 创建时的采样语义（filter/wrap）
     std::array<float, 4> _borderColor{{1.0f, 1.0f, 1.0f, 1.0f}};  // ClampToBorder 边框色
+};
+
+// ---- 3D/立方体纹理（实现于 DX11Texture3D.cpp，Task 4）----
+// - cubemap 承载：D3D11 无独立 cube 资源类型，用 Texture2D(ArraySize=6)+
+//   MISC_TEXTURECUBE 建，SRV 取 TEXTURECUBE 维度（点光阴影深度图/天空盒同路径）；
+//   深度格式按 TYPELESS 族建资源（Depth32F→R32_TYPELESS、D24S8→R24G8_TYPELESS），
+//   DSV/SRV 视图阶段取 typed 格式（同 DXTexture3D::createEmpty 约定）；
+// - initCube CPU 上传：逐面 STAGING Map → CopySubresourceRegion（子资源索引
+//   =face*mipLevels）；generateMipmap=true 时资源带 BIND_RT+MISC_GENERATE_MIPS，
+//   genCubeMipmaps 直接走 D3D11 内建 GenerateMips（DX12 手动 blit 是其特有限制）；
+// - 渲染目标接入：颜色 cube 提供 rtvFace(face,mip)、深度 cube 提供 dsvFace(face)
+//   （TEXTURE2DARRAY 视图 FirstArraySlice=面），DX11RenderTarget::attachCubeFace
+//   消费；真 3D 纹理（init 旧签名）走 ID3D11Texture3D，仅 RGBA8 上传。
+class DX11Texture3D : public ITexture3D {
+public:
+    // device/context 归 Renderer 所有，此处仅借用
+    DX11Texture3D(ID3D11Device* device, ID3D11DeviceContext* context);
+    ~DX11Texture3D() override;
+
+    bool init(const TextureDataView3D& data) override;                  // 真 3D 纹理：RGBA8 上传
+    bool initCube(const TextureDesc& desc, const TextureDataView2D* faces) override;
+    bool createEmpty(const TextureDesc& desc, int width, int height) override;
+    void bind(unsigned int unit) override {}                            // 绑定=Renderer 写共享槽位
+    void* handle() override;                                            // Texture2D(cube)/Texture3D
+    bool valid() const override { return _valid; }
+    void release() override;
+    void genCubeMipmaps() override;
+
+    // ---- Renderer / RT 访问器 ----
+    ID3D11ShaderResourceView* srv() const { return _srv.Get(); }
+    const TextureDesc& samplerParams() const { return _params; }
+    DXGI_FORMAT dsvFormat() const { return _dsvFormat; }                // 深度 cube DSV typed 格式
+    UINT mipLevels() const { return _mipLevels; }
+    bool isCube() const { return _cube; }
+    bool isDepth() const { return _depth; }
+    // 深度 cube 逐面 DSV（TEXTURE2DARRAY FirstArraySlice=face，懒建 6 槽）
+    // 与颜色 cube 逐面 RTV（IBL capture 用，懒建 6*mips 槽）
+    ID3D11DepthStencilView* dsvFace(int face);
+    ID3D11RenderTargetView* rtvFace(int face, int mip);
+
+private:
+    ID3D11Device* _device{nullptr};
+    ID3D11DeviceContext* _context{nullptr};
+
+    Dx11ComPtr<ID3D11Texture2D> _texture{};     // cube 路径（ArraySize=6）
+    Dx11ComPtr<ID3D11Texture3D> _texture3d{};   // 真 3D 路径（init 旧签名）
+    Dx11ComPtr<ID3D11ShaderResourceView> _srv{};
+    std::array<Dx11ComPtr<ID3D11DepthStencilView>, 6> _faceDsv{};
+    std::vector<Dx11ComPtr<ID3D11RenderTargetView>> _faceRtv{};
+
+    DXGI_FORMAT _format{DXGI_FORMAT_UNKNOWN};     // 资源存储格式（深度为 TYPELESS 族）
+    DXGI_FORMAT _srvFormat{DXGI_FORMAT_UNKNOWN};  // SRV 视图 typed 格式
+    DXGI_FORMAT _dsvFormat{DXGI_FORMAT_UNKNOWN};  // DSV 视图 typed 格式
+    DXGI_FORMAT _rtvFormat{DXGI_FORMAT_UNKNOWN};  // 颜色 RTV 视图格式
+    UINT _mipLevels{1};
+    int _width{0};
+    int _height{0};
+    int _depthSlices{0};                 // init(3D) 的 z 维度（cube 恒 6）
+    bool _cube{false};
+    bool _depth{false};
+    bool _mipsBindable{false};           // 资源带 BIND_RT+MISC_GENERATE_MIPS（GenerateMips 前置）
+    bool _valid{false};
+
+    TextureDesc _params{};               // 创建时的采样语义（filter/wrap）
 };
 
 // ---- 最小管线（实现于 DX11Pipeline.cpp）----
@@ -266,6 +334,74 @@ private:
     PrimitiveType _primitive{PrimitiveType::TriangleList};
 
     std::unordered_map<uint32_t, StateObjects> _stateCache{};
+};
+
+// ---- 离屏渲染目标（实现于 DX11RenderTarget.cpp，Task 4，对照 DXRenderTarget 接口面）----
+// - 附件：颜色/深度按 FramebufferDesc 内部建 DX11Texture2D（颜色 BIND_RT|SRV；
+//   深度 TYPELESS 族 BIND_DSV|SRV typed 视图；MSAA 颜色 RTV-only）并各建 RTV/DSV
+//   视图（TEXTURE2D/TEXTURE2DMS 维度）；colorTexture2D(i)/depthTexture2D() 直接
+//   返回内部纹理（阴影采样/后处理 quad 消费 SRV）；
+// - cube 挂接：attachCubeFace/attachDepthCube 仅记录挂接状态（延迟生效），OM 目标
+//   由 Renderer flushOmTargets 在每 draw 前装配——深度 cube 面取 DX11Texture3D::
+//   dsvFace(face)（TEXTURE2DARRAY 切片），颜色 cube 面取 rtvFace(face,mip)；纯深度
+//   pass 合法（OMSetRenderTargets(0,nullptr,dsv)）；
+// - D3D11 即时上下文无资源状态/屏障概念：DX12 的 BeginPass/EndPass 往返在此坍缩为
+//   "setRenderTarget 必置 pending → 每 draw 前 flushOmTargets 完整重绑+清屏"，
+//   "重复激活走完整往返"语义由 setRenderTarget 恒置 pending 保证。
+class DX11RenderTarget : public IRenderTarget {
+public:
+    // device/context 归 Renderer 所有，此处仅借用
+    DX11RenderTarget(ID3D11Device* device, ID3D11DeviceContext* context);
+    ~DX11RenderTarget() override;
+
+    bool create(int width, int height) override;                          // 旧签名：RGBA8 + Depth24Stencil8
+    bool create(const FramebufferDesc& desc) override;
+    bool attachCubeFace(ITexture3D* cube, int face, int mip = 0) override;
+    bool attachDepthCube(ITexture3D* cube, int mip = 0) override;
+    bool bind() override { return true; }                                 // 绑定由 Renderer 统一编排
+    bool unbind() override { return true; }
+    void* colorTexture() override;
+    ITexture2D* colorTexture2D(int attachment = 0) override;
+    ITexture2D* depthTexture2D() override;
+    bool resolveTo(IRenderTarget& dst) override;                          // MSAA resolve 走 blitFramebuffer
+    void* handle() override;                                              // 颜色 0 纹理（无颜色返回 nullptr）
+    void release() override;
+
+    // ---- Renderer 协作 ----
+    bool valid() const { return _valid; }
+    uint32_t colorCount() const;                                          // 当前生效颜色目标数（纯深度 pass=0）
+    // 当前生效 OM 句柄组装：内部附件 RTV 数组或 cube 面（attachCubeFace 延迟生效，
+    // Renderer flushOmTargets 每 draw 前消费）；FillRtvs 返回实际写入数
+    UINT FillRtvs(ID3D11RenderTargetView** out, UINT maxCount);
+    ID3D11DepthStencilView* ActiveDsv();                                  // 内部深度或深度 cube 当前面
+    bool hasDepthAttachment() const;
+    void renderDims(int& w, int& h) const;                                // viewport 兜底尺寸（cube 面=mip 尺寸）
+    // 清屏：当前生效颜色 RTV ×N + 深度/模板 DSV（stencil 标志按格式有无裁剪）
+    void ClearAll(ID3D11DeviceContext* ctx, const std::array<float, 4>& cc);
+
+private:
+    bool depthHasStencil() const;
+
+    ID3D11Device* _device{nullptr};
+    ID3D11DeviceContext* _context{nullptr};
+
+    int _width{0};
+    int _height{0};
+    UINT _samples{1};
+
+    std::vector<std::shared_ptr<DX11Texture2D>> _colors{};     // 非 MSAA 颜色（可采样）
+    std::vector<std::shared_ptr<DX11Texture2D>> _msaaColors{}; // MSAA 颜色（RTV-only）
+    std::shared_ptr<DX11Texture2D> _depth{};                   // 内部深度（可空）
+    std::vector<Dx11ComPtr<ID3D11RenderTargetView>> _rtvs{};   // 与 [_colors..., _msaaColors...] 对齐
+    Dx11ComPtr<ID3D11DepthStencilView> _dsv{};
+    DXGI_FORMAT _dsvFormat{DXGI_FORMAT_UNKNOWN};               // 内部深度 typed 格式（Clear 标志裁剪）
+
+    // cube 挂接状态（弱引用，App 持有纹理生命周期；face<0=仅 attachDepthCube 未选面）
+    DX11Texture3D* _cube{nullptr};
+    int _face{-1};
+    int _mip{0};
+    bool _cubeIsDepth{false};
+    bool _valid{false};
 };
 
 } // namespace rhi
