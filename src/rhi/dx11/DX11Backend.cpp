@@ -252,6 +252,7 @@ public:
         return std::make_shared<DX11Texture2D>(_device.ptr, _context.ptr);
     }
     std::shared_ptr<IBuffer> createUniformBuffer() override {
+        LOGI("[DX11][PROBE] createUniformBuffer enter");
         if (!_device.ptr) { LOGE("[DX11] createUniformBuffer before init"); return std::make_shared<DXNullBuffer>(); }
         auto buf = std::make_shared<DX11Buffer>(_device.ptr, _context.ptr);
         // 每个样例持且仅持一个 UniformBlock 缓冲：最近创建者即当前绑定目标，
@@ -271,6 +272,7 @@ public:
 
     // ---- 帧控制 ----
     void beginFrame() override {
+        LOGI("[DX11][PROBE] beginFrame");
         // 窗口目标绑定 + Clear RTV/DSV + 视口缓存下发（clearColor 语义同 GL 默认帧缓冲全清）
         if (!_swapchain || !_swapchain->initialized()) return;
         bindWindowTargets(true);
@@ -684,6 +686,7 @@ void DX11Renderer::applyViewport() {
 // "prepareDraw 自愈重设" 注释语义。顺序要点：OMSetRenderTargets 会解绑与 RT
 // 冲突的 SRV，故 SRV 绑定必须在其之后。
 bool DX11Renderer::prepareDraw(bool needsIndex) {
+    LOGI("[DX11][PROBE] prepareDraw enter idx={}", needsIndex);
     if (!_context.ptr || !_pipeline) return false;
     auto p = std::dynamic_pointer_cast<DX11Pipeline>(_pipeline);
     if (!p || !p->valid()) return false;
