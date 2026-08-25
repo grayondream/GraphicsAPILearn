@@ -473,30 +473,6 @@ bool DX11Renderer::init(const std::shared_ptr<ISurface>& surface) {
         LOGE("[DX11] sampler creation failed");
         return false;
     }
-    // TEMP 边框采样器选装自检（评审 Important-1 验证用，RHI_DX11_BORDERTEST=1 触发）
-    if (std::getenv("RHI_DX11_BORDERTEST")) {
-        TextureDesc td;
-        td.wrapS = td.wrapT = td.wrapR = TextureWrap::ClampToBorder;
-        const std::array<float, 4> white{{1.0f, 1.0f, 1.0f, 1.0f}};
-        const std::array<float, 4> black{{0.0f, 0.0f, 0.0f, 1.0f}};
-        const std::array<float, 4> gray{{0.5f, 0.5f, 0.5f, 1.0f}};
-        td.minFilter = TextureFilter::Linear;
-        InstallBorderColorSampler(td, white.data());
-        LOGI("[DX11][BT] linear+white   s2={} expect-white={}", static_cast<void*>(_activeSamplers[2]), static_cast<void*>(_samplers[2].Get()));
-        InstallBorderColorSampler(td, black.data());
-        LOGI("[DX11][BT] linear+black   s2={} expect-black={}", static_cast<void*>(_activeSamplers[2]), static_cast<void*>(_samplersBlack[0].Get()));
-        td.minFilter = TextureFilter::Nearest;
-        InstallBorderColorSampler(td, black.data());
-        LOGI("[DX11][BT] nearest+black  s5={} expect-black={}", static_cast<void*>(_activeSamplers[5]), static_cast<void*>(_samplersBlack[1].Get()));
-        InstallBorderColorSampler(td, gray.data());
-        LOGI("[DX11][BT] nearest+gray   s5={} keep-black={} (WARN expected above)", static_cast<void*>(_activeSamplers[5]), static_cast<void*>(_samplersBlack[1].Get()));
-        td.minFilter = TextureFilter::LinearMipLinear;
-        InstallBorderColorSampler(td, black.data());
-        LOGI("[DX11][BT] miplinear+black s8={} expect-black={}", static_cast<void*>(_activeSamplers[8]), static_cast<void*>(_samplersBlack[2].Get()));
-        InstallBorderColorSampler(td, white.data());
-        LOGI("[DX11][BT] miplinear+white  s8={} expect-white={}", static_cast<void*>(_activeSamplers[8]), static_cast<void*>(_samplers[8].Get()));
-    }
-
     _swapchain = std::make_shared<DX11Swapchain>();
     if (!_swapchain->init(_device.ptr, surface)) {
         LOGE("[DX11] swapchain init failed");
@@ -611,8 +587,8 @@ void DX11Renderer::InstallBorderColorSampler(const TextureDesc& params, const fl
     const bool white = std::memcmp(bc, kWhite.data(), sizeof(float) * 4) == 0;
     const bool black = std::memcmp(bc, kBlack.data(), sizeof(float) * 4) == 0;
     if (!white && !black) {
-        WarnOnce("borderColor not white/black unsupported by static sampler table; using white");
-        return;   // 保持当前档位不动（预填语义为白）
+        WarnOnce("borderColor not white/black unsupported by static sampler table; keeping current");
+        return;   // 保持当前档位不动（初始预填语义为白）
     }
     int fi = 0;
     switch (params.minFilter) {
