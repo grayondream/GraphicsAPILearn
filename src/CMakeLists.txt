@@ -156,6 +156,79 @@ if(${ENABLE_DX12})
     endif()
 endif()
 
+if(${ENABLE_DX11})
+    message("Graphic API Enable D3D11")
+    target_compile_definitions(${PROJECT_NAME} PRIVATE ENABLE_DX11=1)
+    # Windows SDK 自带 d3d11/dxgi/d3dcompiler 导入库，直接链接；Linux 侧仅定义宏
+    # 不链接不编译源（源文件组由 rhi/CMakeLists 按 WIN32 门控），保证 Linux 构建/CI 不受影响
+    if(WIN32)
+        target_link_libraries(${PROJECT_NAME} d3d11.lib dxgi.lib d3dcompiler.lib)
+    endif()
+    # ---- fxc 构建目标（仿 dx_shaders；产物 build/res/DX11/<dir>/<name>.<stage>.fxc，
+    #      与 DX11Shader::LocateFxc 的查找路径约定一致。SM5.0 目标只能用 SDK 自带
+    #      fxc.exe 编译，dxc 不支持 5_0 profile）----
+    if(WIN32)
+        set(_FXC_GLOBS "")
+        if(EXISTS "$ENV{WindowsSdkDir}")
+            list(APPEND _FXC_GLOBS "$ENV{WindowsSdkDir}/bin/*/x64/fxc.exe")
+        endif()
+        list(APPEND _FXC_GLOBS "C:/Program Files (x86)/Windows Kits/10/bin/*/x64/fxc.exe")
+        set(FXC_CANDIDATES "")
+        foreach(g IN LISTS _FXC_GLOBS)
+            file(GLOB _c "${g}")
+            list(APPEND FXC_CANDIDATES "${_c}")
+        endforeach()
+        # 版本号零填充目录按字典序排列：取最大者即最新 SDK
+        list(SORT FXC_CANDIDATES)
+        list(REVERSE FXC_CANDIDATES)
+        foreach(c IN LISTS FXC_CANDIDATES)
+            if(EXISTS "${c}")
+                set(FXC_TOOL "${c}")
+                break()
+            endif()
+        endforeach()
+        if(FXC_TOOL)
+            message(STATUS "[DX11] fxc found: ${FXC_TOOL}")
+            set(DX11_SHADER_SOURCE "${CMAKE_SOURCE_DIR}/res/DX11")
+            set(DX11_SHADER_OUTPUT "${CMAKE_BINARY_DIR}/res/DX11")
+            file(GLOB_RECURSE DX11_HLSL_SOURCES
+                "${DX11_SHADER_SOURCE}/*.vert.hlsl"
+                "${DX11_SHADER_SOURCE}/*.frag.hlsl"
+                "${DX11_SHADER_SOURCE}/*.geom.hlsl")
+            foreach(src IN LISTS DX11_HLSL_SOURCES)
+                file(RELATIVE_PATH rel "${DX11_SHADER_SOURCE}" "${src}")
+                get_filename_component(rel_dir "${rel}" DIRECTORY)
+                string(REGEX REPLACE "\\.(vert|frag|geom)\\.hlsl$" "" base "${rel}")
+                if(rel MATCHES "\\.vert\\.hlsl$")
+                    set(profile vs_5_0)
+                    set(entry VSMain)
+                    set(stage vert)
+                elseif(rel MATCHES "\\.frag\\.hlsl$")
+                    set(profile ps_5_0)
+                    set(entry PSMain)
+                    set(stage frag)
+                else()
+                    set(profile gs_5_0)
+                    set(entry GSMain)
+                    set(stage geom)
+                endif()
+                set(out "${DX11_SHADER_OUTPUT}/${base}.${stage}.fxc")
+                add_custom_command(OUTPUT "${out}"
+                    COMMAND ${CMAKE_COMMAND} -E make_directory "${DX11_SHADER_OUTPUT}/${rel_dir}"
+                    COMMAND "${FXC_TOOL}" /T ${profile} /E ${entry} /Fo "${out}" "${src}"
+                    DEPENDS "${src}" COMMENT "Compiling DX11 shader ${rel}" VERBATIM)
+                list(APPEND DX11_FXC_OUTPUTS "${out}")
+            endforeach()
+            if(DX11_FXC_OUTPUTS)
+                add_custom_target(dx11_shaders ALL DEPENDS ${DX11_FXC_OUTPUTS})
+                add_dependencies(renderLearn dx11_shaders)
+            endif()
+        else()
+            message(WARNING "[DX11] fxc not found - dx11_shaders skipped, HLSL will not compile to .fxc")
+        endif()
+    endif()
+endif()
+
 if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
     target_link_libraries(${PROJECT_NAME}
     user32.lib

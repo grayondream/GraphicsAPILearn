@@ -5,7 +5,9 @@ set(IMGUI_SRC_FILES)
 include_directories(${IMGUI_SRC_PATH})
 aux_source_directory(${IMGUI_SRC_PATH} IMGUI_SRC_FILES)
 
-if(ENABLE_DX11)
+# DX11 ImGui 后端源文件仅 Windows 收录（含 d3d11.h，Linux 无 SDK 头会编译失败；
+# 源文件组与 rhi/dx11 同口径按 WIN32 门控）
+if(ENABLE_DX11 AND WIN32)
     include_directories(${IMGUI_SRC_PATH}/DX11)
     aux_source_directory(${IMGUI_SRC_PATH}/DX11 IMGUI_DX11_SRC_FILES)
     message(STATUS "IMGUI_DX11_SRC_FILES: ${IMGUI_DX11_SRC_FILES}")

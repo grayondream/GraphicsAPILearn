@@ -15,6 +15,9 @@
 #if ENABLE_DX12
 #include "rhi/dx12/DXBackend.hpp"
 #endif
+#if ENABLE_DX11
+#include "rhi/dx11/DX11Backend.hpp"
+#endif
 #include "base/ErrorHandle.hpp"
 #include "base/Log.hpp"
 #include "utils/EnumUtil.hpp"
@@ -84,6 +87,25 @@ bool AppHost::rebuildBackend(const GLFWWindowProperties& props) {
         return reloadSample();
     }
 #endif
+#if ENABLE_DX11
+    if (_backend == GraphicsType::DX11) {
+        // 后端切换需按新 client API 重建原生窗口：D3D11 flip 交换链要求 HWND 未被
+        // GDI/OpenGL 设置像素格式（与 VK 同理走 NO_API，见 GLFWWindow::initialize）
+        m_window->shutdown();
+        m_window->initialize();
+        rhi::setBackendKind(rhi::BackendKind::Dx11);
+        auto surface = std::make_shared<rhi::GLFWSurface>(
+            m_window->getNativeGLFWWindow(), static_cast<int>(props.width), static_cast<int>(props.height));
+        _renderer = rhi::createDX11Renderer();
+        if (!_renderer || !_renderer->init(surface)) { LOGE("Failed to init DX11 renderer"); return false; }
+        _renderer->setViewport(rhi::Viewport{0, 0, static_cast<int>(props.width), static_cast<int>(props.height)});
+        _renderer->setPipeline(nullptr);
+        // ImGui overlay 留空（Task 6 接入）：m_imguiWindow 保持 nullptr，
+        // renderTotalBar 与主循环渲染路径均有判空守卫
+        hookWindowCallbacks();
+        return reloadSample();
+    }
+#endif
     // 后端切换需按新 client API 重建原生窗口；VK 分支在上面已重建为 NO_API，
     // GL 分支同样需 shutdown+initialize 以按属性重建为 OPENGL 上下文窗口。
     if (_backend == GraphicsType::GL) { m_window->shutdown(); m_window->initialize(); }
@@ -122,7 +144,8 @@ bool AppHost::reloadSample() {
 bool AppHost::init(const GLFWWindowProperties& properties) {
     auto props = properties;
     if (props.samples == 0) props.samples = getSampleCount();
-    props.vulkan = (_backend == GraphicsType::Vulkan);
+    // DX11 与 VK 同样不需要 GL 上下文（NO_API 窗口，D3D11 自建交换链）
+    props.vulkan = (_backend == GraphicsType::Vulkan || _backend == GraphicsType::DX11);
 
     m_window = std::make_unique<GLFWWindow>(props);
     if (!m_window->initialize()) { LOGE("GLFWWindow init failed"); return false; }
@@ -172,7 +195,7 @@ void AppHost::applyPendingChanges() {
         _pendingBackend = false;
         if (m_window) {
             auto props = m_window->getProperties();
-            props.vulkan = (_backend == GraphicsType::Vulkan);
+            props.vulkan = (_backend == GraphicsType::Vulkan || _backend == GraphicsType::DX11);
             m_window->setProperties(props);
             if (!rebuildBackend(props)) LOGE("Backend rebuild failed");
         }
@@ -225,6 +248,10 @@ void AppHost::renderTotalBar() {
 #if ENABLE_DX12
     backendNames.emplace_back("Direct3D 12");
     backendTypes.emplace_back(GraphicsType::DX12);
+#endif
+#if ENABLE_DX11
+    backendNames.emplace_back("Direct3D 11");
+    backendTypes.emplace_back(GraphicsType::DX11);
 #endif
     int curBackend = 0;
     for (int i = 0; i < static_cast<int>(backendTypes.size()); ++i)

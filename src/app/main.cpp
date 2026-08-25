@@ -27,6 +27,9 @@ static std::vector<std::pair<std::string, GraphicsType>> AvailableBackends() {
 #if ENABLE_DX12
     v.emplace_back("dx12", GraphicsType::DX12);
 #endif
+#if ENABLE_DX11
+    v.emplace_back("dx11", GraphicsType::DX11);
+#endif
     return v;
 }
 

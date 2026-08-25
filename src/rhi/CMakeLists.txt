@@ -23,3 +23,12 @@ if(ENABLE_DX12)
     set(ALL_CPP_FILES ${ALL_CPP_FILES} ${RHI_DX12_CPP_FILES} CACHE STRING "all source files" FORCE)
     set(ALL_HPP_FILES ${ALL_HPP_FILES} ${RHI_DX12_HPP_FILES} CACHE STRING "all header files" FORCE)
 endif()
+
+# DX11 源文件组仅 Windows 参与（原生 D3D11 实现含 windows.h，Linux 构建零影响；
+# Linux 侧 ENABLE_DX11 只定义宏，createDX11Renderer 由 DX11Backend.hpp 内联兜底）
+if(ENABLE_DX11 AND WIN32)
+    file(GLOB RHI_DX11_CPP_FILES "dx11/*.cpp")
+    file(GLOB RHI_DX11_HPP_FILES "dx11/*.hpp")
+    set(ALL_CPP_FILES ${ALL_CPP_FILES} ${RHI_DX11_CPP_FILES} CACHE STRING "all source files" FORCE)
+    set(ALL_HPP_FILES ${ALL_HPP_FILES} ${RHI_DX11_HPP_FILES} CACHE STRING "all header files" FORCE)
+endif()
