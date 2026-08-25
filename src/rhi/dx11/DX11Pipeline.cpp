@@ -131,7 +131,8 @@ uint32_t DX11Pipeline::stateHash() const {
     mix(static_cast<uint32_t>(_cullFace));
     mix(_frontFaceCCW ? 1u : 0u);
     mix(static_cast<uint32_t>(_polygonMode));
-    mix(_multisample ? 1u : 0u);
+    // _multisample 不混入：D3D11 的 MSAA 是 RT 资源属性（SampleDesc）而非状态对象
+    // 输入，入键只产生永不消费的冗余变体（评审 Minor-2；成员保留供未来 RT 协商）
     mix(static_cast<uint32_t>(_primitive));
     return h;
 }
@@ -139,9 +140,11 @@ uint32_t DX11Pipeline::stateHash() const {
 // 未命中按当前成员构建 RS/Blend/DS 三元组。字段翻译口径对照
 // src/rhi/dx12/DXPipeline.cpp createGraphicsPipeline（RS/BlendState/DepthStencilState）
 // 逐字段一致——两代 API 拆成独立状态对象但语义相同。
-DX11Pipeline::StateObjects& DX11Pipeline::statesFor(uint32_t hash) {
+// 任一创建失败返回 nullptr 且不入缓存（评审 Minor-1：null 对象不得被永久复用；
+// 对照 DXPipeline::pipelineFor 未命中且创建失败时同样不产生缓存项）。
+DX11Pipeline::StateObjects* DX11Pipeline::statesFor(uint32_t hash) {
     auto it = _stateCache.find(hash);
-    if (it != _stateCache.end()) return it->second;
+    if (it != _stateCache.end()) return &it->second;
 
     StateObjects st{};
 
@@ -201,20 +204,24 @@ DX11Pipeline::StateObjects& DX11Pipeline::statesFor(uint32_t hash) {
     bd.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
     DX11_CHECK(_device->CreateBlendState(&bd, &st.blend), "create blend state");
     if (!st.rs.Get() || !st.ds.Get() || !st.blend.Get()) {
-        LOGE("[DX11] state objects incomplete rs={} ds={} blend={}",
+        LOGE("[DX11] state objects incomplete rs={} ds={} blend={} (not cached)",
              static_cast<void*>(st.rs.Get()), static_cast<void*>(st.ds.Get()),
              static_cast<void*>(st.blend.Get()));
+        return nullptr;
     }
 
-    return _stateCache.emplace(hash, std::move(st)).first->second;
+    return &_stateCache.emplace(hash, std::move(st)).first->second;
 }
 
-// 每 draw 全量下发（即时上下文无状态泄漏风险，对齐 DX12 "prepareDraw 自愈重设"）
-void DX11Pipeline::bindStates(ID3D11DeviceContext* ctx) {
-    const StateObjects& st = statesFor(stateHash());
-    ctx->RSSetState(st.rs.Get());
-    ctx->OMSetDepthStencilState(st.ds.Get(), static_cast<UINT>(_stencilRef));
-    ctx->OMSetBlendState(st.blend.Get(), nullptr, 0xFFFFFFFFu);
+// 每 draw 全量下发（即时上下文无状态泄漏风险，对齐 DX12 "prepareDraw 自愈重设"）。
+// 返回 false=状态对象缺失，调用方跳过本次 draw（同 DX12 PSO 为 null 的语义）
+bool DX11Pipeline::bindStates(ID3D11DeviceContext* ctx) {
+    const StateObjects* st = statesFor(stateHash());
+    if (!st) return false;
+    ctx->RSSetState(st->rs.Get());
+    ctx->OMSetDepthStencilState(st->ds.Get(), static_cast<UINT>(_stencilRef));
+    ctx->OMSetBlendState(st->blend.Get(), nullptr, 0xFFFFFFFFu);
+    return true;
 }
 
 } // namespace rhi

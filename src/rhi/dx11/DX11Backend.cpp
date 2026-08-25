@@ -360,6 +360,8 @@ public:
         _vertexBuffers = {};
         _uniformBuffer = nullptr;
         _srvSlots.fill(nullptr);   // 纹理 SRV 槽位随上一样例销毁，先清防悬垂
+        // 采样器换装复位白档（上一样例的黑边框绑定不得泄漏到下一样例）
+        for (uint32_t i = 0; i < kSamplerSlots; ++i) _activeSamplers[i] = _samplers[i].Get();
         _windowBound = false;
         _viewportSet = false;
         _viewport = {};
@@ -374,12 +376,17 @@ private:
     void createDefaultStates();
 
     // 采样器全槽预建（Task 2.4）：0-8=f*3+w 组合（border 白）、9=比较采样器
-    // LESS_EQUAL+Border 白、10/11=LOD bias 0 预留（DX12 NVIDIA 对齐采样器的占位）
+    // LESS_EQUAL+Border 白（勿动：阴影越界=最远=受光）、10/11=LOD bias 0 预留；
+    // 另预建 border 组合的黑边框档（评审 Important-1，按 borderColor 精确选装）
     bool createSamplers();
 
     // bindTexture 公共实现：纹理 SRV 写入共享槽位 unit+1（槽 0 预留 ImGui，
     // 与 HLSL t<unit+1> 寄存器约定一致）；prepareDraw 每 draw 全量 PSSetShaderResources
     void BindTexture2D(rhi::ITexture2D* texture, unsigned int unit);
+    // ClampToBorder 纹理按 borderColor 白/黑精确选装对应寄存器位的采样器状态
+    // （D3D11 采样器状态不可变+HLSL s# 寄存器静态绑定，同 draw 同组合异色仍不可
+    // 表达——与 DX12 动态采样器堆的已记录限制一致）；非白/黑 WARN 回退白
+    void InstallBorderColorSampler(const TextureDesc& params, const float bc[4]);
 
     // OMSetRenderTargets(窗口 RTV+DSV) → 默认状态 → 可选清屏 → 视口
     void bindWindowTargets(bool doClear);
@@ -410,10 +417,15 @@ private:
     Dx11ComPtr<ID3D11BlendState> _blendDefault;
 
     // 采样器全槽预建（寄存器编号=f*3+w 与 res/DX11/_samplers.hlsli 别名一致）+
-    // 纹理 SRV 共享槽位表（槽 0 预留 ImGui，槽 i ↔ t<i>）
+    // border 黑档（评审 Important-1：brief"白/黑两档"落地）+ 纹理 SRV 共享槽位表
+    // （槽 0 预留 ImGui，槽 i ↔ t<i>）。_activeSamplers 为每 draw 实际下发的运行时
+    // 表：默认=白档，ClampToBorder 纹理按 borderColor 换装黑档（resetRenderState 复位）
     static constexpr uint32_t kSamplerSlots = 12;   // 0..8 组合 + s9 比较 + s10/s11 预留
+    static constexpr uint32_t kBlackBorderSlots = 3; // 三个 filter 的黑边框变体（非 s# 寄存器）
     static constexpr uint32_t kSrvSlots = 16;       // t0 预留 ImGui，t1..t15 = unit 0..14
     std::array<Dx11ComPtr<ID3D11SamplerState>, kSamplerSlots> _samplers{};
+    std::array<Dx11ComPtr<ID3D11SamplerState>, kBlackBorderSlots> _samplersBlack{};
+    std::array<ID3D11SamplerState*, kSamplerSlots> _activeSamplers{};
     std::array<ID3D11ShaderResourceView*, kSrvSlots> _srvSlots{};
 
     // 主循环状态机
@@ -461,6 +473,29 @@ bool DX11Renderer::init(const std::shared_ptr<ISurface>& surface) {
         LOGE("[DX11] sampler creation failed");
         return false;
     }
+    // TEMP 边框采样器选装自检（评审 Important-1 验证用，RHI_DX11_BORDERTEST=1 触发）
+    if (std::getenv("RHI_DX11_BORDERTEST")) {
+        TextureDesc td;
+        td.wrapS = td.wrapT = td.wrapR = TextureWrap::ClampToBorder;
+        const std::array<float, 4> white{{1.0f, 1.0f, 1.0f, 1.0f}};
+        const std::array<float, 4> black{{0.0f, 0.0f, 0.0f, 1.0f}};
+        const std::array<float, 4> gray{{0.5f, 0.5f, 0.5f, 1.0f}};
+        td.minFilter = TextureFilter::Linear;
+        InstallBorderColorSampler(td, white.data());
+        LOGI("[DX11][BT] linear+white   s2={} expect-white={}", static_cast<void*>(_activeSamplers[2]), static_cast<void*>(_samplers[2].Get()));
+        InstallBorderColorSampler(td, black.data());
+        LOGI("[DX11][BT] linear+black   s2={} expect-black={}", static_cast<void*>(_activeSamplers[2]), static_cast<void*>(_samplersBlack[0].Get()));
+        td.minFilter = TextureFilter::Nearest;
+        InstallBorderColorSampler(td, black.data());
+        LOGI("[DX11][BT] nearest+black  s5={} expect-black={}", static_cast<void*>(_activeSamplers[5]), static_cast<void*>(_samplersBlack[1].Get()));
+        InstallBorderColorSampler(td, gray.data());
+        LOGI("[DX11][BT] nearest+gray   s5={} keep-black={} (WARN expected above)", static_cast<void*>(_activeSamplers[5]), static_cast<void*>(_samplersBlack[1].Get()));
+        td.minFilter = TextureFilter::LinearMipLinear;
+        InstallBorderColorSampler(td, black.data());
+        LOGI("[DX11][BT] miplinear+black s8={} expect-black={}", static_cast<void*>(_activeSamplers[8]), static_cast<void*>(_samplersBlack[2].Get()));
+        InstallBorderColorSampler(td, white.data());
+        LOGI("[DX11][BT] miplinear+white  s8={} expect-white={}", static_cast<void*>(_activeSamplers[8]), static_cast<void*>(_samplers[8].Get()));
+    }
 
     _swapchain = std::make_shared<DX11Swapchain>();
     if (!_swapchain->init(_device.ptr, surface)) {
@@ -471,15 +506,17 @@ bool DX11Renderer::init(const std::shared_ptr<ISurface>& surface) {
     return true;
 }
 
-// 采样器全槽预建（Task 2.4）。槽位布局（寄存器编号与 _samplers.hlsli 别名一致）：
+// 采样器全槽预建（Task 2.4 + 评审 Important-1 黑档）。槽位布局（寄存器编号与
+// _samplers.hlsli 别名一致）：
 //   0..8 = f*3+w 组合（f: Linear=0/Nearest=1/LinearMipLinear=2 × w: Repeat=0/
-//          ClampToEdge=1/ClampToBorder=2），border 槽位统一白边框；
+//          ClampToEdge=1/ClampToBorder=2），border 槽位预填白边框；
 //   9    = 硬件比较采样器 COMPARISON_MIN_MAG_MIP_POINT + LESS_EQUAL + Border 白
-//          （shadow map 专用，gShadowCompare）；
+//          （shadow map 专用 gShadowCompare；白边框勿动——越界=far=受光语义）；
 //   10/11= LinearMipLinear+Repeat 的 LOD bias 占位（DX12 为 NVIDIA 隐式 LOD 对齐
-//          设 bias 0.28/0.85；brief 指定 DX11 预留 0）。
-// D3D11 采样器状态不可变：borderColor 仅白/黑两档可静态表达，动态色延后
-// （bindTexture 路径对非白/黑告警回退白，同 DX12 静态表语义）。
+//          设 bias 0.28/0.85；brief 指定 DX11 预留 0）；
+//   另建 _samplersBlack[3] = 三个 filter 的黑边框变体（brief"border 白/黑两档"），
+//   经 InstallBorderColorSampler 按 borderColor 精确换装到对应 s# 寄存器位。
+// D3D11 采样器状态不可变：仅白/黑两档可静态表达，其余色 WARN 回退白（动态色延后）。
 bool DX11Renderer::createSamplers() {
     constexpr TextureFilter filters[3] = {TextureFilter::Linear, TextureFilter::Nearest,
                                           TextureFilter::LinearMipLinear};
@@ -495,7 +532,7 @@ bool DX11Renderer::createSamplers() {
         sd.MipLODBias = 0.0f;
         sd.MaxAnisotropy = 1;   // 非各向异性过滤时必须为 1
         sd.ComparisonFunc = D3D11_COMPARISON_NEVER;
-        // ClampToBorder 统一白边框（越界=最远深度=受光，阴影采样依赖此语义）
+        // border 槽位预填白（越界=最远深度=受光，阴影采样依赖此语义）
         const bool border = wrap == TextureWrap::ClampToBorder;
         sd.BorderColor[0] = border ? 1.0f : 0.0f;
         sd.BorderColor[1] = border ? 1.0f : 0.0f;
@@ -539,7 +576,57 @@ bool DX11Renderer::createSamplers() {
                    "create reserved sampler");
         if (!_samplers[slot].Get()) return false;
     }
+    // 黑边框档：三个 filter 各一（对应寄存器 s2/s5/s8），供 borderColor=黑时换装
+    for (int f = 0; f < 3; ++f) {
+        D3D11_SAMPLER_DESC sd{};
+        sd.Filter = Dx11FilterOf(filters[f]);
+        sd.AddressU = D3D11_TEXTURE_ADDRESS_BORDER;
+        sd.AddressV = D3D11_TEXTURE_ADDRESS_BORDER;
+        sd.AddressW = D3D11_TEXTURE_ADDRESS_BORDER;
+        sd.MipLODBias = 0.0f;
+        sd.MaxAnisotropy = 1;
+        sd.ComparisonFunc = D3D11_COMPARISON_NEVER;
+        sd.BorderColor[0] = 0.0f;
+        sd.BorderColor[1] = 0.0f;
+        sd.BorderColor[2] = 0.0f;
+        sd.BorderColor[3] = 1.0f;   // GL 黑边框默认 alpha=1（Common.hpp 同口径）
+        sd.MinLOD = 0;
+        sd.MaxLOD = D3D11_FLOAT32_MAX;
+        DX11_CHECK(_device->CreateSamplerState(&sd, &_samplersBlack[f]),
+                   "create black-border sampler");
+        if (!_samplersBlack[f].Get()) return false;
+    }
+    // 运行时下发表初始=白档
+    for (uint32_t i = 0; i < kSamplerSlots; ++i) _activeSamplers[i] = _samplers[i].Get();
     return true;
+}
+
+// ClampToBorder 纹理按 borderColor 白/黑精确换装对应寄存器位的采样器状态。
+// 寄存器编号沿用 f*3+w 约定（w 取 wrapS，同 DX12 TouchHeapSampler 口径）；
+// 换装持久生效至下一次异色绑定或 resetRenderState 复位白档——同一 draw 内同组合
+// 异色不可表达（s# 寄存器静态绑定，与 DX12 动态采样器堆的已记录限制一致）。
+void DX11Renderer::InstallBorderColorSampler(const TextureDesc& params, const float bc[4]) {
+    static const std::array<float, 4> kWhite{{1.0f, 1.0f, 1.0f, 1.0f}};
+    static const std::array<float, 4> kBlack{{0.0f, 0.0f, 0.0f, 1.0f}};
+    const bool white = std::memcmp(bc, kWhite.data(), sizeof(float) * 4) == 0;
+    const bool black = std::memcmp(bc, kBlack.data(), sizeof(float) * 4) == 0;
+    if (!white && !black) {
+        WarnOnce("borderColor not white/black unsupported by static sampler table; using white");
+        return;   // 保持当前档位不动（预填语义为白）
+    }
+    int fi = 0;
+    switch (params.minFilter) {
+        case TextureFilter::Linear:          fi = 0; break;
+        case TextureFilter::Nearest:         fi = 1; break;
+        case TextureFilter::LinearMipLinear: fi = 2; break;
+    }
+    const UINT reg = static_cast<UINT>(fi * 3 + 2);   // w=2 即 border 组合位
+    ID3D11SamplerState* want =
+        black ? _samplersBlack[static_cast<size_t>(fi)].Get() : _samplers[reg].Get();
+    if (_activeSamplers[reg] != want) {
+        LOGI("[DX11] border sampler s{} -> {}", reg, black ? "black" : "white");
+        _activeSamplers[reg] = want;
+    }
 }
 
 // bindTexture 公共实现（对照 DX12 BindTexture2D）：SRV 写共享槽位 unit+1，
@@ -547,7 +634,8 @@ bool DX11Renderer::createSamplers() {
 // 样例切换经 resetRenderState 清槽防悬垂。
 void DX11Renderer::BindTexture2D(rhi::ITexture2D* texture, unsigned int unit) {
     if (!texture) return;
-    if (unit + 1 >= kSrvSlots) {
+    // 64 位中间量防 unit=UINT_MAX 时 unit+1 回绕绕过守卫（评审 Minor-4）
+    if (static_cast<uint64_t>(unit) + 1 >= kSrvSlots) {
         WarnOnce("bindTexture unit out of SRV slot range; ignored");
         return;
     }
@@ -558,19 +646,18 @@ void DX11Renderer::BindTexture2D(rhi::ITexture2D* texture, unsigned int unit) {
         return;
     }
     _srvSlots[unit + 1] = tex->srv();
-    // borderColor 记录口径：静态采样器表仅表达白/黑两档，其余色 WARN 回退白
-    static const std::array<float, 4> kWhite{{1.0f, 1.0f, 1.0f, 1.0f}};
-    static const std::array<float, 4> kBlack{{0.0f, 0.0f, 0.0f, 1.0f}};
-    const auto& bc = tex->borderColor();
-    const bool whiteOrBlack =
-        std::memcmp(bc.data(), kWhite.data(), sizeof(float) * 4) == 0 ||
-        std::memcmp(bc.data(), kBlack.data(), sizeof(float) * 4) == 0;
-    if (!whiteOrBlack) {
-        WarnOnce("borderColor not white/black unsupported by static sampler table; using white");
+    // ClampToBorder 纹理按 borderColor 白/黑精确选装采样器档位（评审 Important-1：
+    // 黑色不再静默得白边框）；其余色在 Install 内 WARN 回退白
+    const TextureDesc& params = tex->samplerParams();
+    if (params.wrapS == TextureWrap::ClampToBorder ||
+        params.wrapT == TextureWrap::ClampToBorder ||
+        params.wrapR == TextureWrap::ClampToBorder) {
+        InstallBorderColorSampler(params, tex->borderColor().data());
     }
 }
 
-void DX11Renderer::createDefaultStates() {    D3D11_RASTERIZER_DESC rs{};
+void DX11Renderer::createDefaultStates() {
+    D3D11_RASTERIZER_DESC rs{};
     rs.FillMode = D3D11_FILL_SOLID;
     rs.CullMode = D3D11_CULL_NONE;   // GL 默认无剔除（Triangle/Rect 依赖此语义）
     rs.FrontCounterClockwise = TRUE; // GL 惯例 CCW 正面（CULL_NONE 下仅语义声明）
@@ -615,6 +702,8 @@ void DX11Renderer::shutdown() {
     _vertexBuffers = {};
     _srvSlots.fill(nullptr);
     for (auto& s : _samplers) s.Reset();
+    for (auto& s : _samplersBlack) s.Reset();
+    _activeSamplers.fill(nullptr);
     _windowBound = false;
     _rasterDefault.Reset();
     _depthDefault.Reset();
@@ -696,7 +785,11 @@ bool DX11Renderer::prepareDraw(bool needsIndex) {
     }
 
     p->bindShaders(_context.ptr);
-    p->bindStates(_context.ptr);   // RSSetState + OMSetDepthStencilState(ref) + OMSetBlendState
+    if (!p->bindStates(_context.ptr)) {
+        // RS/DS/Blend 状态对象创建失败（不缓存不重试）：跳过本次 draw，
+        // 对照 DX12 pipelineFor 返回 nullptr 时 prepareDraw 直接退出的语义
+        return false;
+    }
     applyViewport();               // RSSetViewports 每 draw 重发
 
     _context->IASetPrimitiveTopology(ToDx11Topology(p->primitiveType()));
@@ -746,12 +839,11 @@ bool DX11Renderer::prepareDraw(bool needsIndex) {
         }
     }
 
-    // 纹理采样：SRV 槽位 t<unit+1>（槽 0 预留 ImGui）+ 采样器全槽绑定。
+    // 纹理采样：SRV 槽位 t<unit+1>（槽 0 预留 ImGui）+ 采样器全槽绑定
+    // （_activeSamplers=白档预填表，ClampToBorder 黑边框纹理经换装生效）。
     // 本仓库全部纹理采样在 PS（同 DX12 根表 PIXEL 可见性口径）
     _context->PSSetShaderResources(0, kSrvSlots, _srvSlots.data());
-    std::array<ID3D11SamplerState*, kSamplerSlots> samplers{};
-    for (uint32_t i = 0; i < kSamplerSlots; ++i) samplers[i] = _samplers[i].Get();
-    _context->PSSetSamplers(0, kSamplerSlots, samplers.data());
+    _context->PSSetSamplers(0, kSamplerSlots, _activeSamplers.data());
     return true;
 }
 

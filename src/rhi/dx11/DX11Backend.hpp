@@ -211,8 +211,10 @@ public:
     // 非 const：着色器对象（ID3D11VertexShader 等）按字节码懒创建并缓存
     void bindShaders(ID3D11DeviceContext* ctx);
     // RS/Blend/DS 状态对象按 stateHash 懒建缓存后全量下发（RSSetState +
-    // OMSetDepthStencilState(stencilRef) + OMSetBlendState），prepareDraw 每 draw 调用
-    void bindStates(ID3D11DeviceContext* ctx);
+    // OMSetDepthStencilState(stencilRef) + OMSetBlendState），prepareDraw 每 draw 调用；
+    // 返回 false=状态对象创建失败（不缓存不重试，调用方跳过本次 draw，对照
+    // DXPipeline::pipelineFor 返回 nullptr 的语义）
+    bool bindStates(ID3D11DeviceContext* ctx);
     // 状态指纹（与 DX12 同字段口径：混合/深度/模板/剔除/朝向/多态/拓扑；
     // 差异点：_stencilRef 参与键——DX11 无独立 ref 绑定通道，ref 变化必须换状态对象）
     uint32_t stateHash() const;
@@ -227,8 +229,9 @@ private:
         Dx11ComPtr<ID3D11DepthStencilState> ds{};
         Dx11ComPtr<ID3D11BlendState> blend{};
     };
-    // stateHash → 状态对象；未命中时按当前成员构建（对照 DXPipeline::pipelineFor）
-    StateObjects& statesFor(uint32_t hash);
+    // stateHash → 状态对象；未命中时按当前成员构建，任一创建失败返回 nullptr
+    // 且不入缓存（避免 null 对象被永久复用；对照 DXPipeline::pipelineFor）
+    StateObjects* statesFor(uint32_t hash);
 
     ID3D11Device* _device{nullptr};
     Dx11ComPtr<ID3D11InputLayout> _inputLayout{};
