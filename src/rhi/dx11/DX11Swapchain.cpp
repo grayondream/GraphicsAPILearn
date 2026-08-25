@@ -64,7 +64,7 @@ bool DX11Swapchain::init(ID3D11Device* device, const std::shared_ptr<ISurface>& 
         HRESULT hrP = _swapchain->GetBuffer(0, IID_PPV_ARGS(&_buffers[0]));
         LOGI("[DX11][probe] immediate GetBuffer(0) after create hr=0x{:08X}", static_cast<uint32_t>(hrP));
         if (_buffers[0].Get()) { _buffers[0]->Release(); _buffers[0].ptr = nullptr; }
-        ComPtr<IDXGISwapChain3> scProbe;
+        Dx11ComPtr<IDXGISwapChain3> scProbe;
         HRESULT hrQ = _swapchain->QueryInterface(IID_PPV_ARGS(&scProbe));
         LOGI("[DX11][probe] QI SwapChain3 hr=0x{:08X} idx={}", static_cast<uint32_t>(hrQ),
              scProbe.Get() ? static_cast<int>(scProbe->GetCurrentBackBufferIndex()) : -1);
