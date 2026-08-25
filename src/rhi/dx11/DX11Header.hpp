@@ -9,7 +9,8 @@
 #endif
 #include <windows.h>
 #include <d3d11.h>
-#include <dxgi1_2.h>       // IDXGIFactory2/IDXGISwapChain1（CreateSwapchainForHwnd）
+#include <dxgi1_4.h>       // IDXGIFactory2/IDXGISwapChain1/CreateSwapchainForHwnd；
+                           // IDXGISwapChain3(GetCurrentBackBufferIndex) 需 1_4
 #include <d3dcompiler.h>   // D3DCreateBlob（.fxc 产物装载）
 #include "base/Log.hpp"
 #include "rhi/core/Common.hpp"
@@ -52,6 +53,11 @@ struct Dx11ComPtr {
     T** operator&() { return &ptr; }
     T* operator->() const { return ptr; }
     T* Get() const { return ptr; }
+    // 显式释放并置空（析构语义等价，供 shutdown 路径复用）
+    void Reset(T* newPtr = nullptr) {
+        if (ptr && ptr != newPtr) ptr->Release();
+        ptr = newPtr;
+    }
 };
 using namespace std::string_literals;
 
