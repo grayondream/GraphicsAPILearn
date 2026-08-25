@@ -251,10 +251,6 @@ public:
         _uniformBuffer = buf;
         return buf;
     }
-    std::shared_ptr<ITexture2D> createTexture2D() override {
-        if (!_device.ptr) { LOGE("[DX11] createTexture2D before init"); return std::make_shared<DXNullTexture2D>(); }
-        return std::make_shared<DX11Texture2D>(_device.ptr, _context.ptr);
-    }
     std::shared_ptr<ITexture3D> createTexture3D() override {
         WarnOnce("createTexture3D: not implemented yet (later task); returning null stub");
         return std::make_shared<DXNullTexture3D>();
