@@ -267,28 +267,8 @@ private:
                 for (int j = 0; j < 4; ++j) f[4 * j + 2] = 0.5f * (f[4 * j + 2] + f[4 * j + 3]);
             };
             unsigned char* base = static_cast<unsigned char*>(mapped.pData) + offset;
-            // TEMP 探针（验证后移除）：RHI_DX11_ZPROBE=1 时输出补丁前后数值，
-            // 验证索引恰为 4j+2 且仅 z 行变化（历史教训：8+4j 会污染相邻矩阵）
-            static const bool zprobe = std::getenv("RHI_DX11_ZPROBE") != nullptr;
-            std::array<float, 16> before{};
-            if (zprobe) std::memcpy(before.data(), base, 64);
             patch(base);                                        // projection
             for (int i = 0; i < 7; ++i) patch(base + 320 + 64 * i);   // extraMat4[0..6]
-            if (zprobe) {
-                const float* b = before.data();
-                const float* a = reinterpret_cast<const float*>(base);
-                for (int j = 0; j < 4; ++j) {
-                    LOGI("[DX11][ZP] proj col{} : z {}->{} w={} (expect {})", j,
-                         b[4 * j + 2], a[4 * j + 2], b[4 * j + 3],
-                         0.5f * (b[4 * j + 2] + b[4 * j + 3]));
-                }
-                bool other = false;
-                for (int k = 0; k < 16; ++k) {
-                    if (k % 4 == 2) continue;
-                    if (b[k] != a[k]) other = true;
-                }
-                LOGI("[DX11][ZP] non-z elements unchanged={}", !other);
-            }
         }
         _ctx->Unmap(_buffer.Get(), 0);
         return true;
