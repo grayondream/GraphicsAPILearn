@@ -35,6 +35,18 @@ bool DX11Swapchain::init(ID3D11Device* device, const std::shared_ptr<ISurface>& 
     desc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
     desc.AlphaMode = DXGI_ALPHA_MODE_UNSPECIFIED;
 
+    // ---- TEMP PROBE（GetBuffer 0x887A0001 根因二分，定位后移除）----
+    {
+        const int mode = std::getenv("RHI_DX11_PROBE") ? std::atoi(std::getenv("RHI_DX11_PROBE")) : -1;
+        LOGI("[DX11][probe] mode={} {}x{}", mode, desc.Width, desc.Height);
+        if (mode == 0) { /* 基线：STRETCH+FLIP */ }
+        else if (mode == 1) desc.Scaling = DXGI_SCALING_NONE;
+        else if (mode == 2) { desc.Scaling = DXGI_SCALING_NONE; desc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL; }
+        else if (mode == 3) desc.SwapEffect = DXGI_SWAP_EFFECT_DISCARD;
+        else if (mode == 4) { desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM; }
+    }
+    // ---- TEMP PROBE END ----
+
     // FLIP_DISCARD 失败回退传统 DISCARD（brief 约定；老系统/特殊窗口样式兜底）
     HRESULT hrFlip = _factory->CreateSwapChainForHwnd(_device, hwnd, &desc, nullptr, nullptr, &_swapchain);
     DX11_CHECK(hrFlip, "CreateSwapChainForHwnd(FLIP_DISCARD)");
