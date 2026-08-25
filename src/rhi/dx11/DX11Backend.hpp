@@ -45,13 +45,15 @@ public:
     int width() const { return _width; }
     int height() const { return _height; }
     DXGI_FORMAT colorFormat() const { return DXGI_FORMAT_B8G8R8A8_UNORM; }
-    ID3D11RenderTargetView* rtv(uint32_t index);
+    // 惰性获取指定 backbuffer 的 RTV：flip 模型下 DXGI 按 Present 进度惰性分配
+    // backbuffer，未分配槽位的 GetBuffer 返回 DXGI_ERROR_INVALID_CALL（本机实测：
+    // 建链初期仅 currentIndex 槽可取），故按需获取并缓存；失败返回 nullptr 由
+    // 调用方跳过本帧（后续帧自动重试）
+    ID3D11RenderTargetView* acquireRtv(uint32_t index);
     ID3D11DepthStencilView* dsv();
-    // backbuffer 裸纹理（dumpFrame 读回源）
-    ID3D11Texture2D* backBuffer(uint32_t index);
 
 private:
-    bool createSizeDependent(int width, int height);   // GetBuffer+RTV+深度 DSV
+    bool createSizeDependent(int width, int height);   // 尽力预取各槽 RTV+深度 DSV
     void destroySizeDependent();
 
     static constexpr UINT kBufferCount = 2;

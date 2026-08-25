@@ -35,18 +35,6 @@ bool DX11Swapchain::init(ID3D11Device* device, const std::shared_ptr<ISurface>& 
     desc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
     desc.AlphaMode = DXGI_ALPHA_MODE_UNSPECIFIED;
 
-    // ---- TEMP PROBE（GetBuffer 0x887A0001 根因二分，定位后移除）----
-    {
-        const int mode = std::getenv("RHI_DX11_PROBE") ? std::atoi(std::getenv("RHI_DX11_PROBE")) : -1;
-        LOGI("[DX11][probe] mode={} {}x{}", mode, desc.Width, desc.Height);
-        if (mode == 0) { /* 基线：STRETCH+FLIP */ }
-        else if (mode == 1) desc.Scaling = DXGI_SCALING_NONE;
-        else if (mode == 2) { desc.Scaling = DXGI_SCALING_NONE; desc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL; }
-        else if (mode == 3) desc.SwapEffect = DXGI_SWAP_EFFECT_DISCARD;
-        else if (mode == 4) { desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM; }
-    }
-    // ---- TEMP PROBE END ----
-
     // FLIP_DISCARD 失败回退传统 DISCARD（brief 约定；老系统/特殊窗口样式兜底）
     HRESULT hrFlip = _factory->CreateSwapChainForHwnd(_device, hwnd, &desc, nullptr, nullptr, &_swapchain);
     DX11_CHECK(hrFlip, "CreateSwapChainForHwnd(FLIP_DISCARD)");
@@ -59,25 +47,6 @@ bool DX11Swapchain::init(ID3D11Device* device, const std::shared_ptr<ISurface>& 
         if (!_swapchain.Get()) return false;
     }
 
-    // ---- TEMP PROBE（GetBuffer 0x887A0001 根因二分，定位后移除）----
-    {
-        HRESULT hrP = _swapchain->GetBuffer(0, IID_PPV_ARGS(&_buffers[0]));
-        LOGI("[DX11][probe] immediate GetBuffer(0) after create hr=0x{:08X}", static_cast<uint32_t>(hrP));
-        if (_buffers[0].Get()) { _buffers[0]->Release(); _buffers[0].ptr = nullptr; }
-        Dx11ComPtr<IDXGISwapChain3> scProbe;
-        HRESULT hrQ = _swapchain->QueryInterface(IID_PPV_ARGS(&scProbe));
-        LOGI("[DX11][probe] QI SwapChain3 hr=0x{:08X} idx={}", static_cast<uint32_t>(hrQ),
-             scProbe.Get() ? static_cast<int>(scProbe->GetCurrentBackBufferIndex()) : -1);
-        char t[64] = {};
-        GetWindowTextA(hwnd, t, 60);
-        LONG style = GetWindowLongA(hwnd, GWL_STYLE);
-        RECT rc{};
-        GetClientRect(hwnd, &rc);
-        LOGI("[DX11][probe] hwnd={} title='{}' style=0x{:X} client={}x{}", static_cast<void*>(hwnd), t,
-             static_cast<unsigned>(style), rc.right - rc.left, rc.bottom - rc.top);
-        LOGI("[DX11][probe] desc {}x{} bufcount={}", desc.Width, desc.Height, desc.BufferCount);
-    }
-    // ---- TEMP PROBE END ----
 
     // 禁 Alt+Enter 独占全屏切换：全屏接管后 RTV 全部失效（同 DX12）
     _factory->MakeWindowAssociation(hwnd, DXGI_MWA_NO_ALT_ENTER);
@@ -99,17 +68,16 @@ void DX11Swapchain::shutdown() {
     _initialized = false;
 }
 
-// 尺寸相关资源：backbuffer 引用 + 每缓冲 RTV、窗口深度纹理 + DSV。
-// ResizeBuffers 前必须全部释放对 backbuffer 的引用。
+// 尺寸相关资源：尽力预取各 backbuffer RTV、创建窗口深度纹理 + DSV。
+// ResizeBuffers 前必须全部释放对 backbuffer 的引用。flip 模型下未就绪槽位由
+// acquireRtv 在渲染路径惰性补取，此处不因缺槽失败。
 bool DX11Swapchain::createSizeDependent(int width, int height) {
     destroySizeDependent();
 
     for (UINT i = 0; i < kBufferCount; ++i) {
-        DX11_CHECK(_swapchain->GetBuffer(i, IID_PPV_ARGS(&_buffers[i])), "GetBuffer");
-        if (!_buffers[i].Get()) return false;
-        DX11_CHECK(_device->CreateRenderTargetView(_buffers[i].Get(), nullptr, &_rtv[i]),
-                   "create backbuffer RTV");
-        if (!_rtv[i].Get()) return false;
+        if (!acquireRtv(i)) {
+            LOGI("[DX11] backbuffer {} not allocated yet (lazy flip-model); will retry on demand", i);
+        }
     }
 
     // 窗口深度：GL 默认帧缓冲语义（clearColor 同清深度/模板；模板供 TemplateTest 等）
@@ -173,8 +141,19 @@ uint32_t DX11Swapchain::currentIndex() const {
                : 0u;
 }
 
-ID3D11RenderTargetView* DX11Swapchain::rtv(uint32_t index) {
-    return index < kBufferCount ? _rtv[index].Get() : nullptr;
+ID3D11RenderTargetView* DX11Swapchain::acquireRtv(uint32_t index) {
+    if (index >= kBufferCount || !_swapchain.Get() || !_device) return nullptr;
+    if (_rtv[index].Get()) return _rtv[index].Get();
+    HRESULT hr = _swapchain->GetBuffer(index, IID_PPV_ARGS(&_buffers[index]));
+    if (FAILED(hr)) {
+        static int lazyWarn = 0;
+        if (lazyWarn++ < 8)
+            LOGW("[DX11] GetBuffer({}) hr=0x{:08X}; retry next frame", index, static_cast<uint32_t>(hr));
+        return nullptr;
+    }
+    DX11_CHECK(_device->CreateRenderTargetView(_buffers[index].Get(), nullptr, &_rtv[index]),
+               "create backbuffer RTV");
+    return _rtv[index].Get();
 }
 
 ID3D11DepthStencilView* DX11Swapchain::dsv() {

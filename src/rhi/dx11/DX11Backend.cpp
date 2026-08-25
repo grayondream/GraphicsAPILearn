@@ -515,9 +515,11 @@ bool DX11Renderer::present() {
 
 void DX11Renderer::bindWindowTargets(bool doClear) {
     if (!_swapchain || !_swapchain->initialized() || !_context.ptr) return;
-    ID3D11RenderTargetView* rtv = _swapchain->rtv(_swapchain->currentIndex());
+    // flip 模型下 backbuffer 惰性就绪：当前槽未分配时跳过本帧，后续帧自动重试
+    const uint32_t idx = _swapchain->currentIndex();
+    ID3D11RenderTargetView* rtv = _swapchain->acquireRtv(idx);
     ID3D11DepthStencilView* dsv = _swapchain->dsv();
-    if (!rtv) return;
+    if (!rtv) { LOGW("[DX11] window RTV not ready (index {}); frame skipped", idx); return; }
     ID3D11RenderTargetView* rtvs[1] = {rtv};
     _context->OMSetRenderTargets(1, rtvs, dsv);
     _context->RSSetState(_rasterDefault.Get());
@@ -529,7 +531,7 @@ void DX11Renderer::bindWindowTargets(bool doClear) {
 }
 
 void DX11Renderer::clearWindowTargets() {
-    ID3D11RenderTargetView* rtv = _swapchain->rtv(_swapchain->currentIndex());
+    ID3D11RenderTargetView* rtv = _swapchain->acquireRtv(_swapchain->currentIndex());
     ID3D11DepthStencilView* dsv = _swapchain->dsv();
     if (rtv) _context->ClearRenderTargetView(rtv, _clearColor);
     if (dsv) _context->ClearDepthStencilView(dsv, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);
@@ -625,7 +627,12 @@ void DX11Renderer::dumpFrame() {
 
     const int w = _swapchain->width();
     const int h = _swapchain->height();
-    ID3D11Texture2D* bb = _swapchain->backBuffer(_swapchain->currentIndex());
+    const uint32_t idx = _swapchain->currentIndex();
+    if (!_swapchain->acquireRtv(idx)) {   // 顺带确保该槽 backbuffer 已分配
+        LOGE("dumpFrame: swapchain backbuffer not ready");
+        return;
+    }
+    ID3D11Texture2D* bb = _swapchain->backBuffer(idx);
     if (w <= 0 || h <= 0 || !bb || !_context.ptr) {
         LOGE("dumpFrame: swapchain backbuffer not ready");
         return;
