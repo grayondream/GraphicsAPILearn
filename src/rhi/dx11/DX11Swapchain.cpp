@@ -59,6 +59,26 @@ bool DX11Swapchain::init(ID3D11Device* device, const std::shared_ptr<ISurface>& 
         if (!_swapchain.Get()) return false;
     }
 
+    // ---- TEMP PROBE（GetBuffer 0x887A0001 根因二分，定位后移除）----
+    {
+        HRESULT hrP = _swapchain->GetBuffer(0, IID_PPV_ARGS(&_buffers[0]));
+        LOGI("[DX11][probe] immediate GetBuffer(0) after create hr=0x{:08X}", static_cast<uint32_t>(hrP));
+        if (_buffers[0].Get()) { _buffers[0]->Release(); _buffers[0].ptr = nullptr; }
+        ComPtr<IDXGISwapChain3> scProbe;
+        HRESULT hrQ = _swapchain->QueryInterface(IID_PPV_ARGS(&scProbe));
+        LOGI("[DX11][probe] QI SwapChain3 hr=0x{:08X} idx={}", static_cast<uint32_t>(hrQ),
+             scProbe.Get() ? static_cast<int>(scProbe->GetCurrentBackBufferIndex()) : -1);
+        char t[64] = {};
+        GetWindowTextA(hwnd, t, 60);
+        LONG style = GetWindowLongA(hwnd, GWL_STYLE);
+        RECT rc{};
+        GetClientRect(hwnd, &rc);
+        LOGI("[DX11][probe] hwnd={} title='{}' style=0x{:X} client={}x{}", static_cast<void*>(hwnd), t,
+             static_cast<unsigned>(style), rc.right - rc.left, rc.bottom - rc.top);
+        LOGI("[DX11][probe] desc {}x{} bufcount={}", desc.Width, desc.Height, desc.BufferCount);
+    }
+    // ---- TEMP PROBE END ----
+
     // 禁 Alt+Enter 独占全屏切换：全屏接管后 RTV 全部失效（同 DX12）
     _factory->MakeWindowAssociation(hwnd, DXGI_MWA_NO_ALT_ENTER);
 
