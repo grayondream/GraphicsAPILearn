@@ -231,12 +231,15 @@ public:
     // ---- 资源工厂 ----
     std::shared_ptr<IShader> createShader() override { return std::make_shared<DX11Shader>(); }
     std::shared_ptr<IPipeline> createPipeline(const VertexLayout& layout, const std::shared_ptr<IShader>& shader) override {
+        LOGI("[DX11][PROBE] createPipeline enter elems={}", layout.elements.size());
         auto dxShader = std::dynamic_pointer_cast<DX11Shader>(shader);
         if (!_device.ptr || !dxShader || !dxShader->valid()) {
             LOGE("[DX11] createPipeline: device/shader not ready, null fallback");
             return std::make_shared<DXNullPipeline>();
         }
-        return std::make_shared<DX11Pipeline>(_device.ptr, layout, dxShader);
+        auto pl = std::make_shared<DX11Pipeline>(_device.ptr, layout, dxShader);
+        LOGI("[DX11][PROBE] createPipeline done valid={}", pl->valid());
+        return pl;
     }
     std::shared_ptr<IBuffer> createBuffer() override {
         if (!_device.ptr) { LOGE("[DX11] createBuffer before init"); return std::make_shared<DXNullBuffer>(); }
