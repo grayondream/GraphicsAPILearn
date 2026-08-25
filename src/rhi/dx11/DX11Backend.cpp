@@ -7,6 +7,7 @@
 #include <array>
 #include <cstdio>    // std::fopen/fprintf（RHI_DUMP_FRAME PPM 导出）
 #include <cstdlib>   // std::getenv
+#include <cstring>   // std::memcpy（UBO Map DISCARD 写入）
 #include <map>
 
 #ifndef RESOURCE_DIR
@@ -149,8 +150,11 @@ public:
     void release() override {}
 };
 
-// VB/IB/UBO 真实现（Task 1 上屏必需）：DEFAULT 堆一次性上传，更新走
-// UpdateSubresource。常量缓冲要求 ByteWidth 为 16 的倍数且不允许部分 box 更新。
+// VB/IB 真实现（Task 1 上屏必需）：DEFAULT 堆一次性上传，更新走
+// UpdateSubresource（常量缓冲以外的资源允许部分 box 更新）。
+// UBO（Task 3 改造）：DYNAMIC + CPU_WRITE 动态常量缓冲，update 语义=
+// Map(WRITE_DISCARD) 换名写 + 槽内 z 再映射补丁（自 src/rhi/dx12/DXBuffer.cpp
+// update 的 Uniform 分支整体移植）。常量缓冲要求 ByteWidth 为 16 的倍数。
 class DX11Buffer : public IBuffer {
 public:
     DX11Buffer(ID3D11Device* device, ID3D11DeviceContext* ctx)
@@ -170,6 +174,18 @@ public:
                 bd.ByteWidth = (bd.ByteWidth + 15u) & ~15u;
                 break;
         }
+        if (type == BufferType::Uniform) {
+            // 动态常量缓冲（Task 3）：每次 update 经 Map(WRITE_DISCARD) 换名写入，
+            // GPU 仍在读旧副本时驱动直接改名到新副本、CPU 无同步停顿；初始数据
+            // 同样走 Map 路径（DYNAMIC 资源不使用 CreateBuffer 的 pInitialData）
+            bd.Usage = D3D11_USAGE_DYNAMIC;
+            bd.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+            DX11_CHECK(_device->CreateBuffer(&bd, nullptr, &_buffer),
+                       "create dynamic constant buffer");
+            _byteWidth = bd.ByteWidth;
+            if (!_buffer.Get()) return false;
+            return !data || mapWrite(data, size, 0);
+        }
         bd.Usage = D3D11_USAGE_DEFAULT;
         bd.CPUAccessFlags = 0;
         bd.MiscFlags = 0;
@@ -186,13 +202,17 @@ public:
 
     bool update(const void* data, size_t size, size_t offset) override {
         if (!_buffer.Get() || !_ctx || !data || size == 0) return false;
+        if (_type == BufferType::Uniform) {
+            // UBO 动态 CB（Task 3）：Map DISCARD 整块换名写（语义见 mapWrite 注释）
+            return mapWrite(data, size, offset);
+        }
         if (offset + size > _byteWidth) {
             LOGE("[DX11] buffer update out of range offset={} size={} width={}",
                  offset, size, _byteWidth);
             return false;
         }
-        if (_type == BufferType::Uniform || (offset == 0 && size == _byteWidth)) {
-            // 常量缓冲不允许部分 box：整块提交
+        if (offset == 0 && size == _byteWidth) {
+            // 整块提交走无 box 快路径
             _ctx->UpdateSubresource(_buffer.Get(), 0, nullptr, data, 0, 0);
         } else {
             D3D11_BOX box{};
@@ -212,6 +232,48 @@ public:
     void* handle() override { return _buffer.Get(); }
 
 private:
+    // UBO 更新核心（Task 3）：Map(WRITE_DISCARD) → memcpy → z 再映射补丁 → Unmap。
+    // 全部现有调用方均为全块更新（update(&_ubo, sizeof(UniformBlock), 0)）；
+    // DISCARD 会弃置整块旧内容，部分更新的其余字节为换名后的未定义值——
+    // 与 DX12 ring 槽"槽内互不覆盖"的帧内持久性不同，混合偏移的多次 update
+    // 不受支持（当前无此用法，出现时以 LOGE 越界守卫同级显式拒绝为宜）。
+    bool mapWrite(const void* data, size_t size, size_t offset) {
+        // 单次 update 不允许越界：越界会静默破坏映射区域外的内存（对照 DX12 槽界守卫）
+        if (offset + size > _byteWidth) {
+            LOGE("[DX11] uniform write crosses buffer boundary offset={} size={}",
+                 offset, size);
+            return false;
+        }
+        D3D11_MAPPED_SUBRESOURCE mapped{};
+        const HRESULT hr = _ctx->Map(_buffer.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped);
+        if (FAILED(hr) || !mapped.pData) {
+            LOGE("[DX11] map constant buffer failed hr=0x{:08X}", static_cast<uint32_t>(hr));
+            return false;
+        }
+        std::memcpy(static_cast<char*>(mapped.pData) + offset, data, size);
+        // D3D11 裁剪空间 z∈[0,w]，GL 语义投影矩阵产出 z_ndc∈[-1,1]：负 z 段会被
+        // 光栅化整段裁掉（Shadow 光空间正交 near=1/far=7.5 时近半场景从深度图消失，
+        // 表现为无阴影）。在映射内存上对投影类矩阵做 z 再映射 M'=R·M（z'=0.5z+0.5w），
+        // 经视口变换后的存储深度恰与 GL 视口 [-1,1]→[0,1] 的结果逐位一致。
+        // 覆盖 projection@0 与 extraMat4[0..6]（lightSpaceMatrix/点光 6 面
+        // shadowMatrices，全部为投影语义；[7..13] 自由槽不动）。列主序 glm 内存：
+        // M'[2][j]=0.5(M[2][j]+M[3][j])，即 f[4*j+2]=0.5f*(f[4*j+2]+f[4*j+3])
+        // ——索引必须是 4j+2（DX12 曾在此犯 8+4j 错误污染相邻矩阵，勿改）。
+        // 守卫 offset==0&&size>=1216：仅覆盖至 vec4Pool 起始的全块更新才补丁；
+        // 部分更新不保证投影类矩阵完整，跳过（同 DX12 口径）。
+        if (offset == 0 && size >= 1216) {
+            auto patch = [](unsigned char* m) {
+                float* f = reinterpret_cast<float*>(m);
+                for (int j = 0; j < 4; ++j) f[4 * j + 2] = 0.5f * (f[4 * j + 2] + f[4 * j + 3]);
+            };
+            unsigned char* base = static_cast<unsigned char*>(mapped.pData) + offset;
+            patch(base);                                        // projection
+            for (int i = 0; i < 7; ++i) patch(base + 320 + 64 * i);   // extraMat4[0..6]
+        }
+        _ctx->Unmap(_buffer.Get(), 0);
+        return true;
+    }
+
     ID3D11Device* _device{nullptr};
     ID3D11DeviceContext* _ctx{nullptr};
     Dx11ComPtr<ID3D11Buffer> _buffer{};
