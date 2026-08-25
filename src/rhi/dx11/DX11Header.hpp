@@ -33,15 +33,15 @@ void DumpMessages(const char* context);
 } // namespace dxdiag
 
 template <typename T>
-struct ComPtr {
+struct Dx11ComPtr {
     T* ptr{nullptr};
-    ComPtr() = default;
-    ~ComPtr() { if (ptr) ptr->Release(); }
+    Dx11ComPtr() = default;
+    ~Dx11ComPtr() { if (ptr) ptr->Release(); }
     // 禁拷贝防双重 Release；移动后源指针置空
-    ComPtr(const ComPtr&) = delete;
-    ComPtr& operator=(const ComPtr&) = delete;
-    ComPtr(ComPtr&& other) noexcept : ptr(other.ptr) { other.ptr = nullptr; }
-    ComPtr& operator=(ComPtr&& other) noexcept {
+    Dx11ComPtr(const Dx11ComPtr&) = delete;
+    Dx11ComPtr& operator=(const Dx11ComPtr&) = delete;
+    Dx11ComPtr(Dx11ComPtr&& other) noexcept : ptr(other.ptr) { other.ptr = nullptr; }
+    Dx11ComPtr& operator=(Dx11ComPtr&& other) noexcept {
         if (this != std::addressof(other)) {
             if (ptr) ptr->Release();
             ptr = other.ptr;

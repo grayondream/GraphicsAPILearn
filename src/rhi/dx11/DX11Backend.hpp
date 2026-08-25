@@ -57,15 +57,15 @@ private:
     static constexpr UINT kBufferCount = 2;
 
     ID3D11Device* _device{nullptr};
-    ComPtr<IDXGIFactory2> _factory;
-    ComPtr<IDXGISwapChain1> _swapchain;
+    Dx11ComPtr<IDXGIFactory2> _factory;
+    Dx11ComPtr<IDXGISwapChain1> _swapchain;
     // GetCurrentBackBufferIndex 需 DXGI 1.4 接口（Win10 起可用；FLIP 模型本身即
     // Win10 特性，QI 失败时 currentIndex 回退 0）
-    ComPtr<IDXGISwapChain3> _swapchain3;
-    ComPtr<ID3D11Texture2D> _buffers[kBufferCount];
-    ComPtr<ID3D11RenderTargetView> _rtv[kBufferCount];
-    ComPtr<ID3D11Texture2D> _depth;
-    ComPtr<ID3D11DepthStencilView> _dsv;
+    Dx11ComPtr<IDXGISwapChain3> _swapchain3;
+    Dx11ComPtr<ID3D11Texture2D> _buffers[kBufferCount];
+    Dx11ComPtr<ID3D11RenderTargetView> _rtv[kBufferCount];
+    Dx11ComPtr<ID3D11Texture2D> _depth;
+    Dx11ComPtr<ID3D11DepthStencilView> _dsv;
     int _width{0};
     int _height{0};
     bool _initialized{false};
@@ -82,14 +82,14 @@ public:
     bool valid() const override { return !_blobs.empty(); }
 
     bool hasStage(ShaderStage::Type type) const { return _blobs.count(type) != 0; }
-    // 返回独立引用（AddRef 拷贝），调用方经 ComPtr 释放
-    ComPtr<ID3DBlob> moduleFor(ShaderStage::Type type) const;
+    // 返回独立引用（AddRef 拷贝），调用方经 Dx11ComPtr 释放
+    Dx11ComPtr<ID3DBlob> moduleFor(ShaderStage::Type type) const;
 
     // 产物定位约定复用入口（与 compile 同一套三级查找）
     static std::string FindFxc(const std::string& sourcePath, ShaderStage::Type type);
 
 private:
-    std::map<ShaderStage::Type, ComPtr<ID3DBlob>> _blobs{};
+    std::map<ShaderStage::Type, Dx11ComPtr<ID3DBlob>> _blobs{};
     std::string _log{};
 };
 
@@ -154,10 +154,10 @@ private:
     void ensureShaderObjects();   // VS/PS/GS 字节码 → D3D11 着色器对象（一次）
 
     ID3D11Device* _device{nullptr};
-    ComPtr<ID3D11InputLayout> _inputLayout{};
-    ComPtr<ID3D11VertexShader> _vs{};
-    ComPtr<ID3D11PixelShader> _ps{};
-    ComPtr<ID3D11GeometryShader> _gs{};
+    Dx11ComPtr<ID3D11InputLayout> _inputLayout{};
+    Dx11ComPtr<ID3D11VertexShader> _vs{};
+    Dx11ComPtr<ID3D11PixelShader> _ps{};
+    Dx11ComPtr<ID3D11GeometryShader> _gs{};
     bool _shadersReady{false};
     VertexLayout _layout{};
     std::shared_ptr<DX11Shader> _shader{};

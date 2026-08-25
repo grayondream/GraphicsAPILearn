@@ -128,7 +128,7 @@ bool DX11Shader::compile(const std::vector<ShaderStage>& stages) {
             LOGE("{}", _log);
             return false;
         }
-        ComPtr<ID3DBlob> blob;
+        Dx11ComPtr<ID3DBlob> blob;
         DX11_CHECK(D3DCreateBlob(bytes.size(), &blob), "D3DCreateBlob");
         if (!blob.Get()) {
             _log = "DX11Shader: D3DCreateBlob failed for " + fxcPath;
@@ -141,10 +141,10 @@ bool DX11Shader::compile(const std::vector<ShaderStage>& stages) {
     return !_blobs.empty();
 }
 
-ComPtr<ID3DBlob> DX11Shader::moduleFor(ShaderStage::Type type) const {
+Dx11ComPtr<ID3DBlob> DX11Shader::moduleFor(ShaderStage::Type type) const {
     auto it = _blobs.find(type);
     if (it == _blobs.end() || !it->second.Get()) return {};
-    ComPtr<ID3DBlob> out;
+    Dx11ComPtr<ID3DBlob> out;
     out.ptr = it->second.Get();
     out.ptr->AddRef();
     return out;

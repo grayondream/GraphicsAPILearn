@@ -29,8 +29,8 @@ static void WarnOnce(const char* message) {
 // ---- 设备侧诊断（DX11Header.hpp 声明）----
 namespace {
 
-ComPtr<ID3D11InfoQueue>& DxDiagQueue() {
-    static ComPtr<ID3D11InfoQueue> q;
+Dx11ComPtr<ID3D11InfoQueue>& DxDiagQueue() {
+    static Dx11ComPtr<ID3D11InfoQueue> q;
     return q;
 }
 
@@ -38,14 +38,14 @@ ComPtr<ID3D11InfoQueue>& DxDiagQueue() {
 
 void dxdiag::SetInfoQueue(ID3D11Device* device) {
     if (!device) return;
-    ComPtr<ID3D11InfoQueue> got;
+    Dx11ComPtr<ID3D11InfoQueue> got;
     if (SUCCEEDED(device->QueryInterface(IID_PPV_ARGS(&got)))) {
         DxDiagQueue() = std::move(got);
     }
 }
 
 void dxdiag::DumpMessages(const char* context) {
-    ComPtr<ID3D11InfoQueue>& iq = DxDiagQueue();
+    Dx11ComPtr<ID3D11InfoQueue>& iq = DxDiagQueue();
     if (!iq.ptr) return;
     const UINT64 count = iq->GetNumStoredMessages();
     for (UINT64 i = 0; i < count && i < 32; ++i) {
@@ -213,7 +213,7 @@ public:
 private:
     ID3D11Device* _device{nullptr};
     ID3D11DeviceContext* _ctx{nullptr};
-    ComPtr<ID3D11Buffer> _buffer{};
+    Dx11ComPtr<ID3D11Buffer> _buffer{};
     BufferType _type{BufferType::Vertex};
     UINT _byteWidth{0};
 };
@@ -390,15 +390,15 @@ private:
     std::shared_ptr<ISurface> _surface;
     Viewport _viewport{};
     bool _viewportSet{false};
-    ComPtr<ID3D11Device> _device;
-    ComPtr<ID3D11DeviceContext> _context;
+    Dx11ComPtr<ID3D11Device> _device;
+    Dx11ComPtr<ID3D11DeviceContext> _context;
     D3D_FEATURE_LEVEL _featureLevel{};
     std::shared_ptr<DX11Swapchain> _swapchain{};
 
     // GL 语义默认状态对象（生命周期与 device 一致）
-    ComPtr<ID3D11RasterizerState> _rasterDefault;
-    ComPtr<ID3D11DepthStencilState> _depthDefault;
-    ComPtr<ID3D11BlendState> _blendDefault;
+    Dx11ComPtr<ID3D11RasterizerState> _rasterDefault;
+    Dx11ComPtr<ID3D11DepthStencilState> _depthDefault;
+    Dx11ComPtr<ID3D11BlendState> _blendDefault;
 
     // 主循环状态机
     bool _windowBound{false};     // 当前 OM 目标为窗口 backbuffer
@@ -642,7 +642,7 @@ void DXRenderer::dumpFrame() {
     sd.BindFlags = 0;
     sd.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
     sd.MiscFlags = 0;
-    ComPtr<ID3D11Texture2D> staging;
+    Dx11ComPtr<ID3D11Texture2D> staging;
     DX11_CHECK(_device->CreateTexture2D(&sd, nullptr, &staging), "create dump staging texture");
     if (!staging.Get()) { LOGE("dumpFrame: create staging failed"); return; }
 
