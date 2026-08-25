@@ -336,8 +336,6 @@ void DX11Texture2D::setBorderColor(const float bc[4]) {
     _borderColor = {bc[0], bc[1], bc[2], bc[3]};
 }
 
-void* DX11Texture2D::handle() { return _texture.ptr; }
-
 void DX11Texture2D::release() {
     _texture.Reset();
     _srv.Reset();
