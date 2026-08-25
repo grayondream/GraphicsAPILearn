@@ -212,7 +212,6 @@ DX11Pipeline::StateObjects& DX11Pipeline::statesFor(uint32_t hash) {
 // 每 draw 全量下发（即时上下文无状态泄漏风险，对齐 DX12 "prepareDraw 自愈重设"）
 void DX11Pipeline::bindStates(ID3D11DeviceContext* ctx) {
     const StateObjects& st = statesFor(stateHash());
-         static_cast<void*>(st.ds.Get()));
     ctx->RSSetState(st.rs.Get());
     ctx->OMSetDepthStencilState(st.ds.Get(), static_cast<UINT>(_stencilRef));
     ctx->OMSetBlendState(st.blend.Get(), nullptr, 0xFFFFFFFFu);
