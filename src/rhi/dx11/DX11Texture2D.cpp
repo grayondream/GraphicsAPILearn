@@ -139,7 +139,6 @@ bool DX11Texture2D::init(const TextureDataView2D& data) {
 }
 
 bool DX11Texture2D::init(const TextureDesc& desc, const TextureDataView2D& data) {
-    LOGI("[DX11][PROBE] tex::init enter {}x{} fmt={}", data.width, data.height, static_cast<int>(desc.format));
     release();
     if (!_device || !data.data || data.width <= 0 || data.height <= 0) return false;
     // 深度格式走 createEmpty（渲染目标），CPU 上传路径不支持
@@ -206,7 +205,6 @@ bool DX11Texture2D::init(const TextureDesc& desc, const TextureDataView2D& data)
 // STAGING 纹理 Map 行拷贝 → CopySubresourceRegion 写 mip0 →（可选）GenerateMips。
 // brief 指定路径：CPU 上传 staging+CopySubresourceRegion。
 bool DX11Texture2D::uploadAndGenMips(const TextureDesc&, const TextureDataView2D& data) {
-    LOGI("[DX11][PROBE] tex::upload enter");
     if (!_device || !_context || !_texture.Get() || !_srv.Get()) return false;
     UINT texel = 4;
     std::vector<uint8_t> expanded;

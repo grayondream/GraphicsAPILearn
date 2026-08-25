@@ -142,7 +142,6 @@ uint32_t DX11Pipeline::stateHash() const {
 DX11Pipeline::StateObjects& DX11Pipeline::statesFor(uint32_t hash) {
     auto it = _stateCache.find(hash);
     if (it != _stateCache.end()) return it->second;
-    LOGI("[DX11][PROBE] statesFor enter hash={:08X}", hash);
 
     StateObjects st{};
 
@@ -171,7 +170,6 @@ DX11Pipeline::StateObjects& DX11Pipeline::statesFor(uint32_t hash) {
     rs.MultisampleEnable = FALSE;
     rs.AntialiasedLineEnable = FALSE;
     DX11_CHECK(_device->CreateRasterizerState(&rs, &st.rs), "create rasterizer state");
-    LOGI("[DX11][PROBE] rs done ptr={}", static_cast<void*>(st.rs.Get()));
 
     // ---- 深度/模板（对照 psoDesc.DepthStencilState）----
     // GL 语义对齐（同 VKPipeline）：测试关、写开时仍需写深度 → 强制开测试 + ALWAYS
@@ -188,7 +186,6 @@ DX11Pipeline::StateObjects& DX11Pipeline::statesFor(uint32_t hash) {
     ds.FrontFace = sop;
     ds.BackFace = sop;   // 接口为单面模板状态，前后同配（同 VK/DX12）
     DX11_CHECK(_device->CreateDepthStencilState(&ds, &st.ds), "create depth stencil state");
-    LOGI("[DX11][PROBE] ds done ptr={}", static_cast<void*>(st.ds.Get()));
 
     // ---- 混合（对照 psoDesc.BlendState，GL SrcAlpha/OneMinusSrcAlpha 语义）----
     D3D11_BLEND_DESC bd{};
@@ -203,7 +200,6 @@ DX11Pipeline::StateObjects& DX11Pipeline::statesFor(uint32_t hash) {
     bd.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
     bd.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
     DX11_CHECK(_device->CreateBlendState(&bd, &st.blend), "create blend state");
-    LOGI("[DX11][PROBE] blend done ptr={}", static_cast<void*>(st.blend.Get()));
     if (!st.rs.Get() || !st.ds.Get() || !st.blend.Get()) {
         LOGE("[DX11] state objects incomplete rs={} ds={} blend={}",
              static_cast<void*>(st.rs.Get()), static_cast<void*>(st.ds.Get()),
@@ -216,7 +212,6 @@ DX11Pipeline::StateObjects& DX11Pipeline::statesFor(uint32_t hash) {
 // 每 draw 全量下发（即时上下文无状态泄漏风险，对齐 DX12 "prepareDraw 自愈重设"）
 void DX11Pipeline::bindStates(ID3D11DeviceContext* ctx) {
     const StateObjects& st = statesFor(stateHash());
-    LOGI("[DX11][PROBE] bindStates apply rs={} ds={}", static_cast<void*>(st.rs.Get()),
          static_cast<void*>(st.ds.Get()));
     ctx->RSSetState(st.rs.Get());
     ctx->OMSetDepthStencilState(st.ds.Get(), static_cast<UINT>(_stencilRef));
