@@ -238,6 +238,11 @@ public:
         }
         return std::make_shared<DX11Pipeline>(_device.ptr, layout, dxShader);
     }
+    std::shared_ptr<IBuffer> createBuffer() override {
+        if (!_device.ptr) { LOGE("[DX11] createBuffer before init"); return std::make_shared<DXNullBuffer>(); }
+        LOGI("[DX11][PROBE] createBuffer");
+        return std::make_shared<DX11Buffer>(_device.ptr, _context.ptr);
+    }
     std::shared_ptr<ITexture2D> createTexture2D() override {
         if (!_device.ptr) { LOGE("[DX11] createTexture2D before init"); return std::make_shared<DXNullTexture2D>(); }
         LOGI("[DX11][PROBE] createTexture2D");
