@@ -1,4 +1,5 @@
 #include "rhi/dx11/DX11Backend.hpp"
+#include <cstdlib>
 #include "base/Log.hpp"
 #include <vector>
 
@@ -146,6 +147,12 @@ DX11Pipeline::StateObjects* DX11Pipeline::statesFor(uint32_t hash) {
     auto it = _stateCache.find(hash);
     if (it != _stateCache.end()) return &it->second;
 
+    // TEMP 调试二分（RHI_DX11_DBGMODE 位掩码：1=强制关剔除 2=强制关混合 4=强制关深度测试）
+    static const UINT dbgMode = [] {
+        const char* e = std::getenv("RHI_DX11_DBGMODE");
+        return e ? static_cast<UINT>(std::atoi(e)) : 0u;
+    }();
+
     StateObjects st{};
 
     // ---- 光栅化（对照 psoDesc.RasterizerState）----
@@ -158,7 +165,7 @@ DX11Pipeline::StateObjects* DX11Pipeline::statesFor(uint32_t hash) {
             [[fallthrough]];
         default:                 rs.FillMode = D3D11_FILL_SOLID; break;
     }
-    if (!_cullEnable) rs.CullMode = D3D11_CULL_NONE;
+    if (!_cullEnable || (dbgMode & 1u)) rs.CullMode = D3D11_CULL_NONE;
     else if (_cullFace == CullFace::Front) rs.CullMode = D3D11_CULL_FRONT;
     else {
         if (_cullFace == CullFace::FrontAndBack)
@@ -177,7 +184,7 @@ DX11Pipeline::StateObjects* DX11Pipeline::statesFor(uint32_t hash) {
     // ---- 深度/模板（对照 psoDesc.DepthStencilState）----
     // GL 语义对齐（同 VKPipeline）：测试关、写开时仍需写深度 → 强制开测试 + ALWAYS
     D3D11_DEPTH_STENCIL_DESC ds{};
-    ds.DepthEnable = (_depthTest || _depthMask) ? TRUE : FALSE;
+    ds.DepthEnable = ((_depthTest || _depthMask) && !(dbgMode & 4u)) ? TRUE : FALSE;
     ds.DepthWriteMask = _depthMask ? D3D11_DEPTH_WRITE_MASK_ALL : D3D11_DEPTH_WRITE_MASK_ZERO;
     ds.DepthFunc = _depthTest ? Dx11Compare(_depthFunc) : D3D11_COMPARISON_ALWAYS;
     ds.StencilEnable = _stencilTest ? TRUE : FALSE;
@@ -194,7 +201,7 @@ DX11Pipeline::StateObjects* DX11Pipeline::statesFor(uint32_t hash) {
     D3D11_BLEND_DESC bd{};
     bd.AlphaToCoverageEnable = FALSE;
     bd.IndependentBlendEnable = FALSE;
-    bd.RenderTarget[0].BlendEnable = _blend ? TRUE : FALSE;
+    bd.RenderTarget[0].BlendEnable = (_blend && !(dbgMode & 2u)) ? TRUE : FALSE;
     bd.RenderTarget[0].SrcBlend = Dx11Blend(_blendSrc);
     bd.RenderTarget[0].DestBlend = Dx11Blend(_blendDst);
     bd.RenderTarget[0].BlendOp = D3D11_BLEND_OP_ADD;
