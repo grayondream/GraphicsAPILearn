@@ -1513,7 +1513,10 @@ std::shared_ptr<IRenderer> createDX11Renderer() { return std::make_shared<DX11Re
 // 全量重设（即时上下文无状态泄漏）
 void DX11Renderer::renderImGuiDrawData(void* drawData) {
     auto* dd = static_cast<ImDrawData*>(drawData);
-    if (!dd || !_context.ptr || !_swapchain || !_swapchain->initialized()) return;
+    if (!dd || !_context.ptr || !_swapchain || !_swapchain->initialized()) {
+        LOGI("PROBE renderImGuiDrawData: early bail dd={} ctx={} sw={}", (void*)drawData, (void*)_context.ptr, (void*)_swapchain.get());
+        return;
+    }
     if (!_windowBound) {
         // 结束离屏态：OM 绑回窗口 backbuffer（不清屏）
         _renderTarget = nullptr;
@@ -1521,6 +1524,12 @@ void DX11Renderer::renderImGuiDrawData(void* drawData) {
         _activeOffscreen.reset();
         updateOffscreenYFlip();
         bindWindowTargets(false);
+    }
+    static int probeOnce = 0;
+    if (probeOnce++ == 0) {
+        LOGI("PROBE renderImGuiDrawData: CmdLists={} TotalVtx={} DisplaySize={}x{} wb={}",
+             dd->CmdListsCount, dd->TotalVtxCount, dd->DisplaySize.x, dd->DisplaySize.y,
+             _windowBound ? 1 : 0);
     }
     ImGui_ImplDX11_RenderDrawData(dd);
 }
