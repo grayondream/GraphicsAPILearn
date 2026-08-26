@@ -251,7 +251,13 @@ void BloomApp::renderFinal() {
 	renderer()->setPipeline(m_finalProgram);
 	renderer()->bindTexture(m_hdrFBO->colorTexture2D(0), 0);
 	renderer()->bindTexture(m_pingpongFBO[1]->colorTexture2D(0), 1);
-	rhi::SetUniform(m_ubo, "bloom", m_enableBloom);
+	// TEMP 分级隔离（RHI_BLOOM_STAGE）：1=关 bloom 看场景 pass；2=bloom 纹理占双槽看模糊链
+	static const int dbgStage = [] {
+		const char* e = std::getenv("RHI_BLOOM_STAGE");
+		return e ? std::atoi(e) : 0;
+	}();
+	if (dbgStage == 2) renderer()->bindTexture(m_pingpongFBO[1]->colorTexture2D(0), 0);
+	rhi::SetUniform(m_ubo, "bloom", (dbgStage == 1) ? false : m_enableBloom);
 	rhi::SetUniform(m_ubo, "exposure", m_expose);
 	m_uboBuffer->update(&m_ubo, sizeof(rhi::UniformBlock), 0);
 	renderQuad();
