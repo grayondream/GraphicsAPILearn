@@ -64,6 +64,11 @@ void dx11diag::DumpMessages(const char* context) {
 
 namespace {
 
+// 离屏 Y 翻转开关（mapWrite 的投影类矩阵补丁消费；DX11Renderer 维护）。
+// 语义见 DX11Buffer::mapWrite 内注释——本机 D3D11 驱动无视口符号翻转能力，
+// 离屏 RT 存储行序相对 GL FBO 垂直镜像，写入侧矩阵 y 行取反补偿。
+bool g_dx11OffscreenYFlip = false;
+
 // Null 桩仅作 init 前兜底（create()==false 使样例在加载期经 ExitIfFailed 干净
 // 退出，避免空指针解引用段错误）；真实工厂在 device 就绪后返回 DX 实现类。
 
@@ -261,14 +266,32 @@ private:
         // ——索引必须是 4j+2（DX12 曾在此犯 8+4j 错误污染相邻矩阵，勿改）。
         // 守卫 offset==0&&size>=1216：仅覆盖至 vec4Pool 起始的全块更新才补丁；
         // 部分更新不保证投影类矩阵完整，跳过（同 DX12 口径）。
+        //
+        // 离屏 Y 翻转（Task 4 真机实证）：本机 NVIDIA D3D11 驱动对视口 Height
+        // 符号不敏感（±h 光栅化逐位相同，负高度视口不可用），离屏 RT 存储行序
+        // 相对 GL FBO 整体垂直镜像——直接渲染会使深度图内容上下颠倒（Shadow_Map
+        // 全屏可视化呈 GL 镜像、Shadow 阴影查找错位）。补偿=写入侧把投影类矩阵
+        // y 行取反（y_clip'=-y_clip），存储方向随之翻转回 GL FBO 口径；采样侧
+        // projCoords.xy=ndc*0.5+0.5 公式不变即自洽。cube 逐面捕获同理逐面镜像
+        // 抵消。注意：镜像同时翻转屏幕空间 winding——凸封闭体+深度测试的深度图
+        // 不受剔除方向影响；当前阴影组样例安全（PLS 大世界盒该段显式关剔除），
+        // 后续含非凸/开几何的离屏 pass 需复核剔除朝向。
         if (offset == 0 && size >= 1216) {
             auto patch = [](unsigned char* m) {
                 float* f = reinterpret_cast<float*>(m);
                 for (int j = 0; j < 4; ++j) f[4 * j + 2] = 0.5f * (f[4 * j + 2] + f[4 * j + 3]);
             };
+            auto flipY = [](unsigned char* m) {
+                float* f = reinterpret_cast<float*>(m);
+                for (int j = 0; j < 4; ++j) f[4 * j + 1] = -f[4 * j + 1];
+            };
             unsigned char* base = static_cast<unsigned char*>(mapped.pData) + offset;
             patch(base);                                        // projection
             for (int i = 0; i < 7; ++i) patch(base + 320 + 64 * i);   // extraMat4[0..6]
+            if (g_dx11OffscreenYFlip) {
+                flipY(base);
+                for (int i = 0; i < 7; ++i) flipY(base + 320 + 64 * i);
+            }
         }
         _ctx->Unmap(_buffer.Get(), 0);
         return true;
@@ -336,6 +359,7 @@ public:
         _renderTarget = nullptr;
         _activeOffscreen.reset();
         _omPending = false;
+        updateOffscreenYFlip();
         bindWindowTargets(true);
     }
     void endFrame() override {}   // 即时上下文无帧命令收尾（brief 指定空实现）
@@ -372,6 +396,7 @@ public:
         if (!target) {
             _omPending = false;
             _activeOffscreen.reset();
+            updateOffscreenYFlip();
             if (_swapchain && _swapchain->initialized()) bindWindowTargets(true);
             return;
         }
@@ -380,6 +405,7 @@ public:
         // 后续物体全部画进窗口而非深度图（ShadowMap 丢球体/Shadow 丢立方体的根因）
         _windowBound = false;
         _omPending = true;
+        updateOffscreenYFlip();
     }
     void bindTexture(const std::shared_ptr<ITexture2D>& texture, unsigned int unit) override {
         BindTexture2D(texture.get(), unit);
@@ -437,6 +463,7 @@ public:
         _context->OMSetRenderTargets(0, nullptr, nullptr);
         _activeOffscreen.reset();
         _windowBound = false;
+        updateOffscreenYFlip();
 
         if (sTex->isMsaa()) {
             if (sTex->storageFormat() != dTex->storageFormat()) {
@@ -484,6 +511,7 @@ public:
         _activeOffscreen.reset();
         _omPending = false;
         _clearColors.clear();
+        updateOffscreenYFlip();
         _srvSlots.fill(nullptr);   // 纹理 SRV 槽位随上一样例销毁，先清防悬垂
         // 采样器换装复位白档（上一样例的黑边框绑定不得泄漏到下一样例）
         for (uint32_t i = 0; i < kSamplerSlots; ++i) _activeSamplers[i] = _samplers[i].Get();
@@ -517,6 +545,11 @@ private:
 
     // OMSetRenderTargets(窗口 RTV+DSV) → 默认状态 → 可选清屏 → 视口
     void bindWindowTargets(bool doClear);
+    // g_dx11OffscreenYFlip 同步：离屏挂起或激活时置 true（mapWrite 消费）
+    void updateOffscreenYFlip() {
+        g_dx11OffscreenYFlip = _activeOffscreen != nullptr ||
+                               (_omPending && _renderTarget != nullptr);
+    }
     void clearWindowTargets();
 
     // pending RT 变更落地（Task 4，DX12 flushOmTargets 等价物）：null=窗口路径；
@@ -846,6 +879,7 @@ void DX11Renderer::shutdown() {
     _activeOffscreen.reset();
     _omPending = false;
     _clearColors.clear();
+    updateOffscreenYFlip();
     _srvSlots.fill(nullptr);
     for (auto& s : _samplers) s.Reset();
     for (auto& s : _samplersBlack) s.Reset();
@@ -907,9 +941,11 @@ void DX11Renderer::flushOmTargets() {
         WarnOnce("offscreen render target invalid; routing to window");
         next = nullptr;
         _renderTarget = nullptr;
+        updateOffscreenYFlip();
     }
     if (!next) {
         _activeOffscreen.reset();
+        updateOffscreenYFlip();
         if (_swapchain && _swapchain->initialized()) bindWindowTargets(true);
         return;
     }
