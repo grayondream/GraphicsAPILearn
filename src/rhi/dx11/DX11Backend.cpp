@@ -1115,12 +1115,16 @@ bool DX11Renderer::Mipdown2D(DX11Texture2D* tex) {
             D3D11_MAPPED_SUBRESOURCE mp{};
             if (SUCCEEDED(_context->Map(stg.Get(), 0, D3D11_MAP_READ, 0, &mp)) && mp.pData) {
                 auto* base = static_cast<const uint8_t*>(mp.pData);
-                const int cy = static_cast<int>(sh) / 2, cx = static_cast<int>(sw) / 2;
-                auto* p = base + static_cast<size_t>(cy) * mp.RowPitch +
-                          static_cast<size_t>(cx) * 4;
-                LOGW("[DX11][MIPDBG] [{}] {} tex{}x{} mip{}({}x{}) center=({}, {}, {}, {})",
-                     tag, reinterpret_cast<void*>(res), rd0.Width, rd0.Height,
-                     sub, sw, sh, p[0], p[1], p[2], p[3]);
+                UINT nonzero = 0;
+                for (UINT y = 0; y < sh; ++y) {
+                    auto* row = base + static_cast<size_t>(y) * mp.RowPitch;
+                    for (UINT x = 0; x < sw; ++x) {
+                        auto* p = row + static_cast<size_t>(x) * 4;
+                        if (p[0] | p[1] | p[2] | p[3]) ++nonzero;
+                    }
+                }
+                LOGW("[DX11][MIPDBG] [{}] {} mip{}({}x{}) nonzero={}/{}", tag,
+                     reinterpret_cast<void*>(res), sub, sw, sh, nonzero, sw * sh);
                 _context->Unmap(stg.Get(), 0);
             }
         }
@@ -1133,22 +1137,23 @@ bool DX11Renderer::Mipdown2D(DX11Texture2D* tex) {
     } else {
         runPass();
     }
-    // TEMP 二分：RHI_DX11_MIPTEST=1 → 内建 GenerateMips 重生成后回读对照（RHI_DX11_MIPTEST=1）
+    // TEMP 二分：RHI_DX11_MIPTEST=1 → 先 GenerateMips 填链再跑手动 pass，判别
+    // "draw 未执行"(GENMIPS 值保留) vs "draw 执行但采样为空"(被覆写为零)
     static const bool mipTest = [] {
         const char* e = std::getenv("RHI_DX11_MIPTEST");
         return e && e[0] == '1';
     }();
     if (mipTest && mipDbg && dd.MipLevels > 1) {
-        D3D11_SHADER_RESOURCE_VIEW_DESC fsd{};
-        fsd.Format = fmt;
-        fsd.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
-        fsd.Texture2D.MostDetailedMip = 0;
-        fsd.Texture2D.MipLevels = dd.MipLevels;
-        Dx11ComPtr<ID3D11ShaderResourceView> full;
-        if (SUCCEEDED(_device->CreateShaderResourceView(res, &fsd, &full)) && full.Get()) {
+        ID3D11ShaderResourceView* full = tex->srv();
+        if (full) {
             _context->GenerateMips(full.Get());
             _context->Flush();
-            for (UINT k = 1; k < std::min<UINT>(dd.MipLevels, 5u); ++k) readMip(k, "GENMIPS");
+            readMip(1, "GM-FILLED");
+            mw = static_cast<int>(dd.Width);
+            mh = static_cast<int>(dd.Height);
+            runPass();
+            _context->Flush();
+            readMip(1, "AFTER-PASS");
         }
     }
     ID3D11ShaderResourceView* nullSRV = nullptr;   // 清 t0 残绑（视图随 ComPtr 析构）
