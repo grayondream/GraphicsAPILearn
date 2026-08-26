@@ -805,13 +805,13 @@ void DX11Renderer::InstallSamplerFor(const TextureDesc& params, const float bc[4
         case TextureWrap::ClampToBorder: wi = 2; break;
     }
     // s6=镜像树 gSamplerDefault 固定消费位：非 border wrap 恒白表；border wrap 按
-    // 白/黑精确选装（黑档仅 border 语义有意义）
+    // 白/黑精确选装（黑档仅 border 语义有意义）。静默换装（逐帧交替绑定属常态，
+    // Bloom wood/bricks 每 draw 重绑；border 色变更罕见才记日志）
     const UINT reg6 = 6;
     ID3D11SamplerState* want6 =
         (wi == 2 && black) ? _samplersBlack[static_cast<size_t>(fi)].Get()
                            : _samplers[static_cast<size_t>(fi * 3 + wi)].Get();
     if (_activeSamplers[reg6] != want6) {
-        LOGI("[DX11] sampler s6 -> f{}w{}{}", fi, wi, black ? "+black" : "");
         _activeSamplers[reg6] = want6;
     }
     if (wi == 2) {
