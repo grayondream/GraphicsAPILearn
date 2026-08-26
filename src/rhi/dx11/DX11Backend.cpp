@@ -375,6 +375,10 @@ public:
             if (_swapchain && _swapchain->initialized()) bindWindowTargets(true);
             return;
         }
+        // 离屏激活即脱离窗口绑定：prepareDraw 的"窗口自愈重绑"分支以 _windowBound
+        // 为准绳——若不置 false，pass 内第二个 draw 起会把 swapchain 重绑回 OM，
+        // 后续物体全部画进窗口而非深度图（ShadowMap 丢球体/Shadow 丢立方体的根因）
+        _windowBound = false;
         _omPending = true;
     }
     void bindTexture(const std::shared_ptr<ITexture2D>& texture, unsigned int unit) override {
@@ -580,7 +584,6 @@ private:
         std::array<float, 4> color{{0.0f, 0.0f, 0.0f, 1.0f}};
     };
     std::map<void*, ClearColorEntry> _clearColors{};
-    ID3D11Texture2D* _lastDepthRaw{nullptr};       // TEMP 探针：最近离屏 RT 深度纹理（弱引用）
 
     // RHI_DUMP_FRAME 帧导出（一次性）
     bool _dumpDone{false};
@@ -861,32 +864,6 @@ void DX11Renderer::shutdown() {
 bool DX11Renderer::present() {
     if (!_swapchain || !_swapchain->initialized()) return false;
     dumpFrame();   // 对齐 VK/DX12 口径：帧内容已入 backbuffer、Present 前
-    // TEMP 探针（RHI_DX11_DEPTHROW=帧号）：回读最近离屏 RT 深度纹理指定行原始值
-    static const int depthRowFrame = []{ const char* e = std::getenv("RHI_DX11_DEPTHROW"); return e ? std::atoi(e) : -1; }();
-    static int frameIdx = 0;
-    if (depthRowFrame >= 0 && frameIdx++ == depthRowFrame && _lastDepthRaw) {
-        D3D11_TEXTURE2D_DESC dd{};
-        _lastDepthRaw->GetDesc(&dd);
-        D3D11_TEXTURE2D_DESC sd = dd;
-        sd.Usage = D3D11_USAGE_STAGING; sd.BindFlags = 0;
-        sd.CPUAccessFlags = D3D11_CPU_ACCESS_READ; sd.MipLevels = 1; sd.ArraySize = 1;
-        sd.MiscFlags = 0; sd.SampleDesc.Count = 1;
-        Dx11ComPtr<ID3D11Texture2D> staging;
-        if (SUCCEEDED(_device->CreateTexture2D(&sd, nullptr, &staging)) && staging.Get()) {
-            _context->CopyResource(staging.Get(), _lastDepthRaw);
-            D3D11_MAPPED_SUBRESOURCE m{};
-            if (SUCCEEDED(_context->Map(staging.Get(), 0, D3D11_MAP_READ, 0, &m))) {
-                const int H = static_cast<int>(dd.Height), W = static_cast<int>(dd.Width);
-                const auto* base = static_cast<const uint8_t*>(m.pData);
-                for (int r = (H/2)-300; r < (H/2)+301; r += 12) {
-                    const auto* rowF = reinterpret_cast<const float*>(base + static_cast<size_t>(r) * m.RowPitch);
-                    LOGW("[DEPTH] row {:4d}: c{:4d}={:.4f} c{:3d}={:.4f} c{:4d}={:.4f}",
-                         r, W / 2, rowF[W / 2], W / 4, rowF[W / 4], 3 * W / 4, rowF[3 * W / 4]);
-                }
-                _context->Unmap(staging.Get(), 0);
-            }
-        }
-    }
     return _swapchain->present();   // Present(1,0)
 }
 
@@ -937,9 +914,7 @@ void DX11Renderer::flushOmTargets() {
         return;
     }
     _activeOffscreen = next;
-    if (auto* dt = next->depthTexture2D()) {
-        _lastDepthRaw = static_cast<ID3D11Texture2D*>(dt->handle());   // TEMP 探针
-    }
+    _windowBound = false;   // 离屏态：禁用 prepareDraw 的窗口自愈重绑分支
     ID3D11RenderTargetView* rtvs[8] = {};
     const UINT n = next->FillRtvs(rtvs, 8);   // 纯深度 pass（点光阴影面）n=0 合法
     ID3D11DepthStencilView* dsv = next->ActiveDsv();
@@ -963,13 +938,14 @@ std::array<float, 4> DX11Renderer::clearColorFor(void* key) {
 // 朝向约定（终验教训同 DX12）：D3D NDC y-up，swapchain 直绘用正高度视口即与 GL
 // 呈现朝向一致。【历史】VK 式负高度翻转在 D3D 是错的——非 VK(y-down) 不需要，
 // 会致 Triangle/Rect 等直绘图元整体 Y 镜像。
-// 离屏 RT 分支同样正高度（本任务真机实证，推翻自 DX12 继承的负高度结论）：
-// GL FBO 的纹理行 0 = NDC y=-1；D3D 正高度视口把 NDC -1 映射到资源行 0——
-// 两侧行序一致，纹理 uv 语义逐位对齐（阴影 projCoords.xy=ndc*0.5+0.5 查找、
-// 后处理 quad 链、cubemap 逐面捕获均无需翻转补偿）。【实证】负高度 {y+h,-h}
-// 曾使 Shadow_Map 全屏深度可视化输出恰为 GL 的垂直镜像（vflip 后 mean=0.25）、
-// Shadow 地板阴影 blob 错位致 diff 超门限；改正高度后两者归位。
-// 附带收益：离屏 pass 的屏幕空间 winding 不再被视口翻转，剔除方向与 GL 一致。
+// 离屏 RT 分支同样正高度：本机驱动对视口 Height 的符号不敏感（负/正实测产出
+// 逐位相同），行序由光栅化固定约定决定；深度图/后处理 RT 的 uv 查找语义与
+// GL FBO 的对齐由样例侧 projCoords=ndc*0.5+0.5 公式自洽，三端像素比对通过。
+// 【真机实证记录】Shadow_Map 曾呈 GL 垂直镜像、Shadow 地板阴影错位，根因并非
+// 视口方向而是 _windowBound 未随离屏激活翻转——pass 内第二个 draw 起被
+// prepareDraw 自愈分支重绑回 swapchain，深度图只收到每 pass 首个 draw
+// （plane），后续物体（sphere/cubes）全画进了窗口。修复=setRenderTarget/非空
+// 与 flushOmTargets 离屏分支都置 _windowBound=false。
 void DX11Renderer::applyViewport() {
     if (!_context.ptr) return;
     int fbW = _swapchain ? _swapchain->width() : 0;
@@ -990,17 +966,7 @@ void DX11Renderer::applyViewport() {
                         ? static_cast<float>(_viewport.height)
                         : static_cast<float>(fbH);
     const D3D11_VIEWPORT vp{x, y, w, h, 0.0f, 1.0f};
-    static int vpLog = []{ const char* e = std::getenv("RHI_DX11_VPLOG"); return e ? 1 : 0; }();
-    if (vpLog) LOGW("[VP] off={} x={:.1f} y={:.1f} w={:.1f} h={:.1f} viewportSet={}",
-                    offscreen, x, y, w, h, _viewportSet);
     _context->RSSetViewports(1, &vp);
-    if (vpLog && offscreen) {
-        D3D11_VIEWPORT back{};
-        UINT n = 0;
-        _context->RSGetViewports(&n, &back);
-        LOGW("[VP] readback n={} x={:.1f} y={:.1f} w={:.1f} h={:.1f}", n, back.TopLeftX,
-             back.TopLeftY, back.Width, back.Height);
-    }
 }
 
 // 公共绘制前奏（Task 2.2 draw 路径全量）：每次 draw 全量重设 OM 目标/状态对象/
