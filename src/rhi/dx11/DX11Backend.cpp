@@ -1146,7 +1146,7 @@ bool DX11Renderer::Mipdown2D(DX11Texture2D* tex) {
     if (mipTest && mipDbg && dd.MipLevels > 1) {
         ID3D11ShaderResourceView* full = tex->srv();
         if (full) {
-            _context->GenerateMips(full.Get());
+            _context->GenerateMips(full);
             _context->Flush();
             readMip(1, "GM-FILLED");
             mw = static_cast<int>(dd.Width);
