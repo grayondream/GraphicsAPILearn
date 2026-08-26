@@ -164,6 +164,11 @@ if(${ENABLE_DX11})
     if(WIN32)
         target_link_libraries(${PROJECT_NAME} d3d11.lib dxgi.lib d3dcompiler.lib)
     endif()
+    # DX11Renderer 需要 imgui_impl_dx11.h（imgui DX11 后端头，位于 3party/imgui/DX11）。
+    # 该目录由 3party/imgui 子 CMake 的 include_directories 声明，但因 add_subdirectory
+    # 隔离不传播到 src 的 renderLearn target（imgui_impl_dx11.cpp 靠同目录引号 include
+    # 编译），故这里对本 target 显式添加（同 Vulkan/DX12 块的做法）。
+    target_include_directories(${PROJECT_NAME} PRIVATE "${RENDER_3PARTY_PATH}/imgui/DX11")
     # ---- fxc 构建目标（仿 dx_shaders；产物 build/res/DX11/<dir>/<name>.<stage>.fxc，
     #      与 DX11Shader::LocateFxc 的查找路径约定一致。SM5.0 目标只能用 SDK 自带
     #      fxc.exe 编译，dxc 不支持 5_0 profile）----

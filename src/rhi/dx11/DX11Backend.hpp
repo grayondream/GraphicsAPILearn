@@ -26,7 +26,8 @@ struct DX11ImGuiInitInfo {
 
 std::shared_ptr<IRenderer> createDX11Renderer();
 
-// ImGui overlay 初始化信息桥（Task 6 消费）：本任务恒返回 false
+// ImGui overlay 初始化信息桥（Task 6）：下转型读取 device/context 句柄供
+// ImGui_ImplDX11_Init 使用；renderer 非 DX11 或设备未就绪时返回 false
 bool GetDX11ImGuiInitInfo(const std::shared_ptr<IRenderer>& renderer, DX11ImGuiInitInfo& out);
 
 // ---- 交换链（实现于 DX11Swapchain.cpp）----

@@ -6,7 +6,7 @@
 #include "app/Samples/ImGuiOpenglWindow.hpp"
 #include "app/Samples/ImGuiVulkanWindow.hpp"
 #include "app/Samples/ImGuiDirectx12Window.hpp"
-#include "app/Samples/ImGuiContextWindow.hpp"
+#include "app/Samples/ImGuiDirectx11Window.hpp"
 #include "rhi/gl/GLBackend.hpp"
 #include "rhi/gl/GLFWSurface.hpp"
 #include "rhi/core/Common.hpp"
@@ -101,13 +101,13 @@ bool AppHost::rebuildBackend(const GLFWWindowProperties& props) {
         if (!_renderer || !_renderer->init(surface)) { LOGE("Failed to init DX11 renderer"); return false; }
         _renderer->setViewport(rhi::Viewport{0, 0, static_cast<int>(props.width), static_cast<int>(props.height)});
         _renderer->setPipeline(nullptr);
-        // ImGui 渲染后端留空（Task 6 接入 ImGuiDirectx11Window），但样例 draw 普遍
-        // 直接调 ImGui::Begin 等核心 API——无 context 时 GImGui 为 NULL 必然段错误
-        //（Cube/BlinnPhong/Diffuse 实测 rc=5）。按 VK 先例挂 ImGuiContextWindow：
-        // 仅建 context+每帧 NewFrame，DrawData 丢弃，画面暂不含覆盖层。
-        auto imguiCtx = std::make_unique<ImGuiContextWindow>();
-        imguiCtx->init(m_window->getNativeGLFWWindow());
-        m_imguiWindow = std::move(imguiCtx);
+        // Task 6：真 overlay（对照 DX12 分支）——GetDX11ImGuiInitInfo 桥取
+        // device/context，总控条可见可操作；此前为 ImGuiContextWindow 兜底
+        // （仅建 context 不渲染 DrawData）
+        auto imguiDx11 = std::make_unique<ImGuiDirectx11Window>();
+        imguiDx11->setRenderer(_renderer);
+        imguiDx11->init(m_window->getNativeGLFWwindow());
+        m_imguiWindow = std::move(imguiDx11);
         hookWindowCallbacks();
         return reloadSample();
     }
