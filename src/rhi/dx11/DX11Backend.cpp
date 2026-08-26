@@ -1088,6 +1088,41 @@ bool DX11Renderer::Mipdown2D(DX11Texture2D* tex) {
         _context->PSSetShaderResources(0, 1, &srvRaw);
         _context->Draw(3, 0);   // InstanceCount≥1：单 Draw 全屏三角形即一次实例
     }
+    // TEMP MIPDBG：生成后立即回读 mip1 中心 4 像素（RHI_DX11_MIPDBG=1）
+    static const bool mipDbg = [] {
+        const char* e = std::getenv("RHI_DX11_MIPDBG");
+        return e && e[0] == '1';
+    }();
+    if (mipDbg) {
+        D3D11_TEXTURE2D_DESC rd0{};
+        res->GetDesc(&rd0);
+        D3D11_TEXTURE2D_DESC sd2 = rd0;
+        sd2.MipLevels = 1;
+        sd2.Usage = D3D11_USAGE_STAGING;
+        sd2.BindFlags = 0;
+        sd2.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
+        sd2.MiscFlags = 0;
+        Dx11ComPtr<ID3D11Texture2D> stg;
+        if (SUCCEEDED(_device->CreateTexture2D(&sd2, nullptr, &stg)) && stg.Get()) {
+            _context->CopySubresourceRegion(stg.Get(), 0, 0, 0, 0, res, 1, nullptr);
+            D3D11_MAPPED_SUBRESOURCE mp{};
+            if (SUCCEEDED(_context->Map(stg.Get(), 0, D3D11_MAP_READ, 0, &mp)) && mp.pData) {
+                const int mw2 = std::max(1, static_cast<int>(rd0.Width) / 2);
+                const int mh2 = std::max(1, static_cast<int>(rd0.Height) / 2);
+                auto* base = static_cast<const uint8_t*>(mp.pData);
+                const int cy = mh2 / 2, cx = mw2 / 2;
+                auto px = [&](int dx, int dy) {
+                    auto* p = base + static_cast<size_t>(cy + dy) * mp.RowPitch +
+                              static_cast<size_t>(cx + dx) * 4;
+                    LOGW("[DX11][MIPDBG] {} tex{}x{} mip1 c({},{})=({}, {}, {}, {})",
+                         reinterpret_cast<void*>(res), rd0.Width, rd0.Height, dx, dy,
+                         p[0], p[1], p[2], p[3]);
+                };
+                px(0, 0); px(-cx / 2, -mh2 / 4); px(cx / 4, 0); px(0, mh2 / 4);
+                _context->Unmap(stg.Get(), 0);
+            }
+        }
+    }
     ID3D11ShaderResourceView* nullSRV = nullptr;   // 清 t0 残绑（视图随 ComPtr 析构）
     _context->PSSetShaderResources(0, 1, &nullSRV);
     return true;
