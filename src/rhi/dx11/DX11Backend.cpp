@@ -878,7 +878,7 @@ bool DX11Renderer::present() {
             if (SUCCEEDED(_context->Map(staging.Get(), 0, D3D11_MAP_READ, 0, &m))) {
                 const int H = static_cast<int>(dd.Height), W = static_cast<int>(dd.Width);
                 const auto* base = static_cast<const uint8_t*>(m.pData);
-                for (int r : {0, H / 4, H / 2, 3 * H / 4, H - 1}) {
+                for (int r = (H/2)-300; r < (H/2)+301; r += 12) {
                     const auto* rowF = reinterpret_cast<const float*>(base + static_cast<size_t>(r) * m.RowPitch);
                     LOGW("[DEPTH] row {:4d}: c{:4d}={:.4f} c{:3d}={:.4f} c{:4d}={:.4f}",
                          r, W / 2, rowF[W / 2], W / 4, rowF[W / 4], 3 * W / 4, rowF[3 * W / 4]);
