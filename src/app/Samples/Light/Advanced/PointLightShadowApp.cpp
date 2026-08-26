@@ -163,8 +163,10 @@ void PointLightShadowApp::renderScene2FrameBuffer(std::shared_ptr<rhi::IPipeline
 
 void PointLightShadowApp::renderScene2Screen(std::shared_ptr<rhi::IPipeline>& program, const glm::vec3& lightPos) {
     renderer()->setPipeline(program);
-    renderer()->bindTexture(_texture, 0);
+    // 绑定顺序契约：同 ShadowApp——ClampToBorder 深度 cubemap 先绑，
+    // 平铺 wood（Repeat）最后换装 s6，保证本 draw 采样档位正确。
     renderer()->bindTexture(_shadowDepthMap, 1);
+    renderer()->bindTexture(_texture, 0);
     const auto projection = glm::perspective(glm::radians(_camera.zoom()), aspectRatio(), 0.1f, 100.0f);
     const auto view = _camera.getViewMatrix();
     rhi::SetUniform(_ubo, "projection", projection);

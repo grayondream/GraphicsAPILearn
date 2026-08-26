@@ -171,8 +171,11 @@ void ShadowApp::renderScene2FrameBuffer(const glm::mat4& lightSpaceMatrix, const
 
 void ShadowApp::renderScene2Screen(const glm::mat4& lightSpaceMatrix, const glm::vec3& lightPos) {
     renderer()->setPipeline(_shadowProgram);
-    renderer()->bindTexture(_texture, 0);
+    // 绑定顺序契约：DX11 采样器为 s# 寄存器静态绑定，s6 档位随最后一次 bindTexture
+    // 换装——ClampToBorder 深度图须先绑，让平铺 wood（Repeat）最后换装 s6，
+    // 否则地板 UV0..5 被钳边拉伸（GL/VK 采样器按纹理实例、与顺序无关不受影响）。
     renderer()->bindTexture(_shadowDepthMapFbo->depthTexture2D(), 1);
+    renderer()->bindTexture(_texture, 0);
     const auto projection = glm::perspective(glm::radians(_camera.zoom()), aspectRatio(), 0.1f, 100.0f);
     const auto view = _camera.getViewMatrix();
     rhi::SetUniform(_ubo, "projection", projection);
