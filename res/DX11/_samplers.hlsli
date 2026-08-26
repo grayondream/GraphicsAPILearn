@@ -3,7 +3,10 @@
 //   filter: Linear=0 / Nearest=1 / LinearMipLinear=2
 //   wrap:   Repeat=0 / ClampToEdge=1 / ClampToBorder=2（borderColor 统一白）
 // 各 shader 按需在此取别名（编译期固定寄存器 s#，运行期经 PSSetSamplers 槽位绑定）。
-// gSamplerDefault(s6) = LinearMipLinear+Repeat，即 RhiImage::Load2D 的默认组合。
+// gSamplerDefault(s6) = LinearMipLinear+Repeat 静态初值；运行期 Renderer 在每次
+// bindTexture 时按该纹理的 (minFilter, wrapS, borderColor) 精确换装本寄存器
+// （GL"采样器状态跟纹理走"语义；Bloom 地板 Clamp 纹理曾被静态 Repeat 平铺的教训）。
+// 故 shader 侧常规采样统一写 gSamplerDefault 即可，勿按纹理 wrap 挑别名。
 #ifndef DX11_SAMPLERS_HLSLI
 #define DX11_SAMPLERS_HLSLI
 

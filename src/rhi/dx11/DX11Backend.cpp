@@ -536,7 +536,7 @@ private:
     // ClampToBorder 纹理按 borderColor 白/黑精确选装对应寄存器位的采样器状态
     // （D3D11 采样器状态不可变+HLSL s# 寄存器静态绑定，同 draw 同组合异色仍不可
     // 表达——与 DX12 动态采样器堆的已记录限制一致）；非白/黑 WARN 回退白
-    void InstallBorderColorSampler(const TextureDesc& params, const float bc[4]);
+    void InstallSamplerFor(const TextureDesc& params, const float bc[4]);
 
     // OMSetRenderTargets(窗口 RTV+DSV) → 默认状态 → 可选清屏 → 视口
     void bindWindowTargets(bool doClear);
@@ -775,18 +775,22 @@ bool DX11Renderer::createSamplers() {
     return true;
 }
 
-// ClampToBorder 纹理按 borderColor 白/黑精确换装对应寄存器位的采样器状态。
-// 寄存器编号沿用 f*3+w 约定（w 取 wrapS，同 DX12 TouchHeapSampler 口径）；
-// 换装持久生效至下一次异色绑定或 resetRenderState 复位白档——同一 draw 内同组合
-// 异色不可表达（s# 寄存器静态绑定，与 DX12 动态采样器堆的已记录限制一致）。
-void DX11Renderer::InstallBorderColorSampler(const TextureDesc& params, const float bc[4]) {
+// 按纹理参数换装采样器档位。镜像树 28 个 shader 的常规采样统一消费
+// gSamplerDefault(s6)（编译期固定寄存器），而 GL 语义是采样器状态跟纹理走——
+// 故每次 bindTexture 把该纹理 (minFilter, wrapS, borderColor) 的精确档位装入 s6，
+// Repeat/ClampToEdge/Nearest 由此按纹理生效（Bloom 地板 bricks2 Clamp+UV0..5 曾被
+// 静态 s6=Repeat 平铺，GL↔DX 底部 1/3 全差即此；DX12 同病另案）。
+// ClampToBorder 另按 borderColor 白/黑换装 s2/s5/s8 寄存器位（供显式 border 别名
+// 消费者；黑档不再静默得白，评审 Important-1 语义保留）。其余色 WARN 回退白。
+// 换装持久生效至下一次绑定或 resetRenderState 复位静态表——同一 draw 内多纹理
+// 异 wrap/异色不可表达（s# 寄存器静态绑定，与 DX12 动态采样器堆的已记录限制同源）。
+void DX11Renderer::InstallSamplerFor(const TextureDesc& params, const float bc[4]) {
     static const std::array<float, 4> kWhite{{1.0f, 1.0f, 1.0f, 1.0f}};
     static const std::array<float, 4> kBlack{{0.0f, 0.0f, 0.0f, 1.0f}};
     const bool white = std::memcmp(bc, kWhite.data(), sizeof(float) * 4) == 0;
     const bool black = std::memcmp(bc, kBlack.data(), sizeof(float) * 4) == 0;
     if (!white && !black) {
         WarnOnce("borderColor not white/black unsupported by static sampler table; keeping current");
-        return;   // 保持当前档位不动（初始预填语义为白）
     }
     int fi = 0;
     switch (params.minFilter) {
@@ -794,12 +798,29 @@ void DX11Renderer::InstallBorderColorSampler(const TextureDesc& params, const fl
         case TextureFilter::Nearest:         fi = 1; break;
         case TextureFilter::LinearMipLinear: fi = 2; break;
     }
-    const UINT reg = static_cast<UINT>(fi * 3 + 2);   // w=2 即 border 组合位
-    ID3D11SamplerState* want =
-        black ? _samplersBlack[static_cast<size_t>(fi)].Get() : _samplers[reg].Get();
-    if (_activeSamplers[reg] != want) {
-        LOGI("[DX11] border sampler s{} -> {}", reg, black ? "black" : "white");
-        _activeSamplers[reg] = want;
+    int wi = 0;
+    switch (params.wrapS) {
+        case TextureWrap::Repeat:        wi = 0; break;
+        case TextureWrap::ClampToEdge:   wi = 1; break;
+        case TextureWrap::ClampToBorder: wi = 2; break;
+    }
+    // s6=镜像树 gSamplerDefault 固定消费位：非 border wrap 恒白表；border wrap 按
+    // 白/黑精确选装（黑档仅 border 语义有意义）
+    const UINT reg6 = 6;
+    ID3D11SamplerState* want6 =
+        (wi == 2 && black) ? _samplersBlack[static_cast<size_t>(fi)].Get()
+                           : _samplers[static_cast<size_t>(fi * 3 + wi)].Get();
+    if (_activeSamplers[reg6] != want6) {
+        LOGI("[DX11] sampler s6 -> f{}w{}{}", fi, wi, black ? "+black" : "");
+        _activeSamplers[reg6] = want6;
+    }
+    if (wi == 2) {
+        const UINT reg = static_cast<UINT>(fi * 3 + 2);   // w=2 即 border 组合位
+        ID3D11SamplerState* want =
+            black ? _samplersBlack[static_cast<size_t>(fi)].Get() : _samplers[reg].Get();
+        if (_activeSamplers[reg] != want) {
+            _activeSamplers[reg] = want;
+        }
     }
 }
 
@@ -820,14 +841,10 @@ void DX11Renderer::BindTexture2D(rhi::ITexture2D* texture, unsigned int unit) {
         return;
     }
     _srvSlots[unit + 1] = tex->srv();
-    // ClampToBorder 纹理按 borderColor 白/黑精确选装采样器档位（评审 Important-1：
-    // 黑色不再静默得白边框）；其余色在 Install 内 WARN 回退白
+    // 采样器按纹理参数换装 s6（GL"状态跟纹理走"语义；含 ClampToBorder 的白/黑
+    // 边框精确选装——黑色不再静默得白边框，评审 Important-1 语义保留）
     const TextureDesc& params = tex->samplerParams();
-    if (params.wrapS == TextureWrap::ClampToBorder ||
-        params.wrapT == TextureWrap::ClampToBorder ||
-        params.wrapR == TextureWrap::ClampToBorder) {
-        InstallBorderColorSampler(params, tex->borderColor().data());
-    }
+    InstallSamplerFor(params, tex->borderColor().data());
 }
 
 // cubemap/3D 纹理 SRV 写共享槽位 unit+1（TEXTURECUBE/TEXTURE3D 视图由纹理对象
@@ -845,6 +862,10 @@ void DX11Renderer::BindTexture3D(rhi::ITexture3D* texture, unsigned int unit) {
         return;
     }
     _srvSlots[unit + 1] = tex->srv();
+    // cubemap 同样按纹理参数换装 s6（SkyBox 组等 gSamplerDefault 消费者；
+    // Texture3D 无 border 色概念，恒白档语义）
+    static const std::array<float, 4> kWhite{{1.0f, 1.0f, 1.0f, 1.0f}};
+    InstallSamplerFor(tex->samplerParams(), kWhite.data());
 }
 
 void DX11Renderer::createDefaultStates() {
