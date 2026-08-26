@@ -106,7 +106,7 @@ bool AppHost::rebuildBackend(const GLFWWindowProperties& props) {
         // （仅建 context 不渲染 DrawData）
         auto imguiDx11 = std::make_unique<ImGuiDirectx11Window>();
         imguiDx11->setRenderer(_renderer);
-        imguiDx11->init(m_window->getNativeGLFWwindow());
+        imguiDx11->init(m_window->getNativeGLFWWindow());
         m_imguiWindow = std::move(imguiDx11);
         hookWindowCallbacks();
         return reloadSample();
