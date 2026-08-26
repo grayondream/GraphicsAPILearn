@@ -247,8 +247,15 @@ bool DX11Texture2D::uploadAndGenMips(const TextureDesc&, const TextureDataView2D
     _context->CopySubresourceRegion(_texture.Get(), 0, 0, 0, 0, staging.Get(), 0, &box);
 
     if (_mipLevels > 1) {
-        // D3D11 内建 mip 链生成（DX12 无此 API，手动 blit 是其特有限制）
-        _context->GenerateMips(_srv.Get());
+        // Task 5：注入的 blit 能力走 Gather 角点盒平均降采样（mipdown.frag，对齐
+        // GL generateMipmap/vkCmdBlitImage 的 2:1 盒式语义）；能力缺失回退 D3D11
+        // 内建 GenerateMips 兜底（语义近似但驱动相关）
+        if (_blitCtx && _blitCtx->Mipdown2D(this)) {
+            // 手动降采样完成
+        } else {
+            LOGW("[DX11] mipdown blit unavailable; falling back to GenerateMips");
+            _context->GenerateMips(_srv.Get());
+        }
     }
     return true;
 }

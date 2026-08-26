@@ -205,11 +205,12 @@ bool DX11Texture3D::initCube(const TextureDesc& desc, const TextureDataView2D* f
                                         0, 0, 0, staging.Get(), 0, nullptr);
     }
 
-    if (_mipLevels > 1) {
-        // D3D11 内建 mip 链生成（TEXTURECUBE SRV 全链一次完成）
-        _context->GenerateMips(_srv.Get());
-    }
+    // Task 5：先置位再生成（genCubeMipmaps 以 valid 为门禁，DX12 同教训）——
+    // 内部经注入的 blit 能力逐面 Gather 盒平均降采样，能力缺失回退 GenerateMips
     _valid = true;
+    if (_mipLevels > 1) {
+        genCubeMipmaps();
+    }
     return true;
 }
 
@@ -325,6 +326,13 @@ void DX11Texture3D::genCubeMipmaps() {
         _mipLevels = 1;
         return;
     }
+    // Task 5：注入的 blit 能力走逐面 Gather 盒平均降采样（mipdown_array.frag，
+    // 源视图 TEXTURE2DARRAY 单面单级——对齐 DX12 口径）；能力缺失回退 D3D11
+    // 内建 GenerateMips 兜底（TEXTURECUBE SRV 全链一次完成）
+    if (_blitCtx && _blitCtx->MipdownCube(this)) {
+        return;
+    }
+    LOGW("[DX11] mipdown blit unavailable; falling back to GenerateMips");
     _context->GenerateMips(_srv.Get());
 }
 

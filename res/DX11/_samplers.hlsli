@@ -20,5 +20,10 @@ SamplerState gSamplerMipLinearBorder : register(s8); // f=2 w=2
 // Nearest+LESS_EQUAL+ClampToBorder(白)）。
 // SampleCmp 返回 ref <= stored ? 1 : 0（lit=1）；GLSL 手动比较的 shadow 取 1-lit。
 SamplerComparisonState gShadowCompare : register(s9);
+// s10/s11：SkyBox 组 LOD 对齐采样器（对照 res/DX12 同名别名；寄存器编号一致）。
+// bias 数值由 Renderer 侧预建采样器给出——DX11 初值 0（brief 指定预留），若与 GL
+// 参照 diff 超标再校准并记录数值（对照 DX12 NVIDIA 实测 0.28/0.85）。
+SamplerState gSamplerCubeLodAlign  : register(s10); // f=2 w=0 + MipLODBias（Renderer 定）
+SamplerState gSamplerTex2DLodAlign : register(s11); // f=2 w=0 + MipLODBias（Renderer 定）
 
 #endif
