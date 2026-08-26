@@ -933,11 +933,13 @@ std::array<float, 4> DX11Renderer::clearColorFor(void* key) {
 // 朝向约定（终验教训同 DX12）：D3D NDC y-up，swapchain 直绘用正高度视口即与 GL
 // 呈现朝向一致。【历史】VK 式负高度翻转在 D3D 是错的——非 VK(y-down) 不需要，
 // 会致 Triangle/Rect 等直绘图元整体 Y 镜像。
-// 离屏 RT 分支（DX12 终验结论，2bc80bf/fef0c12）：负高度视口 {x, y+h, w, -h} 使
-// RT 行 0 ↔ y_ndc=-1，与 GL FBO/VK offscreen 的纹理行序一致——阴影深度 uv=
-// ndc*0.5+0.5 查找自洽、后处理链每 pass 行翻转次数与 cubemap 捕获方向三端对齐。
-// 已知残留（同 DX12 记录）：负高度翻转屏幕空间 winding，离屏 pass 中启用的剔除
-// 方向随之反转；对当前阴影组视觉无实质影响，与 DX12 保持一致不另作补偿。
+// 离屏 RT 分支同样正高度（本任务真机实证，推翻自 DX12 继承的负高度结论）：
+// GL FBO 的纹理行 0 = NDC y=-1；D3D 正高度视口把 NDC -1 映射到资源行 0——
+// 两侧行序一致，纹理 uv 语义逐位对齐（阴影 projCoords.xy=ndc*0.5+0.5 查找、
+// 后处理 quad 链、cubemap 逐面捕获均无需翻转补偿）。【实证】负高度 {y+h,-h}
+// 曾使 Shadow_Map 全屏深度可视化输出恰为 GL 的垂直镜像（vflip 后 mean=0.25）、
+// Shadow 地板阴影 blob 错位致 diff 超门限；改正高度后两者归位。
+// 附带收益：离屏 pass 的屏幕空间 winding 不再被视口翻转，剔除方向与 GL 一致。
 void DX11Renderer::applyViewport() {
     if (!_context.ptr) return;
     int fbW = _swapchain ? _swapchain->width() : 0;
@@ -957,8 +959,7 @@ void DX11Renderer::applyViewport() {
     const float h = (_viewportSet && _viewport.height > 0)
                         ? static_cast<float>(_viewport.height)
                         : static_cast<float>(fbH);
-    const D3D11_VIEWPORT vp = offscreen ? D3D11_VIEWPORT{x, y + h, w, -h, 0.0f, 1.0f}
-                                        : D3D11_VIEWPORT{x, y, w, h, 0.0f, 1.0f};
+    const D3D11_VIEWPORT vp{x, y, w, h, 0.0f, 1.0f};
     _context->RSSetViewports(1, &vp);
 }
 
