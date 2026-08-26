@@ -57,6 +57,9 @@ public:
     // 调用方跳过本帧（后续帧自动重试）
     ID3D11RenderTargetView* acquireRtv(uint32_t index);
     ID3D11DepthStencilView* dsv();
+    // 窗口深度纹理资源（blitFramebuffer 的 Depth→窗口路径消费；CopyResource 需
+    // 与离屏深度同格式——两侧统一 TYPELESS 族 R24G8_TYPELESS）
+    ID3D11Texture2D* depthResource() { return _depth.Get(); }
     // 已获取槽位的 backbuffer 裸纹理（dumpFrame 读回源；未获取槽位返回 nullptr）
     ID3D11Texture2D* backBuffer(uint32_t index);
 
@@ -103,11 +106,29 @@ private:
     std::string _log{};
 };
 
+// ---- 内部 blit 能力接口（Task 5，对照 DX12 IDXBlitContext）----
+// 实现于 DX11Renderer（工厂创建纹理时注入）。mipdown=Gather 角点等权盒平均的
+// 全屏三角形降采样（_internal/mipdown*.hlsl），对齐 vkCmdBlitImage linear 的
+// 2:1 盒式语义（GL generateMipmap 同为盒式）；着色器对象按格式无关缓存（D3D11
+// 无 PSO/根签名，SRV/RTV 视图由实现侧按目标纹理懒建）。
+class DX11Texture2D;
+class DX11Texture3D;
+class IDX11BlitContext {
+public:
+    virtual ~IDX11BlitContext() = default;
+    // 2D 纹理 mip 链降采样（mipdown.frag：Texture2D 源）
+    virtual bool Mipdown2D(DX11Texture2D* tex) = 0;
+    // cubemap mip 链逐面降采样（mipdown_array.frag：TEXTURE2DARRAY 单面单级源视图；
+    // 与 Texture2D 声明混用属视图类型不匹配 UB，须用数组变体——同 DX12 口径）
+    virtual bool MipdownCube(DX11Texture3D* tex) = 0;
+};
+
 // ---- 2D 纹理（实现于 DX11Texture2D.cpp）----
 // - 上传：STAGING 纹理 Map+行拷贝 → CopySubresourceRegion 写 DEFAULT 资源 mip0
-//   （brief 指定路径）；generateMipmap=true 时 D3D11 有内建 GenerateMips（DX12 无，
-//   手动 blit 降采样是 DX12 特有限制），资源带 MISC_GENERATE_MIPS+RT 绑定标志；
-//   非 filterable 格式（RGBA32F 等）钳 mip0 并告警（对齐 DX12 兜底语义）；
+//   （brief 指定路径）；generateMipmap=true 时分配 mip 链并经注入的 IDX11BlitContext
+//   走 Gather 盒平均降采样（Task 5 对齐 DX12/VK/GL 盒式语义；blit 缺失时回退
+//   D3D11 内建 GenerateMips 兜底）；非 filterable 格式（RGBA32F 等）钳 mip0 并告警
+//   （对齐 DX12 "mipgen 不可用钳 mip0" 的降级语义）；
 // - createEmpty：颜色=RT|SRV 绑定；深度=TYPELESS 资源族 + BIND_DEPTH_STENCIL|
 //   BIND_SHADER_RESOURCE，DSV/SRV 视图各取 typed 格式（R32_TYPELESS→D32_FLOAT/
 //   R32_FLOAT、R24G8_TYPELESS→D24_UNORM_S8_UINT/R24_UNORM_X8_TYPELESS）——
@@ -138,6 +159,9 @@ public:
     const TextureDesc& samplerParams() const { return _params; }
     const std::array<float, 4>& borderColor() const { return _borderColor; }
     void setBorderColor(const float bc[4]);
+    // mipgen blit 能力注入（Renderer 工厂 init 前调用；弱引用）
+    void setBlitContext(IDX11BlitContext* ctx) { _blitCtx = ctx; }
+    DXGI_FORMAT srvFormat() const { return _srvFormat; }                // typed 视图格式（mipgen 视图建用）
 
 private:
     bool uploadAndGenMips(const TextureDesc& desc, const TextureDataView2D& data);
@@ -157,6 +181,7 @@ private:
 
     TextureDesc _params{};                      // 创建时的采样语义（filter/wrap）
     std::array<float, 4> _borderColor{{1.0f, 1.0f, 1.0f, 1.0f}};  // ClampToBorder 边框色
+    IDX11BlitContext* _blitCtx{nullptr};        // 弱引用（Renderer 注入，mipgen 用）
 };
 
 // ---- 3D/立方体纹理（实现于 DX11Texture3D.cpp，Task 4）----
@@ -165,8 +190,9 @@ private:
 //   深度格式按 TYPELESS 族建资源（Depth32F→R32_TYPELESS、D24S8→R24G8_TYPELESS），
 //   DSV/SRV 视图阶段取 typed 格式（同 DXTexture3D::createEmpty 约定）；
 // - initCube CPU 上传：逐面 STAGING Map → CopySubresourceRegion（子资源索引
-//   =face*mipLevels）；generateMipmap=true 时资源带 BIND_RT+MISC_GENERATE_MIPS，
-//   genCubeMipmaps 直接走 D3D11 内建 GenerateMips（DX12 手动 blit 是其特有限制）；
+//   =face*mipLevels）；generateMipmap=true 时 genCubeMipmaps 经注入的
+//   IDX11BlitContext 逐面 Gather 盒平均降采样（mipdown_array，Task 5 对齐 DX12；
+//   blit 缺失时回退 D3D11 内建 GenerateMips 兜底）；
 // - 渲染目标接入：颜色 cube 提供 rtvFace(face,mip)、深度 cube 提供 dsvFace(face)
 //   （TEXTURE2DARRAY 视图 FirstArraySlice=面），DX11RenderTarget::attachCubeFace
 //   消费；真 3D 纹理（init 旧签名）走 ID3D11Texture3D，仅 RGBA8 上传。
@@ -184,6 +210,9 @@ public:
     bool valid() const override { return _valid; }
     void release() override;
     void genCubeMipmaps() override;
+
+    // mipgen blit 能力注入（Renderer 工厂 init 前调用；弱引用）
+    void setBlitContext(IDX11BlitContext* ctx) { _blitCtx = ctx; }
 
     // ---- Renderer / RT 访问器 ----
     ID3D11ShaderResourceView* srv() const { return _srv.Get(); }
@@ -218,6 +247,7 @@ private:
     bool _cube{false};
     bool _depth{false};
     bool _mipsBindable{false};           // 资源带 BIND_RT+MISC_GENERATE_MIPS（GenerateMips 前置）
+    IDX11BlitContext* _blitCtx{nullptr}; // 弱引用（Renderer 注入，mipgen 用）
     bool _valid{false};
 
     TextureDesc _params{};               // 创建时的采样语义（filter/wrap）

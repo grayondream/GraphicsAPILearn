@@ -4,10 +4,14 @@
 #include "rhi/core/ITexture3D.hpp"
 #include "rhi/core/IRenderTarget.hpp"
 
+#include <algorithm>
 #include <array>
 #include <cstdio>    // std::fopen/fprintf（RHI_DUMP_FRAME PPM 导出）
 #include <cstdlib>   // std::getenv
 #include <cstring>   // std::memcpy（UBO Map DISCARD 写入）
+#include <filesystem>
+#include <fstream>
+#include <iterator>
 #include <map>
 
 #ifndef RESOURCE_DIR
@@ -306,7 +310,7 @@ private:
 
 } // namespace
 
-class DX11Renderer : public IRenderer {
+class DX11Renderer : public IRenderer, public IDX11BlitContext {
 public:
     ~DX11Renderer() override { shutdown(); }
 
@@ -330,7 +334,9 @@ public:
     }
     std::shared_ptr<ITexture2D> createTexture2D() override {
         if (!_device.ptr) { LOGE("[DX11] createTexture2D before init"); return std::make_shared<DXNullTexture2D>(); }
-        return std::make_shared<DX11Texture2D>(_device.ptr, _context.ptr);
+        auto tex = std::make_shared<DX11Texture2D>(_device.ptr, _context.ptr);
+        tex->setBlitContext(this);   // mipgen blit 能力注入（Task 5）
+        return tex;
     }
     std::shared_ptr<IBuffer> createUniformBuffer() override {
         if (!_device.ptr) { LOGE("[DX11] createUniformBuffer before init"); return std::make_shared<DXNullBuffer>(); }
@@ -342,7 +348,9 @@ public:
     }
     std::shared_ptr<ITexture3D> createTexture3D() override {
         if (!_device.ptr) { LOGE("[DX11] createTexture3D before init"); return std::make_shared<DXNullTexture3D>(); }
-        return std::make_shared<DX11Texture3D>(_device.ptr, _context.ptr);
+        auto tex = std::make_shared<DX11Texture3D>(_device.ptr, _context.ptr);
+        tex->setBlitContext(this);   // mipgen blit 能力注入（Task 5）
+        return tex;
     }
     std::shared_ptr<IRenderTarget> createRenderTarget() override {
         if (!_device.ptr) { LOGE("[DX11] createRenderTarget before init"); return std::make_shared<DXNullRenderTarget>(); }
@@ -433,48 +441,35 @@ public:
         if (!prepareDraw(false)) return;
         _context->DrawInstanced(vertexCount, instanceCount, firstVertex, 0);
     }
-    // blitFramebuffer 雏形（Task 4，Color mask；对照 DX12 DoBlitColor/DoResolveColor）：
-    // - src MSAA → ResolveSubresource（两端存储格式必须一致，无格式转换能力）；
-    // - 非 MSAA → CopySubresourceRegion 整子资源转移（同尺寸 RT 全量拷贝；跨尺寸
-    //   缩放 blit 按需后续扩展）。
-    // 契约同 DX12 UnbindAllOm：src/dst 不得处于活动 OM——先解绑再拷贝，结尾恢复窗口
+    // blitFramebuffer 全 mask（Task 5，M-1 校验补齐；语义对照 VK vkCmdBlitImage/DX12）：
+    // - Color：src MSAA → ResolveSubresource（dst 必须单采样；两端存储格式必须一致，
+    //   无格式转换能力）；单采样→CopyResource（尺寸一致断言——跨尺寸会静默裁剪；
+    //   格式不一致 WARN 拒绝，策略对齐 DX12 DoResolveColor/DoBlitColor）；
+    // - Depth：CopyResource 全资源转移（dst==nullptr 拷入窗口深度=Defer lightbox 路径；
+    //   尺寸一致 + 资源格式逐字节一致——两侧统一 TYPELESS 族 R24G8_TYPELESS）。
+    // 契约同 DX12 UnbindAllOm：src/dst 不得处于活动 OM——先解绑再操作，结尾恢复窗口
     // 绑定（对齐 GL blitFramebuffer 结尾 glBindFramebuffer(GL_FRAMEBUFFER,0) 不清屏语义）
     void blitFramebuffer(const std::shared_ptr<IRenderTarget>& src,
                          const std::shared_ptr<IRenderTarget>& dst, BlitMask mask) override {
-        if (!src || !dst || !_context.ptr) {
-            WarnOnce("blitFramebuffer: src/dst required (window-depth path is a later task)");
+        if (!src || !_context.ptr) {
+            WarnOnce("blitFramebuffer: src required");
             return;
         }
         const bool doColor = (static_cast<uint8_t>(mask) & static_cast<uint8_t>(BlitMask::Color)) != 0;
-        if (!doColor) {
-            WarnOnce("blit depth: not implemented yet (later task)");
+        const bool doDepth = (static_cast<uint8_t>(mask) & static_cast<uint8_t>(BlitMask::Depth)) != 0;
+        if (!doColor && !doDepth) {
+            WarnOnce("blitFramebuffer: empty mask");
             return;
         }
-        auto* sTex = dynamic_cast<DX11Texture2D*>(src->colorTexture2D(0));
-        auto* dTex = dynamic_cast<DX11Texture2D*>(dst->colorTexture2D(0));
-        if (!sTex || !dTex || !sTex->valid() || !dTex->valid()) {
-            WarnOnce("blit color: RT attachments unavailable");
-            return;
-        }
-        auto* sRes = static_cast<ID3D11Resource*>(sTex->handle());
-        auto* dRes = static_cast<ID3D11Resource*>(dTex->handle());
-        if (!sRes || !dRes) return;
 
         _context->OMSetRenderTargets(0, nullptr, nullptr);
         _activeOffscreen.reset();
         _windowBound = false;
         updateOffscreenYFlip();
 
-        if (sTex->isMsaa()) {
-            if (sTex->storageFormat() != dTex->storageFormat()) {
-                LOGW("[DX11] msaa resolve: format mismatch {} vs {} rejected",
-                     static_cast<int>(sTex->storageFormat()), static_cast<int>(dTex->storageFormat()));
-                return;
-            }
-            _context->ResolveSubresource(dRes, 0, sRes, 0, sTex->storageFormat());
-        } else {
-            _context->CopySubresourceRegion(dRes, 0, 0, 0, 0, sRes, 0, nullptr);
-        }
+        bool ok = true;
+        if (doDepth) ok = DoBlitDepth(src, dst);
+        if (ok && doColor && dst) ok = DoBlitColor(src, dst);
 
         // 对齐 GL 语义：blit 结尾窗口已绑定（不清屏），后续 draw 直接可用
         _renderTarget = nullptr;
@@ -564,6 +559,18 @@ private:
     // 行序（DX12 终验结论，实现处注释详述）
     void applyViewport();
 
+    // ---- blit 子路径（Task 5 全 mask，实现见定义处注释）----
+    bool DoBlitColor(const std::shared_ptr<IRenderTarget>& src,
+                     const std::shared_ptr<IRenderTarget>& dst);
+    bool DoBlitDepth(const std::shared_ptr<IRenderTarget>& src,
+                     const std::shared_ptr<IRenderTarget>& dst);
+
+    // ---- 内部 mipgen blit（Task 5，IDX11BlitContext 实现；对照 DX12 EnsureBlitPso 系）----
+    bool Mipdown2D(DX11Texture2D* tex) override;
+    bool MipdownCube(DX11Texture3D* tex) override;
+    bool EnsureBlitShaders();
+    bool BeginMipdownPass(ID3D11PixelShader* ps);
+
     // 公共绘制前奏（Task 2.2 全量重设，实现见下方定义处注释）
     bool prepareDraw(bool needsIndex);
 
@@ -620,6 +627,12 @@ private:
 
     // RHI_DUMP_FRAME 帧导出（一次性）
     bool _dumpDone{false};
+
+    // 内部 mipdown 着色器对象缓存（Task 5；D3D11 无 PSO/根签名——格式无关，
+    // 一套 VS/PS 服务全部 RT 格式，对照 DX12 per-format PSO 缓存的简化形态）
+    Dx11ComPtr<ID3D11VertexShader> _blitVs{};
+    Dx11ComPtr<ID3D11PixelShader> _blitPsMipdown{};    // mipdown.frag（Texture2D 源）
+    Dx11ComPtr<ID3D11PixelShader> _blitPsArray{};      // mipdown_array.frag（TEXTURE2DARRAY 源）
 };
 
 bool DX11Renderer::init(const std::shared_ptr<ISurface>& surface) {
@@ -884,6 +897,9 @@ void DX11Renderer::shutdown() {
     for (auto& s : _samplers) s.Reset();
     for (auto& s : _samplersBlack) s.Reset();
     _activeSamplers.fill(nullptr);
+    _blitVs.Reset();
+    _blitPsMipdown.Reset();
+    _blitPsArray.Reset();
     _windowBound = false;
     _rasterDefault.Reset();
     _depthDefault.Reset();
@@ -969,6 +985,250 @@ std::array<float, 4> DX11Renderer::clearColorFor(void* key) {
         return {0.0f, 0.0f, 0.0f, 1.0f};
     }
     return it->second.color;
+}
+
+// ---- 内部 mipgen/blit（Task 5，对照 DX12 EnsureBlitPso 系 + FrameBlitContext）----
+
+// 从 res/DX11/_internal 的 .fxc 产物装载字节码（与样例 shader 同一套三级查找：
+// RESOURCE_DIR 推导 → ArtifactRoots 向上探测 → 同目录兜底）
+static Dx11ComPtr<ID3DBlob> LoadInternalFxc(const char* rel, ShaderStage::Type type) {
+    const std::string src = std::string(RESOURCE_DIR) + "/DX11/" + rel;
+    const std::string fxcPath = DX11Shader::FindFxc(src, type);
+    std::ifstream f(fxcPath, std::ios::binary);
+    if (!f) return {};
+    std::vector<uint8_t> bytes((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
+    // SM5.0 字节码容器按 32 位字组织，长度非 4 倍数视为损坏
+    if (bytes.empty() || bytes.size() % 4 != 0) return {};
+    Dx11ComPtr<ID3DBlob> blob;
+    if (FAILED(D3DCreateBlob(bytes.size(), &blob)) || !blob.Get()) return {};
+    std::memcpy(blob->GetBufferPointer(), bytes.data(), bytes.size());
+    return blob;
+}
+
+// 全屏三角形 VS + mipdown 两变体 PS 懒建并缓存（缺失列产物日志，同 DX12 blit 资产缺失口径）
+bool DX11Renderer::EnsureBlitShaders() {
+    if (_blitVs.Get() && _blitPsMipdown.Get() && _blitPsArray.Get()) return true;
+    auto vs = LoadInternalFxc("_internal/blit.vert.hlsl", ShaderStage::Vertex);
+    auto ps = LoadInternalFxc("_internal/mipdown.frag.hlsl", ShaderStage::Fragment);
+    auto psa = LoadInternalFxc("_internal/mipdown_array.frag.hlsl", ShaderStage::Fragment);
+    if (!vs.Get() || !ps.Get() || !psa.Get()) {
+        WarnOnce("mipdown shaders not found under build/res/DX11/_internal");
+        return false;
+    }
+    DX11_CHECK(_device->CreateVertexShader(vs->GetBufferPointer(), vs->GetBufferSize(),
+                                           nullptr, &_blitVs),
+               "create mipdown vs");
+    DX11_CHECK(_device->CreatePixelShader(ps->GetBufferPointer(), ps->GetBufferSize(),
+                                          nullptr, &_blitPsMipdown),
+               "create mipdown ps");
+    DX11_CHECK(_device->CreatePixelShader(psa->GetBufferPointer(), psa->GetBufferSize(),
+                                          nullptr, &_blitPsArray),
+               "create mipdown array ps");
+    return _blitVs.Get() && _blitPsMipdown.Get() && _blitPsArray.Get();
+}
+
+// mipdown 公共前奏：解绑 OM（输入/输出 hazard 契约）+ 绑定无顶点流全屏三角形状态。
+// 使用时机契约=加载期/帧外预计算（当前全部调用方为纹理上传路径）；prepareDraw 每 draw
+// 全量重设 OM/状态/视口/SRV，故此处不留恢复动作。GS 显式置空防上一样例残留。
+bool DX11Renderer::BeginMipdownPass(ID3D11PixelShader* ps) {
+    if (!_context.ptr || !_device.ptr || !EnsureBlitShaders()) return false;
+    _context->OMSetRenderTargets(0, nullptr, nullptr);
+    _context->RSSetState(_rasterDefault.Get());
+    _context->OMSetDepthStencilState(_depthDefault.Get(), 0);
+    _context->OMSetBlendState(_blendDefault.Get(), nullptr, 0xFFFFFFFFu);
+    _context->IASetInputLayout(nullptr);   // SV_VertexID 无输入布局
+    _context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+    _context->VSSetShader(_blitVs.Get(), nullptr, 0);
+    _context->PSSetShader(ps, nullptr, 0);
+    _context->GSSetShader(nullptr, nullptr, 0);
+    ID3D11SamplerState* smp = _samplers[1].Get();   // s0=gLinearClamp（f=0,w=1）
+    _context->PSSetSamplers(0, 1, &smp);
+    return true;
+}
+
+// 2D 纹理 mip 链降采样：逐级 SRV(mip i-1)+RTV(mip i)，dst 像素中心恰为 src 四纹素
+// 共享角点 → Gather 等权盒平均（mipdown.frag）。同资源跨子资源绑定（SRV mip i-1 +
+// RTV mip i）是 D3D11 手动 mipgen 的标准形态，运行时按子资源粒度判冲突不误报。
+bool DX11Renderer::Mipdown2D(DX11Texture2D* tex) {
+    // 不以 valid() 作门禁：上传路径在 init 内、_valid 置位前调用（DX12 同教训），
+    // 改按原始资源/描述符守卫
+    if (!tex || tex->isMsaa() || tex->mipLevels() <= 1) return false;
+    auto* res = static_cast<ID3D11Texture2D*>(tex->handle());
+    if (!res || !BeginMipdownPass(_blitPsMipdown.Get())) return false;
+    D3D11_TEXTURE2D_DESC dd{};
+    res->GetDesc(&dd);
+    const DXGI_FORMAT fmt = tex->srvFormat();
+    int mw = static_cast<int>(dd.Width);
+    int mh = static_cast<int>(dd.Height);
+    for (UINT i = 1; i < dd.MipLevels; ++i) {
+        D3D11_SHADER_RESOURCE_VIEW_DESC sd{};
+        sd.Format = fmt;
+        sd.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
+        sd.Texture2D.MostDetailedMip = i - 1;
+        sd.Texture2D.MipLevels = 1;
+        Dx11ComPtr<ID3D11ShaderResourceView> srv;
+        DX11_CHECK(_device->CreateShaderResourceView(res, &sd, &srv), "create mipdown srv");
+
+        D3D11_RENDER_TARGET_VIEW_DESC rd{};
+        rd.Format = fmt;
+        rd.ViewDimension = D3D11_RTV_DIMENSION_TEXTURE2D;
+        rd.Texture2D.MipSlice = i;
+        Dx11ComPtr<ID3D11RenderTargetView> rtv;
+        DX11_CHECK(_device->CreateRenderTargetView(res, &rd, &rtv), "create mipdown rtv");
+        if (!srv.Get() || !rtv.Get()) return false;
+
+        mw = std::max(1, mw / 2);
+        mh = std::max(1, mh / 2);
+        const D3D11_VIEWPORT vp{0.0f, 0.0f, static_cast<float>(mw), static_cast<float>(mh),
+                                0.0f, 1.0f};
+        _context->RSSetViewports(1, &vp);
+        ID3D11RenderTargetView* rtvRaw = rtv.Get();
+        _context->OMSetRenderTargets(1, &rtvRaw, nullptr);   // 先 OM 后 SRV（防解绑冲突）
+        ID3D11ShaderResourceView* srvRaw = srv.Get();
+        _context->PSSetShaderResources(0, 1, &srvRaw);
+        _context->Draw(3, 0);   // InstanceCount≥1：单 Draw 全屏三角形即一次实例
+    }
+    ID3D11ShaderResourceView* nullSRV = nullptr;   // 清 t0 残绑（视图随 ComPtr 析构）
+    _context->PSSetShaderResources(0, 1, &nullSRV);
+    return true;
+}
+
+// cubemap mip 链逐面降采样：源 SRV=TEXTURE2DARRAY 单面单级（FirstArraySlice=f、
+// MipSlice=i-1），目标 RTV 复用 DX11Texture3D::rtvFace(f,i)。数组视图须配
+// mipdown_array.frag 的 Texture2DArray 声明（与 Texture2D 混用属视图类型不匹配 UB）
+bool DX11Renderer::MipdownCube(DX11Texture3D* tex) {
+    if (!tex || !tex->isCube() || tex->isDepth() || tex->mipLevels() <= 1) {
+        return false;
+    }
+    auto* res = static_cast<ID3D11Texture2D*>(tex->handle());
+    if (!res || !BeginMipdownPass(_blitPsArray.Get())) return false;
+    D3D11_TEXTURE2D_DESC dd{};
+    res->GetDesc(&dd);
+    const DXGI_FORMAT fmt = tex->srvFormat();
+    int mw = static_cast<int>(dd.Width);
+    int mh = static_cast<int>(dd.Height);
+    for (UINT i = 1; i < dd.MipLevels; ++i) {
+        mw = std::max(1, mw / 2);
+        mh = std::max(1, mh / 2);
+        const D3D11_VIEWPORT vp{0.0f, 0.0f, static_cast<float>(mw), static_cast<float>(mh),
+                                0.0f, 1.0f};
+        _context->RSSetViewports(1, &vp);
+        for (UINT f = 0; f < 6; ++f) {
+            D3D11_SHADER_RESOURCE_VIEW_DESC sd{};
+            sd.Format = fmt;
+            sd.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2DARRAY;
+            sd.Texture2DArray.MostDetailedMip = i - 1;
+            sd.Texture2DArray.MipLevels = 1;
+            sd.Texture2DArray.FirstArraySlice = f;
+            sd.Texture2DArray.ArraySize = 1;
+            Dx11ComPtr<ID3D11ShaderResourceView> srv;
+            DX11_CHECK(_device->CreateShaderResourceView(res, &sd, &srv),
+                       "create mipdown cube srv");
+            ID3D11RenderTargetView* rtv = tex->rtvFace(static_cast<int>(f), static_cast<int>(i));
+            if (!srv.Get() || !rtv) return false;
+            _context->OMSetRenderTargets(1, &rtv, nullptr);
+            ID3D11ShaderResourceView* srvRaw = srv.Get();
+            _context->PSSetShaderResources(0, 1, &srvRaw);
+            _context->Draw(3, 0);
+        }
+    }
+    ID3D11ShaderResourceView* nullSRV = nullptr;
+    _context->PSSetShaderResources(0, 1, &nullSRV);
+    return true;
+}
+
+// ---- blitFramebuffer 子路径（Task 5）----
+
+// 颜色路径：MSAA→ResolveSubresource；单采样→CopyResource（M-1 校验补齐：
+// 尺寸一致断言拒绝静默裁剪、MSAA dst 校验、格式不一致 WARN 拒绝对齐 DX12）
+bool DX11Renderer::DoBlitColor(const std::shared_ptr<IRenderTarget>& src,
+                               const std::shared_ptr<IRenderTarget>& dst) {
+    auto* sTex = dynamic_cast<DX11Texture2D*>(src->colorTexture2D(0));
+    auto* dTex = dynamic_cast<DX11Texture2D*>(dst->colorTexture2D(0));
+    if (!sTex || !dTex || !sTex->valid() || !dTex->valid()) {
+        WarnOnce("blit color: RT attachments unavailable");
+        return false;
+    }
+    auto* sRes = static_cast<ID3D11Texture2D*>(sTex->handle());
+    auto* dRes = static_cast<ID3D11Texture2D*>(dTex->handle());
+    if (!sRes || !dRes) return false;
+    D3D11_TEXTURE2D_DESC sd{}, dd_{};
+    sRes->GetDesc(&sd);
+    dRes->GetDesc(&dd_);
+    // 尺寸一致断言：CopyResource/CopySubresourceRegion 无缩放能力，跨尺寸要么报错
+    // 要么按交集静默裁剪（GL 参照 assert 语义，显式拒绝）
+    if (sd.Width != dd_.Width || sd.Height != dd_.Height) {
+        LOGE("[DX11] blit color: size mismatch {}x{} -> {}x{} rejected",
+             sd.Width, sd.Height, dd_.Width, dd_.Height);
+        return false;
+    }
+    if (sTex->isMsaa()) {
+        // ResolveSubresource 目标必须单采样（MSAA→MSAA 无 API，需中间单采样 RT）
+        if (dTex->isMsaa()) {
+            WarnOnce("msaa resolve: destination is multisampled; unsupported");
+            return false;
+        }
+        if (sTex->storageFormat() != dTex->storageFormat()) {
+            LOGW("[DX11] msaa resolve: format mismatch {} vs {} rejected",
+                 static_cast<int>(sTex->storageFormat()), static_cast<int>(dTex->storageFormat()));
+            return false;
+        }
+        _context->ResolveSubresource(dRes, 0, sRes, 0, sTex->storageFormat());
+        return true;
+    }
+    // 单采样→MSAA 拷贝非法（样本数不一致），单采样→单采样要求同格式
+    if (dTex->isMsaa()) {
+        WarnOnce("blit color: destination is multisampled; unsupported for copy");
+        return false;
+    }
+    if (sd.Format != dd_.Format) {
+        LOGW("[DX11] blit color: format mismatch {} vs {} rejected "
+             "(CopyResource requires identical formats)",
+             static_cast<int>(sd.Format), static_cast<int>(dd_.Format));
+        return false;
+    }
+    _context->CopyResource(dRes, sRes);
+    return true;
+}
+
+// 深度路径：CopyResource 全资源转移。dst==nullptr 拷入窗口深度（Defer lightbox，
+// 对齐 GL blitFramebuffer(m_gBuffer,nullptr,Depth) 与 DX12 DoBlitDepth 语义）；
+// 尺寸一致 + 资源格式逐字节一致（窗口深度已统一 TYPELESS 族 R24G8_TYPELESS，
+// 见 DX11Swapchain::createSizeDependent 注释）
+bool DX11Renderer::DoBlitDepth(const std::shared_ptr<IRenderTarget>& src,
+                               const std::shared_ptr<IRenderTarget>& dst) {
+    auto* sTex = dynamic_cast<DX11Texture2D*>(src->depthTexture2D());
+    auto* sRes = sTex ? static_cast<ID3D11Texture2D*>(sTex->handle()) : nullptr;
+    if (!sTex || !sTex->valid() || !sRes) {
+        WarnOnce("blit depth: source has no depth texture");
+        return false;
+    }
+    ID3D11Texture2D* dRes = nullptr;
+    if (dst) {
+        auto* dTex = dynamic_cast<DX11Texture2D*>(dst->depthTexture2D());
+        dRes = dTex ? static_cast<ID3D11Texture2D*>(dTex->handle()) : nullptr;
+    } else if (_swapchain && _swapchain->initialized()) {
+        dRes = _swapchain->depthResource();
+    }
+    if (!dRes) {
+        WarnOnce("blit depth: destination has no depth target");
+        return false;
+    }
+    D3D11_TEXTURE2D_DESC sd{}, dd_{};
+    sRes->GetDesc(&sd);
+    dRes->GetDesc(&dd_);
+    if (sd.Width != dd_.Width || sd.Height != dd_.Height) {
+        LOGW("[DX11] blit depth: size mismatch {}x{} -> {}x{} rejected",
+             sd.Width, sd.Height, dd_.Width, dd_.Height);
+        return false;
+    }
+    if (sd.Format != dd_.Format) {
+        LOGW("[DX11] blit depth: resource format mismatch {} vs {} rejected",
+             static_cast<int>(sd.Format), static_cast<int>(dd_.Format));
+        return false;
+    }
+    _context->CopyResource(dRes, sRes);
+    return true;
 }
 
 // 朝向约定（终验教训同 DX12）：D3D NDC y-up，swapchain 直绘用正高度视口即与 GL

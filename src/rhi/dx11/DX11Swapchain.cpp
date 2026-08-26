@@ -80,13 +80,16 @@ bool DX11Swapchain::createSizeDependent(int width, int height) {
         }
     }
 
-    // 窗口深度：GL 默认帧缓冲语义（clearColor 同清深度/模板；模板供 TemplateTest 等）
+    // 窗口深度：GL 默认帧缓冲语义（clearColor 同清深度/模板；模板供 TemplateTest 等）。
+    // 资源用 TYPELESS 族（R24G8_TYPELESS）+ typed DSV 视图——Task 5 深度 blit 的
+    // CopyResource 要求两端资源格式逐字节一致，离屏 RT 深度同为 TYPELESS 族
+    // （同 DX11Texture2D::createEmpty 的 DSV+SRV 双绑定规则）
     D3D11_TEXTURE2D_DESC dd{};
     dd.Width = static_cast<UINT>(width);
     dd.Height = static_cast<UINT>(height);
     dd.MipLevels = 1;
     dd.ArraySize = 1;
-    dd.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
+    dd.Format = DXGI_FORMAT_R24G8_TYPELESS;
     dd.SampleDesc.Count = 1;
     dd.SampleDesc.Quality = 0;
     dd.Usage = D3D11_USAGE_DEFAULT;
@@ -95,7 +98,10 @@ bool DX11Swapchain::createSizeDependent(int width, int height) {
     dd.MiscFlags = 0;
     DX11_CHECK(_device->CreateTexture2D(&dd, nullptr, &_depth), "create window depth buffer");
     if (!_depth.Get()) return false;
-    DX11_CHECK(_device->CreateDepthStencilView(_depth.Get(), nullptr, &_dsv),
+    D3D11_DEPTH_STENCIL_VIEW_DESC dv{};
+    dv.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
+    dv.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2D;
+    DX11_CHECK(_device->CreateDepthStencilView(_depth.Get(), &dv, &_dsv),
                "create window DSV");
     return _dsv.Get() != nullptr;
 }
