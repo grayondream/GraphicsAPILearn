@@ -994,6 +994,13 @@ void DX11Renderer::applyViewport() {
     if (vpLog) LOGW("[VP] off={} x={:.1f} y={:.1f} w={:.1f} h={:.1f} viewportSet={}",
                     offscreen, x, y, w, h, _viewportSet);
     _context->RSSetViewports(1, &vp);
+    if (vpLog && offscreen) {
+        D3D11_VIEWPORT back{};
+        UINT n = 0;
+        _context->RSGetViewports(&n, &back);
+        LOGW("[VP] readback n={} x={:.1f} y={:.1f} w={:.1f} h={:.1f}", n, back.TopLeftX,
+             back.TopLeftY, back.Width, back.Height);
+    }
 }
 
 // 公共绘制前奏（Task 2.2 draw 路径全量）：每次 draw 全量重设 OM 目标/状态对象/
