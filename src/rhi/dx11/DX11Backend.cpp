@@ -960,6 +960,9 @@ void DX11Renderer::applyViewport() {
                         ? static_cast<float>(_viewport.height)
                         : static_cast<float>(fbH);
     const D3D11_VIEWPORT vp{x, y, w, h, 0.0f, 1.0f};
+    static int vpLog = []{ const char* e = std::getenv("RHI_DX11_VPLOG"); return e ? 1 : 0; }();
+    if (vpLog) LOGW("[VP] off={} x={:.1f} y={:.1f} w={:.1f} h={:.1f} viewportSet={}",
+                    offscreen, x, y, w, h, _viewportSet);
     _context->RSSetViewports(1, &vp);
 }
 
