@@ -580,6 +580,7 @@ private:
         std::array<float, 4> color{{0.0f, 0.0f, 0.0f, 1.0f}};
     };
     std::map<void*, ClearColorEntry> _clearColors{};
+    Dx11ComPtr<ID3D11Texture2D> _lastDepthTex{};   // TEMP 探针：最近离屏 RT 深度纹理
 
     // RHI_DUMP_FRAME 帧导出（一次性）
     bool _dumpDone{false};
@@ -860,6 +861,33 @@ void DX11Renderer::shutdown() {
 bool DX11Renderer::present() {
     if (!_swapchain || !_swapchain->initialized()) return false;
     dumpFrame();   // 对齐 VK/DX12 口径：帧内容已入 backbuffer、Present 前
+    // TEMP 探针（RHI_DX11_DEPTHROW=帧号）：回读最近离屏 RT 深度纹理指定行原始值
+    static const int depthRowFrame = []{ const char* e = std::getenv("RHI_DX11_DEPTHROW"); return e ? std::atoi(e) : -1; }();
+    static int frameIdx = 0;
+    if (depthRowFrame >= 0 && frameIdx++ == depthRowFrame && _lastDepthTex.Get()) {
+        D3D11_TEXTURE2D_DESC dd{};
+        _lastDepthTex.Get()->GetDesc(&dd);
+        D3D11_TEXTURE2D_DESC sd = dd;
+        sd.Usage = D3D11_USAGE_STAGING; sd.BindFlags = 0;
+        sd.CPUAccessFlags = D3D11_CPU_ACCESS_READ; sd.MipLevels = 1; sd.ArraySize = 1;
+        sd.MiscFlags = 0; sd.SampleDesc.Count = 1;
+        Dx11ComPtr<ID3D11Texture2D> staging;
+        if (SUCCEEDED(_device->CreateTexture2D(&sd, nullptr, &staging)) && staging.Get()) {
+            _context->CopyResource(staging.Get(), _lastDepthTex.Get());
+            D3D11_MAPPED_SUBRESOURCE m{};
+            if (SUCCEEDED(_context->Map(staging.Get(), 0, D3D11_MAP_READ, 0, &m))) {
+                const auto* row = [&, m](int r) {
+                    return static_cast<const float*>(static_cast<const uint8_t*>(m.pData) +
+                                                     static_cast<size_t>(r) * m.RowPitch); };
+                const int H = static_cast<int>(dd.Height), W = static_cast<int>(dd.Width);
+                for (int r : {0, H / 4, H / 2, 3 * H / 4, H - 1}) {
+                    LOGW("[DEPTH] row {:4d}: col{:4d}={:.4f} col{:4d}={:.4f} col{:4d}={:.4f}",
+                         r, W / 2, row(r)[W / 2], W / 4, row(r)[W / 4], 3 * W / 4, row(r)[3 * W / 4]);
+                }
+                _context->Unmap(staging.Get(), 0);
+            }
+        }
+    }
     return _swapchain->present();   // Present(1,0)
 }
 
@@ -910,6 +938,9 @@ void DX11Renderer::flushOmTargets() {
         return;
     }
     _activeOffscreen = next;
+    if (auto* dt = next->depthTexture2D()) {
+        _lastDepthTex = static_cast<ID3D11Texture2D*>(dt->handle());   // TEMP 探针
+    }
     ID3D11RenderTargetView* rtvs[8] = {};
     const UINT n = next->FillRtvs(rtvs, 8);   // 纯深度 pass（点光阴影面）n=0 合法
     ID3D11DepthStencilView* dsv = next->ActiveDsv();
