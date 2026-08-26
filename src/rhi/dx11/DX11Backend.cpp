@@ -1032,6 +1032,15 @@ bool DX11Renderer::EnsureBlitShaders() {
 // 全量重设 OM/状态/视口/SRV，故此处不留恢复动作。GS 显式置空防上一样例残留。
 bool DX11Renderer::BeginMipdownPass(ID3D11PixelShader* ps) {
     if (!_context.ptr || !_device.ptr || !EnsureBlitShaders()) return false;
+    static const bool ptrDbg = std::getenv("RHI_DX11_MIPDBG") != nullptr;
+    if (ptrDbg) {
+        LOGW("[DX11][MIPDBG] ctx={} vs={} ps(mipdown)={} ps(param)={} rs={} ds={} blend={}",
+             reinterpret_cast<void*>(_context.ptr), reinterpret_cast<void*>(_blitVs.Get()),
+             reinterpret_cast<void*>(_blitPsMipdown.Get()), reinterpret_cast<void*>(ps),
+             reinterpret_cast<void*>(_rasterDefault.Get()),
+             reinterpret_cast<void*>(_depthDefault.Get()),
+             reinterpret_cast<void*>(_blendDefault.Get()));
+    }
     _context->OMSetRenderTargets(0, nullptr, nullptr);
     _context->RSSetState(_rasterDefault.Get());
     _context->OMSetDepthStencilState(_depthDefault.Get(), 0);
@@ -1061,6 +1070,7 @@ bool DX11Renderer::Mipdown2D(DX11Texture2D* tex) {
     int mw = static_cast<int>(dd.Width);
     int mh = static_cast<int>(dd.Height);
     bool passOk = true;
+    static const bool ptrDbg = std::getenv("RHI_DX11_MIPDBG") != nullptr;
     auto runPass = [&]() {
         for (UINT i = 1; i < dd.MipLevels; ++i) {
             D3D11_SHADER_RESOURCE_VIEW_DESC sd{};
@@ -1088,6 +1098,10 @@ bool DX11Renderer::Mipdown2D(DX11Texture2D* tex) {
             _context->OMSetRenderTargets(1, &rtvRaw, nullptr);   // 先 OM 后 SRV（防解绑冲突）
             ID3D11ShaderResourceView* srvRaw = srv.Get();
             _context->PSSetShaderResources(0, 1, &srvRaw);
+            if (ptrDbg) {
+                LOGW("[DX11][MIPDBG] iter{} vp={}x{} rtv={} srv={}", i, mw, mh,
+                     reinterpret_cast<void*>(rtvRaw), reinterpret_cast<void*>(srvRaw));
+            }
             _context->Draw(3, 0);   // InstanceCount≥1：单 Draw 全屏三角形即一次实例
         }
     };
