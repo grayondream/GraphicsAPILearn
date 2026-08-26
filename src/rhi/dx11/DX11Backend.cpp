@@ -4,6 +4,9 @@
 #include "rhi/core/ITexture3D.hpp"
 #include "rhi/core/IRenderTarget.hpp"
 
+#include <imgui.h>              // Task 6 ImGui overlay（ImDrawData）
+#include <imgui_impl_dx11.h>
+
 #include <algorithm>
 #include <array>
 #include <cstdio>    // std::fopen/fprintf（RHI_DUMP_FRAME PPM 导出）
@@ -517,6 +520,19 @@ public:
     void waitIdle() override {}   // 即时上下文命令同步执行，无需等待
     void flush() override {}
 
+    // ImGui overlay（Task 6）：ImGui_ImplDX11_RenderDrawData 不设 OM 目标，样例
+    // 可能把 OM 留在离屏 RT——先回绑窗口（不清屏，场景画面已就绪）再渲染。
+    // imgui backend 自带着色器/顶点装配/状态，每 draw 的 prepareDraw 会自愈重设
+    void renderImGuiDrawData(void* drawData) override;
+
+    // ImGui 初始化句柄桥（Task 6，非虚；GetDX11ImGuiInitInfo 下转型消费）
+    bool imguiInitInfo(DX11ImGuiInitInfo& out) const {
+        if (!_device.ptr || !_context.ptr) return false;
+        out.device = _device.ptr;
+        out.context = _context.ptr;
+        return true;
+    }
+
 private:
     // GL 默认状态对齐（GL 默认深度关/剔除关/混合关）：窗口目标激活后统一下发。
     // prepareDraw 按管线状态对象每 draw 覆盖，本函数保证 draw 前的 clear 阶段
@@ -599,7 +615,8 @@ private:
     // border 黑档（评审 Important-1：brief"白/黑两档"落地）+ 纹理 SRV 共享槽位表
     // （槽 0 预留 ImGui，槽 i ↔ t<i>）。_activeSamplers 为每 draw 实际下发的运行时
     // 表：默认=白档，ClampToBorder 纹理按 borderColor 换装黑档（resetRenderState 复位）
-    static constexpr uint32_t kSamplerSlots = 12;   // 0..8 组合 + s9 比较 + s10/s11 预留
+    static constexpr uint32_t kSamplerSlots = 13;   // 0..8 组合 + s9 比较 + s10/s11 预留
+                                                    // + s12 深度 cube 专用（Task 6 PLS 别名）
     static constexpr uint32_t kBlackBorderSlots = 3; // 三个 filter 的黑边框变体（非 s# 寄存器）
     static constexpr uint32_t kSrvSlots = 16;       // t0 预留 ImGui，t1..t15 = unit 0..14
     std::array<Dx11ComPtr<ID3D11SamplerState>, kSamplerSlots> _samplers{};
@@ -750,6 +767,26 @@ bool DX11Renderer::createSamplers() {
                    "create reserved sampler");
         if (!_samplers[slot].Get()) return false;
     }
+    {
+        // s12 深度 cube 专用采样器（Task 6，Task5 评审 Minor-1 建议项落地）：
+        // Nearest+ClampToEdge——与 GL 端 PLS 深度 cubemap 的纹理参数语义一致
+        // （GL 无独立 sampler 对象，按 glTexParameter 生效）。此前 gDepthMap 经
+        // s6 换装机制借道采样，靠 D3D11 cube clamp-only+无 mip 链巧合保稳；
+        // 显式别名后 BindTexture3D 对深度 cube 不再触碰 s6。
+        D3D11_SAMPLER_DESC sd{};
+        sd.Filter = D3D11_FILTER_MIN_MAG_MIP_POINT;
+        sd.AddressU = D3D11_TEXTURE_ADDRESS_CLAMP;
+        sd.AddressV = D3D11_TEXTURE_ADDRESS_CLAMP;
+        sd.AddressW = D3D11_TEXTURE_ADDRESS_CLAMP;
+        sd.MipLODBias = 0.0f;
+        sd.MaxAnisotropy = 1;
+        sd.ComparisonFunc = D3D11_COMPARISON_NEVER;
+        sd.MinLOD = 0;
+        sd.MaxLOD = D3D11_FLOAT32_MAX;
+        DX11_CHECK(_device->CreateSamplerState(&sd, &_samplers[12]),
+                   "create depth-cube sampler");
+        if (!_samplers[12].Get()) return false;
+    }
     // 黑边框档：三个 filter 各一（对应寄存器 s2/s5/s8），供 borderColor=黑时换装
     for (int f = 0; f < 3; ++f) {
         D3D11_SAMPLER_DESC sd{};
@@ -862,10 +899,14 @@ void DX11Renderer::BindTexture3D(rhi::ITexture3D* texture, unsigned int unit) {
         return;
     }
     _srvSlots[unit + 1] = tex->srv();
-    // cubemap 同样按纹理参数换装 s6（SkyBox 组等 gSamplerDefault 消费者；
-    // Texture3D 无 border 色概念，恒白档语义）
-    static const std::array<float, 4> kWhite{{1.0f, 1.0f, 1.0f, 1.0f}};
-    InstallSamplerFor(tex->samplerParams(), kWhite.data());
+    // 深度 cube（PLS 阴影图）消费专用别名 s12（Nearest+ClampToEdge，与 GL 纹理
+    // 参数语义一致），不再经 s6 换装借道——消除"绑定顺序决定 s6 终态"的时序耦合
+    // （Task5 评审 Minor-1）；颜色 cubemap（SkyBox 等 gSamplerDefault 消费者）仍按
+    // 参数换装 s6，恒白档语义
+    if (!tex->isDepth()) {
+        static const std::array<float, 4> kWhite{{1.0f, 1.0f, 1.0f, 1.0f}};
+        InstallSamplerFor(tex->samplerParams(), kWhite.data());
+    }
 }
 
 void DX11Renderer::createDefaultStates() {
@@ -1466,11 +1507,29 @@ void DX11Renderer::dumpFrame() {
 
 std::shared_ptr<IRenderer> createDX11Renderer() { return std::make_shared<DX11Renderer>(); }
 
-// ImGui overlay 初始化信息桥（Task 6 消费）：本任务按 brief 约定恒返回 false
+// ImGui overlay 渲染（Task 6，对照 DX12/VK 同名钩子）：回绑窗口 OM 后交给
+// imgui_impl_dx11（其内部自设 viewport/着色器/顶点装配并保存恢复部分状态）。
+// 不清屏——overlay 叠加在本帧场景之上；结尾无需重放视口，prepareDraw 每 draw
+// 全量重设（即时上下文无状态泄漏）
+void DX11Renderer::renderImGuiDrawData(void* drawData) {
+    auto* dd = static_cast<ImDrawData*>(drawData);
+    if (!dd || !_context.ptr || !_swapchain || !_swapchain->initialized()) return;
+    if (!_windowBound) {
+        // 结束离屏态：OM 绑回窗口 backbuffer（不清屏）
+        _renderTarget = nullptr;
+        _omPending = false;
+        _activeOffscreen.reset();
+        updateOffscreenYFlip();
+        bindWindowTargets(false);
+    }
+    ImGui_ImplDX11_RenderDrawData(dd);
+}
+
+// ImGui overlay 初始化信息桥（Task 6 真实现，对照 GetDXImGuiInitInfo）：window 层
+// 经此读取 device/context 句柄供 ImGui_ImplDX11_Init 使用
 bool GetDX11ImGuiInitInfo(const std::shared_ptr<IRenderer>& renderer, DX11ImGuiInitInfo& out) {
-    (void)renderer;
-    (void)out;
-    return false;
+    auto* dx = dynamic_cast<DX11Renderer*>(renderer.get());
+    return dx && dx->imguiInitInfo(out);
 }
 
 } // namespace rhi

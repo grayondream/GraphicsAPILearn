@@ -24,7 +24,7 @@ float ShadowCalculation(float3 fragPos)
     // get vector between fragment position and light position
     float3 fragToLight = fragPos - gVec4Pool[2].xyz;   // lightPos
     // use the fragment to light vector to sample from the depth map（存的是距离/far_plane）
-    float closestDepth = gDepthMap.Sample(gSamplerDefault, fragToLight).r;
+    float closestDepth = gDepthMap.Sample(gSamplerCubeDepth, fragToLight).r;
     // re-transform it back to original depth value
     closestDepth *= FPOOL(17);   // far_plane
     // now get current linear depth as the length between the fragment and light position
@@ -55,7 +55,7 @@ float ShadowCalculationWithPCF(float3 fragPos)
     float diskRadius = (1.0 + (viewDistance / FPOOL(17))) / 25.0;   // far_plane
     [loop]
     for (int k = 0; k < samples; ++k) {
-        float closestDepth = gDepthMap.SampleLevel(gSamplerDefault,
+        float closestDepth = gDepthMap.SampleLevel(gSamplerCubeDepth,
                                                    fragToLight + kGridSamplingDisk[k] * diskRadius,
                                                    0.0).r;
         closestDepth *= FPOOL(17);   // far_plane, undo mapping [0;1]

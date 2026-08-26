@@ -150,11 +150,13 @@ bool DX11Texture3D::initCube(const TextureDesc& desc, const TextureDataView2D* f
     td.SampleDesc.Count = 1;
     td.SampleDesc.Quality = 0;
     td.Usage = D3D11_USAGE_DEFAULT;
-    td.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+    // BIND_RT 无条件携带（Task 6 M-2）：attachCubeFace 的逐面 RTV 要求资源带
+    // RENDER_TARGET 绑定，仅 generateMipmap=true 时才有会使无 mip cube（如未来
+    // IBL envCubemap CPU 上传路径）挂接即败；颜色 cube 携带 RT 无副作用。
+    td.BindFlags = D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_RENDER_TARGET;
     td.MiscFlags = D3D11_RESOURCE_MISC_TEXTURECUBE;
     if (_mipLevels > 1) {
-        // GenerateMips 硬性要求：资源带 MISC_GENERATE_MIPS 且同时绑定 SRV+RT 标志
-        td.BindFlags |= D3D11_BIND_RENDER_TARGET;
+        // GenerateMips 硬性要求：资源带 MISC_GENERATE_MIPS（SRV+RT 已齐备）
         td.MiscFlags |= D3D11_RESOURCE_MISC_GENERATE_MIPS;
         _mipsBindable = true;
     }

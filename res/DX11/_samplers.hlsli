@@ -28,5 +28,9 @@ SamplerComparisonState gShadowCompare : register(s9);
 // 参照 diff 超标再校准并记录数值（对照 DX12 NVIDIA 实测 0.28/0.85）。
 SamplerState gSamplerCubeLodAlign  : register(s10); // f=2 w=0 + MipLODBias（Renderer 定）
 SamplerState gSamplerTex2DLodAlign : register(s11); // f=2 w=0 + MipLODBias（Renderer 定）
+// s12：深度 cubemap 专用（DX11 独有别名，Task 6）：Nearest+ClampToEdge，与 GL 端
+// PLS 深度 cubemap 的纹理参数语义一致。深度图勿用 gSamplerDefault——其值由最近
+// 绑定的常规纹理换装决定，采样结果会随绑定顺序漂移。
+SamplerState gSamplerCubeDepth : register(s12);
 
 #endif
