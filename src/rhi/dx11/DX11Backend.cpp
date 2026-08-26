@@ -1060,40 +1060,44 @@ bool DX11Renderer::Mipdown2D(DX11Texture2D* tex) {
     const DXGI_FORMAT fmt = tex->srvFormat();
     int mw = static_cast<int>(dd.Width);
     int mh = static_cast<int>(dd.Height);
-    for (UINT i = 1; i < dd.MipLevels; ++i) {
-        D3D11_SHADER_RESOURCE_VIEW_DESC sd{};
-        sd.Format = fmt;
-        sd.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
-        sd.Texture2D.MostDetailedMip = i - 1;
-        sd.Texture2D.MipLevels = 1;
-        Dx11ComPtr<ID3D11ShaderResourceView> srv;
-        DX11_CHECK(_device->CreateShaderResourceView(res, &sd, &srv), "create mipdown srv");
+    bool passOk = true;
+    auto runPass = [&]() {
+        for (UINT i = 1; i < dd.MipLevels; ++i) {
+            D3D11_SHADER_RESOURCE_VIEW_DESC sd{};
+            sd.Format = fmt;
+            sd.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
+            sd.Texture2D.MostDetailedMip = i - 1;
+            sd.Texture2D.MipLevels = 1;
+            Dx11ComPtr<ID3D11ShaderResourceView> srv;
+            DX11_CHECK(_device->CreateShaderResourceView(res, &sd, &srv), "create mipdown srv");
 
-        D3D11_RENDER_TARGET_VIEW_DESC rd{};
-        rd.Format = fmt;
-        rd.ViewDimension = D3D11_RTV_DIMENSION_TEXTURE2D;
-        rd.Texture2D.MipSlice = i;
-        Dx11ComPtr<ID3D11RenderTargetView> rtv;
-        DX11_CHECK(_device->CreateRenderTargetView(res, &rd, &rtv), "create mipdown rtv");
-        if (!srv.Get() || !rtv.Get()) return false;
+            D3D11_RENDER_TARGET_VIEW_DESC rd{};
+            rd.Format = fmt;
+            rd.ViewDimension = D3D11_RTV_DIMENSION_TEXTURE2D;
+            rd.Texture2D.MipSlice = i;
+            Dx11ComPtr<ID3D11RenderTargetView> rtv;
+            DX11_CHECK(_device->CreateRenderTargetView(res, &rd, &rtv), "create mipdown rtv");
+            if (!srv.Get() || !rtv.Get()) { passOk = false; return; }
 
-        mw = std::max(1, mw / 2);
-        mh = std::max(1, mh / 2);
-        const D3D11_VIEWPORT vp{0.0f, 0.0f, static_cast<float>(mw), static_cast<float>(mh),
-                                0.0f, 1.0f};
-        _context->RSSetViewports(1, &vp);
-        ID3D11RenderTargetView* rtvRaw = rtv.Get();
-        _context->OMSetRenderTargets(1, &rtvRaw, nullptr);   // 先 OM 后 SRV（防解绑冲突）
-        ID3D11ShaderResourceView* srvRaw = srv.Get();
-        _context->PSSetShaderResources(0, 1, &srvRaw);
-        _context->Draw(3, 0);   // InstanceCount≥1：单 Draw 全屏三角形即一次实例
-    }
+            mw = std::max(1, mw / 2);
+            mh = std::max(1, mh / 2);
+            const D3D11_VIEWPORT vp{0.0f, 0.0f, static_cast<float>(mw), static_cast<float>(mh),
+                                    0.0f, 1.0f};
+            _context->RSSetViewports(1, &vp);
+            ID3D11RenderTargetView* rtvRaw = rtv.Get();
+            _context->OMSetRenderTargets(1, &rtvRaw, nullptr);   // 先 OM 后 SRV（防解绑冲突）
+            ID3D11ShaderResourceView* srvRaw = srv.Get();
+            _context->PSSetShaderResources(0, 1, &srvRaw);
+            _context->Draw(3, 0);   // InstanceCount≥1：单 Draw 全屏三角形即一次实例
+        }
+    };
+    runPass();
     // TEMP MIPDBG：生成后立即回读 mip1 中心 4 像素（RHI_DX11_MIPDBG=1）
     static const bool mipDbg = [] {
         const char* e = std::getenv("RHI_DX11_MIPDBG");
         return e && e[0] == '1';
     }();
-    if (mipDbg) {
+    auto readMip1 = [&](const char* tag) {
         D3D11_TEXTURE2D_DESC rd0{};
         res->GetDesc(&rd0);
         D3D11_TEXTURE2D_DESC sd2 = rd0;
@@ -1111,21 +1115,31 @@ bool DX11Renderer::Mipdown2D(DX11Texture2D* tex) {
                 const int mh2 = std::max(1, static_cast<int>(rd0.Height) / 2);
                 auto* base = static_cast<const uint8_t*>(mp.pData);
                 const int cy = mh2 / 2, cx = mw2 / 2;
-                auto px = [&](int dx, int dy) {
-                    auto* p = base + static_cast<size_t>(cy + dy) * mp.RowPitch +
-                              static_cast<size_t>(cx + dx) * 4;
-                    LOGW("[DX11][MIPDBG] {} tex{}x{} mip1 c({},{})=({}, {}, {}, {})",
-                         reinterpret_cast<void*>(res), rd0.Width, rd0.Height, dx, dy,
-                         p[0], p[1], p[2], p[3]);
-                };
-                px(0, 0); px(-cx / 2, -mh2 / 4); px(cx / 4, 0); px(0, mh2 / 4);
+                auto* p = base + static_cast<size_t>(cy) * mp.RowPitch +
+                          static_cast<size_t>(cx) * 4;
+                LOGW("[DX11][MIPDBG] [{}] {} tex{}x{} mip1 center=({}, {}, {}, {})",
+                     tag, reinterpret_cast<void*>(res), rd0.Width, rd0.Height,
+                     p[0], p[1], p[2], p[3]);
                 _context->Unmap(stg.Get(), 0);
             }
         }
+    };
+    if (mipDbg) readMip1("PASS1");
+    // TEMP 二分：RHI_DX11_MIPTEST=1 → Flush 后整链重跑一轮再读回，定位首跑失效层
+    static const bool mipTest = [] {
+        const char* e = std::getenv("RHI_DX11_MIPTEST");
+        return e && e[0] == '1';
+    }();
+    if (mipTest) {
+        _context->Flush();
+        mw = static_cast<int>(dd.Width);
+        mh = static_cast<int>(dd.Height);
+        runPass();
+        if (mipDbg) readMip1("PASS2");
     }
     ID3D11ShaderResourceView* nullSRV = nullptr;   // 清 t0 残绑（视图随 ComPtr 析构）
     _context->PSSetShaderResources(0, 1, &nullSRV);
-    return true;
+    return passOk;
 }
 
 // cubemap mip 链逐面降采样：源 SRV=TEXTURE2DARRAY 单面单级（FirstArraySlice=f、
