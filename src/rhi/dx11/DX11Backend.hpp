@@ -218,6 +218,7 @@ public:
     ID3D11ShaderResourceView* srv() const { return _srv.Get(); }
     const TextureDesc& samplerParams() const { return _params; }
     DXGI_FORMAT dsvFormat() const { return _dsvFormat; }                // 深度 cube DSV typed 格式
+    DXGI_FORMAT srvFormat() const { return _srvFormat; }                // typed 视图格式（mipgen 视图建用）
     UINT mipLevels() const { return _mipLevels; }
     bool isCube() const { return _cube; }
     bool isDepth() const { return _depth; }
