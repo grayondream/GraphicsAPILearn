@@ -1133,6 +1133,7 @@ bool DX11Renderer::Mipdown2D(DX11Texture2D* tex) {
         readMip(0, "SRC-M0");
         runPass();
         _context->Flush();
+        dx11diag::DumpMessages("mipdown-pass");
         for (UINT k = 1; k < std::min<UINT>(dd.MipLevels, 5u); ++k) readMip(k, "PASS1");
     } else {
         runPass();
