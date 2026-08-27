@@ -1402,13 +1402,14 @@ bool DX11Renderer::prepareDraw(bool needsIndex) {
         _context->IASetIndexBuffer(b, DXGI_FORMAT_R32_UINT, 0);   // 全链路 unsigned int 索引
     }
 
-    // 最近创建的 UBO 直挂 cbuffer b0（VS+PS 同槽；shader 未读取块时绑定无害）
+    // 最近创建的 UBO 直挂 cbuffer b0（VS/PS/GS 同槽；shader 未读取块时绑定无害）
     if (_uniformBuffer) {
         auto* cb = static_cast<ID3D11Buffer*>(_uniformBuffer->handle());
         if (cb) {
             ID3D11Buffer* cbs[1] = {cb};
             _context->VSSetConstantBuffers(0, 1, cbs);
             _context->PSSetConstantBuffers(0, 1, cbs);
+            _context->GSSetConstantBuffers(0, 1, cbs);
         }
     }
 

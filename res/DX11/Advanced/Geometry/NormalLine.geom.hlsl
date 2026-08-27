@@ -1,7 +1,7 @@
-// DX11/SM5.0 — NormalLine GS（TriangleStream thin-quad 模拟线段）。
-// DX11 部分驱动对 GS LineStream 光栅化兼容性差（线条不渲染），
-// 改用 TriangleStream 输出四边形条带（每法线线段 4 顶点 ≈ 1px 宽）。
-// 对应 res/GL/Advanced/Geometry/NormalLine.gs 的 line_strip 视觉等价。
+// DX11/SM5.0 镜像（自 res/DX12 同名拷贝，fxc /T gs_5_0 编译，入口 GSMain；
+// 逐文件核对无 SM6 专属语法）。
+// 对应 res/GL/Advanced/Geometry/NormalLine.gs：triangles → line_strip（6 顶点法线线）。
+// 投影矩阵在 GS 内应用（VS 只输出 view*model）；MAGNITUDE=0.4 常量直译。
 #include "../../_uniform_block.hlsli"
 
 struct GSIn {
@@ -14,28 +14,21 @@ struct GSOut {
 };
 
 static const float MAGNITUDE = 0.4;
-static const float HALF_WIDTH = 0.002;
 
-void GenerateQuad(GSIn v, inout TriangleStream<GSOut> stream)
+void GenerateLine(GSIn v, inout LineStream<GSOut> stream)
 {
-    float4 a = mul(gProjection, v.sv);
-    float4 b = mul(gProjection, float4(v.sv.xyz + v.normal * MAGNITUDE, 1.0));
-    float2 ndcA = a.xy / a.w;
-    float2 ndcB = b.xy / b.w;
-    float2 dir = normalize(ndcB - ndcA);
-    float2 perp = float2(-dir.y, dir.x) * HALF_WIDTH;
     GSOut o;
-    o.sv = float4((ndcA + perp) * a.w, a.z, a.w); stream.Append(o);
-    o.sv = float4((ndcA - perp) * a.w, a.z, a.w); stream.Append(o);
-    o.sv = float4((ndcB + perp) * b.w, b.z, b.w); stream.Append(o);
-    o.sv = float4((ndcB - perp) * b.w, b.z, b.w); stream.Append(o);
+    o.sv = mul(gProjection, v.sv);
+    stream.Append(o);
+    o.sv = mul(gProjection, float4(v.sv.xyz + v.normal * MAGNITUDE, 1.0));
+    stream.Append(o);
     stream.RestartStrip();
 }
 
-[maxvertexcount(12)]
-void GSMain(triangle GSIn input[3], inout TriangleStream<GSOut> stream)
+[maxvertexcount(6)]
+void GSMain(triangle GSIn input[3], inout LineStream<GSOut> stream)
 {
-    GenerateQuad(input[0], stream);
-    GenerateQuad(input[1], stream);
-    GenerateQuad(input[2], stream);
+    GenerateLine(input[0], stream);   // 第一个顶点法线
+    GenerateLine(input[1], stream);   // 第二个顶点法线
+    GenerateLine(input[2], stream);   // 第三个顶点法线
 }

@@ -11,7 +11,7 @@
 // 矩阵方向约定（全树）：CPU 经 glm::value_ptr 按列主序上传，HLSL uniform 默认
 // column_major 存储 → 两侧逻辑矩阵一致；变换统一写 mul(matrix, vector)，等价
 // GLSL 的 M*v。禁止 mul(vector, matrix)：数学上等于 Mᵀ·v。
-// DX11 绑定约定：cbuffer b0 经 VSSetConstantBuffers/PSSetConstantBuffers 槽 0 绑定。
+// DX11 绑定约定：cbuffer b0 经 VSSetConstantBuffers/PSSetConstantBuffers/GSSetConstantBuffers 槽 0 绑定。
 #ifndef DX11_UNIFORM_BLOCK_HLSLI
 #define DX11_UNIFORM_BLOCK_HLSLI
 
