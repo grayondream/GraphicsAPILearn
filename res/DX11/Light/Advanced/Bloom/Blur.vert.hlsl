@@ -15,7 +15,7 @@ struct VSOut {
 
 VSOut VSMain(VSIn i) {
     VSOut o;
-    o.TexCoords = i.aTexCoords;
+    o.TexCoords = float2(i.aTexCoords.x, 1.0 - i.aTexCoords.y);
     o.sv = float4(i.aPos, 1.0);
     return o;
 }
