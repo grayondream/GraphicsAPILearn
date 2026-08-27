@@ -27,6 +27,9 @@ public:
     id<MTLSamplerState> sampler() const { return _sampler; }
     int width() const { return _width; }
     int height() const { return _height; }
+    bool isCube() const { return _texture.textureType == MTLTextureTypeCube; }
+    bool isDepth() const { return _desc.format == TextureFormat::Depth32F || _desc.format == TextureFormat::Depth24Stencil8; }
+    int mipLevels() const { return _texture.mipmapLevelCount; }
 
 private:
     bool createCubeTexture(int width, int height, bool mipmapped);
