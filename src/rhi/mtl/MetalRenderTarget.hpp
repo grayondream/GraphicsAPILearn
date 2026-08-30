@@ -32,19 +32,20 @@ public:
 
     id<MTLTexture> activeColorTexture() const;
     id<MTLTexture> activeDepthTexture() const;
+    bool valid() const { return _valid; }
 
 private:
     void buildRenderPassDescriptor();
 
-    id<MTLDevice> _device{nil};
-    MTLRenderPassDescriptor* _rpd{nil};
+    void* _device{nullptr};
+    MTLRenderPassDescriptor* __strong _rpd{nil};
     FramebufferDesc _desc{};
 
     std::vector<std::shared_ptr<MetalTexture2D>> _colors;
     std::shared_ptr<MetalTexture2D> _depth;
 
-    id<MTLTexture> _cubeColorTexture{nil};
-    id<MTLTexture> _cubeDepthTexture{nil};
+    id<MTLTexture> __strong _cubeColorTexture{nil};
+    id<MTLTexture> __strong _cubeDepthTexture{nil};
     ITexture3D* _cube{nullptr};
     int _face{-1};
     int _mip{0};

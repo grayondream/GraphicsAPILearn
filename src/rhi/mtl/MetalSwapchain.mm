@@ -8,14 +8,34 @@ namespace rhi::mtl {
 
 MetalSwapchain::~MetalSwapchain() {
     _drawable = nil;
+    _depthTexture = nil;
+    _device = nil;
+    _layer = nullptr;
+}
+
+void MetalSwapchain::rebuildDepthTexture() {
+    _depthTexture = nil;
+    if (!_device || _width <= 0 || _height <= 0) return;
+    MTLTextureDescriptor* desc =
+        [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatDepth32Float
+                                                           width:_width
+                                                          height:_height
+                                                       mipmapped:NO];
+    desc.storageMode = MTLStorageModePrivate;
+    desc.usage = MTLTextureUsageRenderTarget;
+    _depthTexture = [_device newTextureWithDescriptor:desc];
 }
 
 void MetalSwapchain::init(CAMetalLayer* layer, int width, int height) {
     _layer = layer;
     _layer.pixelFormat = MTLPixelFormatBGRA8Unorm;
-    _layer.framebufferOnly = YES;
+    _layer.framebufferOnly = getenv("METAL_READBACK") ? NO : YES;
     _layer.drawableSize = CGSizeMake(width, height);
     _layer.opaque = YES;
+    _device = _layer.device;
+    _width = width;
+    _height = height;
+    rebuildDepthTexture();
 }
 
 bool MetalSwapchain::present() {
@@ -28,6 +48,11 @@ bool MetalSwapchain::present() {
 void MetalSwapchain::resize(int width, int height) {
     if (_layer) {
         _layer.drawableSize = CGSizeMake(width, height);
+    }
+    if (width != _width || height != _height) {
+        _width = width;
+        _height = height;
+        rebuildDepthTexture();
     }
 }
 

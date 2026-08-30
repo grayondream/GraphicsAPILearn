@@ -6,11 +6,22 @@
 
 namespace rhi {
 
-enum class BackendKind : uint8_t { GL, Vulkan, Dx12, Dx11 };
+enum class BackendKind : uint8_t { GL, Vulkan, Dx12, Dx11, Metal };
 
 inline BackendKind& CurrentBackendKind() { static BackendKind kind = BackendKind::GL; return kind; }
 inline void setBackendKind(BackendKind kind) { CurrentBackendKind() = kind; }
 inline BackendKind backendKind() { return CurrentBackendKind(); }
+
+inline const char* backendDisplayName() {
+    switch (backendKind()) {
+        case BackendKind::GL:     return "OpenGL";
+        case BackendKind::Metal:  return "Metal";
+        case BackendKind::Vulkan: return "Vulkan";
+        case BackendKind::Dx11:   return "DirectX11";
+        case BackendKind::Dx12:   return "DirectX12";
+    }
+    return "Unknown";
+}
 
 enum class PrimitiveType : uint8_t { TriangleList, TriangleStrip, Lines, Points };
 

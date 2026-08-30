@@ -38,7 +38,7 @@ struct VertexOut {
 };
 
 vertex VertexOut PBR_Texture_vertex(VertexIn in [[stage_in]],
-                                    constant UniformBlock& ubo [[buffer(0)]]) {
+                                    constant UniformBlock& ubo [[buffer(8)]]) {
     VertexOut out;
     out.TexCoords = in.aTexCoords;
     out.WorldPos = (ubo.model * in.pos).xyz;
@@ -48,7 +48,7 @@ vertex VertexOut PBR_Texture_vertex(VertexIn in [[stage_in]],
 }
 
 fragment float4 PBR_Texture_fragment(VertexOut in [[stage_in]],
-                                     constant UniformBlock& ubo [[buffer(0)]],
+                                     constant UniformBlock& ubo [[buffer(8)]],
                                      texture2d<float> albedoMap [[texture(0)]],
                                      texture2d<float> roughnessMap [[texture(1)]],
                                      texture2d<float> metallicMap [[texture(2)]],
@@ -63,10 +63,10 @@ fragment float4 PBR_Texture_fragment(VertexOut in [[stage_in]],
     float ao = aoMap.sample(smp, in.TexCoords).r;
     
     float3 tangentNormal = normalMap.sample(smp, in.TexCoords).xyz * 2.0 - 1.0;
-    float3 Q1 = dFdx(in.WorldPos);
-    float3 Q2 = dFdy(in.WorldPos);
-    float2 st1 = dFdx(in.TexCoords);
-    float2 st2 = dFdy(in.TexCoords);
+    float3 Q1 = dfdx(in.WorldPos);
+    float3 Q2 = dfdy(in.WorldPos);
+    float2 st1 = dfdx(in.TexCoords);
+    float2 st2 = dfdy(in.TexCoords);
     float3 N = normalize(in.Normal);
     float3 T = normalize(Q1 * st2.y - Q2 * st1.y);
     float3 B = -normalize(cross(N, T));

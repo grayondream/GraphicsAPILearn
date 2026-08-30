@@ -163,7 +163,7 @@ void FrameBufferApp::drawCube() {
 }
 
 void FrameBufferApp::draw(const float dt) {
-	ImGui::Begin("OpenGL");
+	ImGui::Begin(rhi::backendDisplayName());
 	ImGui::SetNextItemWidth(200);
 	const char* items[4] = { "None", "Inversion", "Gray", "Kernel"};
 	

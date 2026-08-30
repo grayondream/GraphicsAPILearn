@@ -1,4 +1,5 @@
 #include "SimpleLightDiffuse.hpp"
+#include "rhi/core/Common.hpp"
 #include "base/StaticCollector.hpp"
 #include "base/ErrorHandle.hpp"
 #include "rhi/core/IShader.hpp"
@@ -56,7 +57,7 @@ bool SimpleLightDiffuse::load(std::shared_ptr<rhi::IRenderer> rhiRenderer) {
 }
 
 void SimpleLightDiffuse::draw(const float dt) {
-	ImGui::Begin("OpenGL");
+	ImGui::Begin(rhi::backendDisplayName());
 	ImGui::Text("Color Picker with Alpha:");
 	ImGui::ColorEdit4("Color with Alpha", &_lightColor[0]);
 	ImGui::End();
@@ -88,7 +89,7 @@ void SimpleLightDiffuse::draw(const float dt) {
 	{
 		renderer()->setPipeline(_targetPipeline);
 		renderer()->setVertexBuffer(_vb);
-		renderer()->setVertexBuffer(_normal, 2);
+		renderer()->setVertexBuffer(_normal, 1);
 		glm::mat4 model = glm::mat4(1.0f);
 		model = glm::translate(model, glm::vec3(0.0f, 0.0f, 0.0f));
 		model = glm::rotate(model, glm::radians(0.0f), glm::vec3(1.0f, 0.3f, 0.5f));

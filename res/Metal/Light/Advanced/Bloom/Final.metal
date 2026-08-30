@@ -34,7 +34,7 @@ struct VertexOut {
 };
 
 vertex VertexOut Bloom_Final_vertex(VertexIn in [[stage_in]],
-                                    constant UniformBlock& ubo [[buffer(0)]]) {
+                                    constant UniformBlock& ubo [[buffer(8)]]) {
     VertexOut out;
     out.TexCoords = in.textureCoord;
     out.position = float4(in.pos, 1.0);
@@ -42,7 +42,7 @@ vertex VertexOut Bloom_Final_vertex(VertexIn in [[stage_in]],
 }
 
 fragment float4 Bloom_Final_fragment(VertexOut in [[stage_in]],
-                                     constant UniformBlock& ubo [[buffer(0)]],
+                                     constant UniformBlock& ubo [[buffer(8)]],
                                      texture2d<float> scene [[texture(0)]],
                                      texture2d<float> bloomBlur [[texture(1)]],
                                      sampler sceneSampler [[sampler(0)]],

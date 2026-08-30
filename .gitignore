@@ -6,3 +6,5 @@ imgui.ini
 PROGRESS.md
 docs/
 build-nodx/
+.opencode
+build_metal

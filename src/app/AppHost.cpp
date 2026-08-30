@@ -3,10 +3,18 @@
 #include "IImGuiWindow.hpp"
 #include "app/sample/Sample.hpp"
 #include "app/SampleFactory.hpp"
+#if ENABLE_OPENGL
 #include "app/Samples/ImGuiOpenglWindow.hpp"
+#endif
+#if ENABLE_VULKAN
 #include "app/Samples/ImGuiVulkanWindow.hpp"
+#endif
+#if ENABLE_DX12
 #include "app/Samples/ImGuiDirectx12Window.hpp"
+#endif
+#if ENABLE_DX11
 #include "app/Samples/ImGuiDirectx11Window.hpp"
+#endif
 #include "rhi/gl/GLBackend.hpp"
 #include "rhi/gl/GLFWSurface.hpp"
 #include "rhi/core/Common.hpp"
@@ -21,6 +29,7 @@
 #endif
 #if ENABLE_METAL
 #include "rhi/mtl/MetalBackend.hpp"
+#include "rhi/mtl/MetalSurface.hpp"
 #include "app/Samples/ImGuiMetalWindow.hpp"
 #endif
 #include "base/ErrorHandle.hpp"
@@ -120,12 +129,11 @@ bool AppHost::rebuildBackend(const GLFWWindowProperties& props) {
     if (_backend == GraphicsType::Metal) {
         m_window->shutdown();
         m_window->initialize();
-        rhi::setBackendKind(rhi::BackendKind::GL);
-        // Metal needs to get CAMetalLayer from the GLFW window
-        // For now, create a surface that the renderer will configure
-        auto surface = std::make_shared<rhi::MetalSurface>(nullptr,
+        rhi::setBackendKind(rhi::BackendKind::Metal);
+        void* metalLayer = rhi::mtl::createMetalLayer(m_window->getNativeGLFWWindow());
+        auto surface = std::make_shared<rhi::mtl::MetalSurface>(metalLayer,
             static_cast<int>(props.width), static_cast<int>(props.height));
-        _renderer = rhi::createMetalRenderer();
+        _renderer = rhi::mtl::createMetalRenderer();
         if (!_renderer->init(surface)) { LOGE("Failed to init Metal renderer"); return false; }
         _renderer->setViewport(rhi::Viewport{0, 0, static_cast<int>(props.width), static_cast<int>(props.height)});
         _renderer->setPipeline(nullptr);
@@ -137,6 +145,7 @@ bool AppHost::rebuildBackend(const GLFWWindowProperties& props) {
         return reloadSample();
     }
 #endif
+#if ENABLE_OPENGL
     // 后端切换需按新 client API 重建原生窗口；VK 分支在上面已重建为 NO_API，
     // GL 分支同样需 shutdown+initialize 以按属性重建为 OPENGL 上下文窗口。
     if (_backend == GraphicsType::GL) { m_window->shutdown(); m_window->initialize(); }
@@ -151,6 +160,8 @@ bool AppHost::rebuildBackend(const GLFWWindowProperties& props) {
     m_imguiWindow = std::make_unique<ImGuiOpenglWindow>();
     m_imguiWindow->init(m_window->getNativeGLFWWindow());
     return reloadSample();
+#endif
+    return false;
 }
 
 bool AppHost::reloadSample() {

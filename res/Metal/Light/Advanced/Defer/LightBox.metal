@@ -35,13 +35,13 @@ struct VertexOut {
 };
 
 vertex VertexOut Defer_LightBox_vertex(VertexIn in [[stage_in]],
-                                       constant UniformBlock& ubo [[buffer(0)]]) {
+                                       constant UniformBlock& ubo [[buffer(8)]]) {
     VertexOut out;
     out.position = ubo.projection * ubo.view * ubo.model * float4(in.pos);
     return out;
 }
 
 fragment float4 Defer_LightBox_fragment(VertexOut in [[stage_in]],
-                                        constant UniformBlock& ubo [[buffer(0)]]) {
+                                        constant UniformBlock& ubo [[buffer(8)]]) {
     return float4(ubo.vec4Pool[3].rgb, 1.0);   // lightColor
 }

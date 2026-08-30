@@ -350,7 +350,7 @@ void IBLSpecularApp::draw(const float dt) {
     renderObjectsAndLights(m_program, view, projection);
     renderBackground(m_backgroundProgram, view, projection);
 
-    ImGui::Begin("OpenGL");
+    ImGui::Begin(rhi::backendDisplayName());
     ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
     ImGui::SliderFloat("Roughness", &m_roughness, 0.0f, 1.0f);
     ImGui::SliderFloat("Metallic", &m_metallic, 0.0f, 1.0f);

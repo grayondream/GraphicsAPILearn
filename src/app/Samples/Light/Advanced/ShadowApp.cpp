@@ -199,7 +199,7 @@ void ShadowApp::renderDepthDebug() {
 }
 
 void ShadowApp::draw(const float dt) {
-	ImGui::Begin("OpenGL");
+	ImGui::Begin(rhi::backendDisplayName());
 	ImGui::Checkbox("Enable Debug", &_enableDebug);
 	ImGui::Checkbox("Enable DepthMap", &_enableDepthMap);
 	ImGui::Checkbox("Enable Bias", &_enableShadowBias);

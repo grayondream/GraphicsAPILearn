@@ -312,7 +312,7 @@ void SSAOApp::draw(const float dt) {
 	renderSSAOTexture(m_ssaoProgram, projection);
 	renderBlurSSAOTexture(m_ssaoBlurProgram);
 	renderLightPass(m_lightProgram);
-	ImGui::Begin("OpenGL");
+	ImGui::Begin(rhi::backendDisplayName());
 	ImGui::Checkbox("Enable SSAO", &m_enableSSAO);
 	ImGui::End();
 }

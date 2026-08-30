@@ -36,7 +36,7 @@ struct VertexOut {
 };
 
 vertex VertexOut Blend_vertex(VertexIn in [[stage_in]],
-                              constant UniformBlock& ubo [[buffer(0)]]) {
+                              constant UniformBlock& ubo [[buffer(8)]]) {
     VertexOut out;
     out.position = ubo.projection * ubo.view * ubo.model * in.pos;
     out.TexCoords = in.inTextureCoord;
@@ -45,7 +45,7 @@ vertex VertexOut Blend_vertex(VertexIn in [[stage_in]],
 }
 
 fragment half4 Blend_fragment(VertexOut in [[stage_in]],
-                              constant UniformBlock& ubo [[buffer(0)]],
+                              constant UniformBlock& ubo [[buffer(8)]],
                               texture2d<half> textureSampler [[texture(0)]]) {
     constexpr sampler s(mag_filter::linear, min_filter::linear);
     half4 FragColor;

@@ -38,6 +38,7 @@ public:
     void setStencilMask(unsigned mask) override;
     void setBlend(bool enable) override;
     void setBlendFunc(BlendFactor src, BlendFactor dst) override;
+    void setCullMode(bool enable, int face) override;
     void setCullFaceEnable(bool enable) override;
     void setCullFace(CullFace face) override;
     void setFrontFace(bool ccw) override;
@@ -51,15 +52,15 @@ public:
     void setVertexBuffer(const std::shared_ptr<IBuffer>& buffer, uint32_t binding) override;
     void setIndexBuffer(const std::shared_ptr<IBuffer>& buffer) override;
 
-    bool bindShader(MetalShader* shader, const VertexLayout& layout);
+    bool bindShader(const std::shared_ptr<MetalShader>& shader, const VertexLayout& layout);
     void applyRenderEncoder(void* encoder);
     void ensurePipeline(MTLPixelFormat colorFormat, MTLPixelFormat depthFormat);
 
 private:
     uint64_t stateHash() const;
 
-    id<MTLDevice> _device{nil};
-    MetalShader* _shader{nullptr};
+    void* _device{nullptr};
+    std::shared_ptr<MetalShader> _shader{};
     VertexLayout _layout{};
     PrimitiveType _primitive{PrimitiveType::TriangleList};
 
@@ -76,13 +77,13 @@ private:
     bool _pointSizeEnable{false};
     bool _multisample{false};
 
-    id<MTLRenderPipelineState> _pipelineState{nil};
-    id<MTLDepthStencilState> _depthStencilState{nil};
+    id<MTLRenderPipelineState> __strong _pipelineState{nil};
+    id<MTLDepthStencilState> __strong _depthStencilState{nil};
     uint64_t _lastStateHash{0};
     MTLPixelFormat _lastColorFormat{MTLPixelFormatInvalid};
     MTLPixelFormat _lastDepthFormat{MTLPixelFormatInvalid};
 
-    MTLVertexDescriptor* _vertexDescriptor{nil};
+    MTLVertexDescriptor* __strong _vertexDescriptor{nil};
 };
 
 } // namespace rhi::mtl
@@ -116,6 +117,7 @@ public:
     void setStencilMask(unsigned) override {}
     void setBlend(bool) override {}
     void setBlendFunc(BlendFactor, BlendFactor) override {}
+    void setCullMode(bool, int) override {}
     void setCullFaceEnable(bool) override {}
     void setCullFace(CullFace) override {}
     void setFrontFace(bool) override {}

@@ -184,7 +184,7 @@ void PointLightShadowApp::draw(const float dt) {
 	glm::vec3 lightPos = glm::vec3(0.0f, 0.0f, 0.0f);
 	lightPos.z = static_cast<float>(sin(curTime) * 10.0);
 	auto pos = _camera.getAttr().pos;
-	ImGui::Begin("OpenGL");
+	ImGui::Begin(rhi::backendDisplayName());
 	ImGui::Checkbox("Enable PCF", &_enableSimplePCF);
 	ImGui::Checkbox("Enable Shadow", &_enableShadow);
 	ImGui::Text("Camera Pos: (%.2f, %.2f, %.2f)", pos.x, pos.y, pos.z);

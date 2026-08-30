@@ -1,4 +1,5 @@
 #include "LoadModelApp.hpp"
+#include "rhi/core/Common.hpp"
 #include "base/StaticCollector.hpp"
 #include "base/ErrorHandle.hpp"
 #include "rhi/core/IShader.hpp"
@@ -58,7 +59,7 @@ void LoadModelApp::initShader() {
 }
 
 void LoadModelApp::drawUI() {
-	ImGui::Begin("OpenGL");
+	ImGui::Begin(rhi::backendDisplayName());
 	ImGui::End();
 }
 

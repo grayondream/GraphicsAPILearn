@@ -36,7 +36,7 @@ struct VertexOut {
 };
 
 vertex VertexOut PointLightShadow_ShadowMappingDepth_vertex(VertexIn in [[stage_in]],
-                                                           constant UniformBlock& ubo [[buffer(0)]]) {
+                                                           constant UniformBlock& ubo [[buffer(8)]]) {
     VertexOut out;
     float4 worldPos = ubo.model * in.pos;
     out.FragPos = worldPos;
@@ -45,7 +45,7 @@ vertex VertexOut PointLightShadow_ShadowMappingDepth_vertex(VertexIn in [[stage_
 }
 
 fragment float4 PointLightShadow_ShadowMappingDepth_fragment(VertexOut in [[stage_in]],
-                                                             constant UniformBlock& ubo [[buffer(0)]]) {
+                                                             constant UniformBlock& ubo [[buffer(8)]]) {
     // lightPos → vec4Pool[2].xyz, far_plane → floatPool[17]（与 ShadowMapping.fs 同槽）
     float lightDistance = length(in.FragPos.xyz - ubo.vec4Pool[2].xyz);
     

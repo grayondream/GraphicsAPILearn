@@ -22,12 +22,16 @@ public:
     id<MTLLibrary> library() const { return _library; }
     id<MTLFunction> vertexFunction(const std::string& name);
     id<MTLFunction> fragmentFunction(const std::string& name);
+    id<MTLFunction> vertexFunction();
+    id<MTLFunction> fragmentFunction();
 
 private:
-    id<MTLDevice> _device{nil};
-    id<MTLLibrary> _library{nil};
+    void* _device{nullptr};
+    id<MTLLibrary> __strong _library{nil};
     std::string _log;
-    std::unordered_map<std::string, id<MTLFunction>> _functionCache;
+    std::string _vertexEntry;
+    std::string _fragmentEntry;
+    std::unordered_map<std::string, __strong id<MTLFunction>> _functionCache;
 };
 
 } // namespace rhi::mtl
@@ -47,6 +51,8 @@ public:
 
     void* vertexFunction(const std::string&) { return nullptr; }
     void* fragmentFunction(const std::string&) { return nullptr; }
+    void* vertexFunction() { return nullptr; }
+    void* fragmentFunction() { return nullptr; }
 };
 
 } // namespace rhi::mtl

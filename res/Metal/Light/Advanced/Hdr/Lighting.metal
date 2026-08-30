@@ -1,5 +1,24 @@
 #include <metal_stdlib>
 using namespace metal;
+// __MAT_HELPERS__ (auto-added: MSL lacks inverse()/mat4(mat3))
+float3x3 mat3Inverse(float3x3 m) {
+    float a00 = m[0][0], a01 = m[0][1], a02 = m[0][2];
+    float a10 = m[1][0], a11 = m[1][1], a12 = m[1][2];
+    float a20 = m[2][0], a21 = m[2][1], a22 = m[2][2];
+    float b01 =  a22*a11 - a12*a21;
+    float b11 = -a22*a10 + a12*a20;
+    float b21 =  a21*a10 - a11*a20;
+    float det = a00*b01 + a01*b11 + a02*b21;
+    float id = 1.0 / det;
+    return float3x3(
+        b01*id, (-a22*a01 + a02*a21)*id, ( a12*a01 - a02*a11)*id,
+        b11*id, ( a22*a00 - a02*a20)*id, (-a12*a00 + a02*a10)*id,
+        b21*id, (-a21*a00 + a01*a20)*id, ( a11*a00 - a01*a10)*id
+    );
+}
+float4x4 mat4FromMat3(float3x3 m) {
+    return float4x4(float4(m[0], 0.0), float4(m[1], 0.0), float4(m[2], 0.0), float4(0.0, 0.0, 0.0, 1.0));
+}
 
 struct ULight {
     float4 position;
@@ -42,14 +61,14 @@ struct VertexOut {
 };
 
 vertex VertexOut Hdr_Lighting_vertex(VertexIn in [[stage_in]],
-                                     constant UniformBlock& ubo [[buffer(0)]]) {
+                                     constant UniformBlock& ubo [[buffer(8)]]) {
     VertexOut out;
     out.FragPos = float3(ubo.model * float4(in.pos, 1.0));   
     out.TexCoords = in.textureCoord;
     
     float3 n = ubo.floatPool[34] > 0.5 ? -in.normal : in.normal;   // inverse_normals
     
-    float3x3 normalMatrix = transpose(inverse(float3x3(ubo.model)));
+    float3x3 normalMatrix = transpose(mat3Inverse(float3x3(ubo.model[0].xyz, ubo.model[1].xyz, ubo.model[2].xyz)));
     out.Normal = normalize(normalMatrix * n);
     
     out.position = ubo.projection * ubo.view * ubo.model * float4(in.pos, 1.0);
@@ -57,7 +76,7 @@ vertex VertexOut Hdr_Lighting_vertex(VertexIn in [[stage_in]],
 }
 
 fragment float4 Hdr_Lighting_fragment(VertexOut in [[stage_in]],
-                                      constant UniformBlock& ubo [[buffer(0)]],
+                                      constant UniformBlock& ubo [[buffer(8)]],
                                       texture2d<float> diffuseTexture [[texture(0)]],
                                       sampler diffuseSampler [[sampler(0)]]) {
     float3 color = diffuseTexture.sample(diffuseSampler, in.TexCoords).rgb;

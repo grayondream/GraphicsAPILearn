@@ -18,12 +18,13 @@ namespace StaticCollector {
             return getVulkanShaderPath();
         }
         if (rhi::backendKind() == rhi::BackendKind::Dx12) {
-            // 返回 HLSL 镜像树根：DXShader 以源路径推导 build/res/DX12 下同名 .cso
             return getDX12ShaderPath();
         }
         if (rhi::backendKind() == rhi::BackendKind::Dx11) {
-            // 返回 HLSL 镜像树根：DX11Shader 以源路径推导 build/res/DX11 下同名 .fxc
             return getDX11ShaderPath();
+        }
+        if (rhi::backendKind() == rhi::BackendKind::Metal) {
+            return getMetalShaderPath();
         }
         return FileUtils::join(getResPath(), "GL");
 	}
@@ -38,6 +39,10 @@ namespace StaticCollector {
 
 	std::string getDX12ShaderPath() {
 		return FileUtils::join(getResPath(), "DX12");
+	}
+
+	std::string getMetalShaderPath() {
+		return FileUtils::join(getResPath(), "Metal");
 	}
 
 	std::string getImagePath() {

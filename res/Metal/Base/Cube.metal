@@ -37,7 +37,7 @@ struct VertexOut {
 };
 
 vertex VertexOut Cube_vertex(VertexIn in [[stage_in]],
-                             constant UniformBlock& ub [[buffer(1)]]) {
+                             constant UniformBlock& ub [[buffer(8)]]) {
     VertexOut out;
     out.position = ub.projection * ub.view * ub.model * in.aPos;
     out.textureCoord = in.aTexCoord;

@@ -33,14 +33,14 @@ struct VertexOut {
 };
 
 vertex VertexOut ShadowMap_ShadowMapping_vertex(VertexIn in [[stage_in]],
-                                                constant UniformBlock& ubo [[buffer(0)]]) {
+                                                constant UniformBlock& ubo [[buffer(8)]]) {
     VertexOut out;
     out.position = ubo.extraMat4[0] * ubo.model * in.pos;
     return out;
 }
 
 fragment float4 ShadowMap_ShadowMapping_fragment(VertexOut in [[stage_in]],
-                                                 constant UniformBlock& ubo [[buffer(0)]]) {
+                                                 constant UniformBlock& ubo [[buffer(8)]]) {
     // gl_FragDepth = gl_FragCoord.z;
     return float4(0.0);
 }

@@ -39,7 +39,7 @@ struct VertexOut {
 };
 
 vertex VertexOut Mult_Object_vertex(VertexIn in [[stage_in]],
-                                    constant UniformBlock& ubo [[buffer(0)]]) {
+                                    constant UniformBlock& ubo [[buffer(8)]]) {
     VertexOut out;
     out.FragPos = ubo.model * in.pos;
     out.position = ubo.projection * ubo.view * out.FragPos;
@@ -50,7 +50,7 @@ vertex VertexOut Mult_Object_vertex(VertexIn in [[stage_in]],
 }
 
 float3 CalcDirLight(ULight light, float3 normal, float3 viewDir,
-                    texture2d<half> diffuseMap, texture2d<half> specularMap,
+                    texture2d<float> diffuseMap, texture2d<float> specularMap,
                     float2 texCoords, float shininess) {
     float3 lightDir = normalize(-light.direction.xyz);
     float diff = max(dot(normal, lightDir), 0.0);
@@ -65,7 +65,7 @@ float3 CalcDirLight(ULight light, float3 normal, float3 viewDir,
 }
 
 float3 CalcPointLight(ULight light, float3 normal, float3 fragPos, float3 viewDir,
-                      texture2d<half> diffuseMap, texture2d<half> specularMap,
+                      texture2d<float> diffuseMap, texture2d<float> specularMap,
                       float2 texCoords, float shininess) {
     float3 lightDir = normalize(light.position.xyz - fragPos);
     float diff = max(dot(normal, lightDir), 0.0);
@@ -85,7 +85,7 @@ float3 CalcPointLight(ULight light, float3 normal, float3 fragPos, float3 viewDi
 }
 
 float3 CalcSpotLight(ULight light, float3 normal, float3 fragPos, float3 viewDir,
-                     texture2d<half> diffuseMap, texture2d<half> specularMap,
+                     texture2d<float> diffuseMap, texture2d<float> specularMap,
                      float2 texCoords, float shininess) {
     float3 lightDir = normalize(light.position.xyz - fragPos);
     float diff = max(dot(normal, lightDir), 0.0);
@@ -108,9 +108,9 @@ float3 CalcSpotLight(ULight light, float3 normal, float3 fragPos, float3 viewDir
 }
 
 fragment float4 Mult_Object_fragment(VertexOut in [[stage_in]],
-                                      constant UniformBlock& ubo [[buffer(0)]],
-                                      texture2d<half> diffuseMap [[texture(0)]],
-                                      texture2d<half> specularMap [[texture(1)]]) {
+                                      constant UniformBlock& ubo [[buffer(8)]],
+                                      texture2d<float> diffuseMap [[texture(0)]],
+                                      texture2d<float> specularMap [[texture(1)]]) {
     float3 norm = normalize(in.normal.rgb);
     float3 viewDir = normalize(ubo.vec4Pool[0].xyz - in.FragPos.rgb);
 

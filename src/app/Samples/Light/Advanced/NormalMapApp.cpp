@@ -125,7 +125,7 @@ void NormalMapApp::compileShader() {
 }
 
 void NormalMapApp::draw(const float dt) {
-	ImGui::Begin("OpenGL");
+	ImGui::Begin(rhi::backendDisplayName());
 	ImGui::Checkbox("Enable Normal Map", &_enableNormalMap);
 	ImGui::End();
 

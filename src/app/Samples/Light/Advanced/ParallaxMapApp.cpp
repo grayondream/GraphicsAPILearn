@@ -130,7 +130,7 @@ void ParallaxMapApp::compileShader() {
 }
 
 void ParallaxMapApp::draw(const float dt) {
-	ImGui::Begin("OpenGL");
+	ImGui::Begin(rhi::backendDisplayName());
 	ImGui::Checkbox("Enable Normal Map", &_enableDisp);
 	ImGui::Checkbox("Enable Steep", &_enableSteep);
 	ImGui::Checkbox("Enable Occlusion", &_enableOcclusion);

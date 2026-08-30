@@ -121,7 +121,7 @@ void SaturnApp::loadModel() {
 }
 
 void SaturnApp::draw(const float dt) {
-	ImGui::Begin("OpenGL");
+	ImGui::Begin(rhi::backendDisplayName());
 	ImGui::End();
 	static float curTime = 0;
 	curTime += dt;

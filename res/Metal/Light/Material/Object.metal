@@ -37,7 +37,7 @@ struct VertexOut {
 };
 
 vertex VertexOut Material_Object_vertex(VertexIn in [[stage_in]],
-                                        constant UniformBlock& ubo [[buffer(0)]]) {
+                                        constant UniformBlock& ubo [[buffer(8)]]) {
     VertexOut out;
     out.fragPos = ubo.model * in.pos;
     out.position = ubo.projection * ubo.view * out.fragPos;
@@ -47,7 +47,7 @@ vertex VertexOut Material_Object_vertex(VertexIn in [[stage_in]],
 }
 
 fragment float4 Material_Object_fragment(VertexOut in [[stage_in]],
-                                          constant UniformBlock& ubo [[buffer(0)]]) {
+                                          constant UniformBlock& ubo [[buffer(8)]]) {
     float4 ambient = ubo.lights[0].ambient * ubo.vec4Pool[7];
 
     float4 norm = normalize(in.normal);

@@ -36,7 +36,7 @@ struct VertexOut {
 };
 
 vertex VertexOut Instance_Sphere_vertex(VertexIn in [[stage_in]],
-                                        constant UniformBlock& ubo [[buffer(0)]],
+                                        constant UniformBlock& ubo [[buffer(8)]],
                                         uint instanceID [[instance_id]]) {
     VertexOut out;
     float c = instanceID * 5.0 / 255;

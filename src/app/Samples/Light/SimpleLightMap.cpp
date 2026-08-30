@@ -1,4 +1,5 @@
 #include "SimpleLightMap.hpp"
+#include "rhi/core/Common.hpp"
 #include "base/StaticCollector.hpp"
 #include "base/ErrorHandle.hpp"
 #include "rhi/core/IShader.hpp"
@@ -71,7 +72,7 @@ bool SimpleLightMap::load(std::shared_ptr<rhi::IRenderer> rhiRenderer) {
 }
 
 void SimpleLightMap::draw(const float dt) {
-	ImGui::Begin("OpenGL");
+	ImGui::Begin(rhi::backendDisplayName());
 	ImGui::Text("Color Picker with Alpha:");
 	ImGui::ColorEdit4("Color with Alpha", &_lightColor[0]);
 	ImGui::End();

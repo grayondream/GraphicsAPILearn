@@ -36,7 +36,7 @@ struct VertexOut {
 };
 
 vertex VertexOut GLSLCube_vertex(VertexIn in [[stage_in]],
-                                 constant UniformBlock& ubo [[buffer(0)]],
+                                 constant UniformBlock& ubo [[buffer(8)]],
                                  uint vertexID [[vertex_id]]) {
     VertexOut out;
     out.position = ubo.projection * ubo.view * ubo.model * in.pos;
@@ -56,7 +56,7 @@ vertex VertexOut GLSLCube_vertex(VertexIn in [[stage_in]],
 }
 
 fragment half4 GLSLCube_fragment(VertexOut in [[stage_in]],
-                                 constant UniformBlock& ubo [[buffer(0)]],
+                                 constant UniformBlock& ubo [[buffer(8)]],
                                  texture2d<half> textureSampler [[texture(0)]]) {
     half4 color = half4(in.fragColor);
 

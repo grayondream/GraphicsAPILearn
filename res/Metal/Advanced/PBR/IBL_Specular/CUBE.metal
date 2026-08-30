@@ -36,7 +36,7 @@ struct VertexOut {
 };
 
 vertex VertexOut IBL_Specular_CUBE_vertex(VertexIn in [[stage_in]],
-                                          constant UniformBlock& ubo [[buffer(0)]]) {
+                                          constant UniformBlock& ubo [[buffer(8)]]) {
     VertexOut out;
     out.WorldPos = in.pos.xyz;
     out.position = ubo.projection * ubo.view * float4(out.WorldPos, 1.0);
@@ -44,12 +44,12 @@ vertex VertexOut IBL_Specular_CUBE_vertex(VertexIn in [[stage_in]],
 }
 
 fragment float4 IBL_Specular_CUBE_fragment(VertexOut in [[stage_in]],
-                                           constant UniformBlock& ubo [[buffer(0)]],
+                                           constant UniformBlock& ubo [[buffer(8)]],
                                            texture2d<float> equirectangularMap [[texture(0)]],
                                            sampler smp [[sampler(0)]]) {
     const float2 invAtan = float2(0.1591, 0.3183);
     float3 normPos = normalize(in.WorldPos);
-    float2 uv = float2(atan(normPos.z, normPos.x), asin(normPos.y));
+    float2 uv = float2(atan2(normPos.z, normPos.x), asin(normPos.y));
     uv *= invAtan;
     uv += 0.5;
     float3 color = equirectangularMap.sample(smp, uv).rgb;

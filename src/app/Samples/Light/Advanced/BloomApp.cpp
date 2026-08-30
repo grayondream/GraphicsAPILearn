@@ -278,7 +278,7 @@ void BloomApp::renderLight(std::shared_ptr<rhi::IPipeline>& program, const glm::
 
 void BloomApp::draw(const float dt) {
 	auto pos = _camera.getAttr().pos;
-	ImGui::Begin("OpenGL");
+	ImGui::Begin(rhi::backendDisplayName());
 	ImGui::Checkbox("Enable Bloom", &m_enableBloom);
 	ImGui::SliderFloat("Expose Value", &m_expose, 0, 1.0);
 	ImGui::End();

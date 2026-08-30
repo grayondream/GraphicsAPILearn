@@ -43,7 +43,7 @@ struct VertexOut {
 };
 
 vertex VertexOut Defer_Light_vertex(VertexIn in [[stage_in]],
-                                    constant UniformBlock& ubo [[buffer(0)]]) {
+                                    constant UniformBlock& ubo [[buffer(8)]]) {
     VertexOut out;
     out.TexCoords = in.textureCoord;
     out.position = float4(in.pos, 1.0);
@@ -51,7 +51,7 @@ vertex VertexOut Defer_Light_vertex(VertexIn in [[stage_in]],
 }
 
 fragment float4 Defer_Light_fragment(VertexOut in [[stage_in]],
-                                     constant UniformBlock& ubo [[buffer(0)]],
+                                     constant UniformBlock& ubo [[buffer(8)]],
                                      texture2d<float> gPosition [[texture(0)]],
                                      texture2d<float> gNormal [[texture(1)]],
                                      texture2d<float> gAlbedoSpec [[texture(2)]],

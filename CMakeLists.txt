@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(renderLearn)
+project(renderLearn LANGUAGES C CXX OBJC OBJCXX)
 set(CMAKE_CXX_STANDARD 20)
 
 option(ENABLE_DX12 "Enable Direct3D 12 support" OFF)

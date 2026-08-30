@@ -1,3 +1,4 @@
+#if ENABLE_OPENGL
 #include "ImGuiOpenglWindow.hpp"
 #include <imgui.h>
 #include <imgui_impl_glfw.h>
@@ -32,3 +33,5 @@ void ImGuiOpenglWindow::destroy(){
     ImGui_ImplGlfw_Shutdown();
     ImGui::DestroyContext();
 }
+
+#endif

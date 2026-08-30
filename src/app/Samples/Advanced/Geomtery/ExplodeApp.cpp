@@ -46,7 +46,7 @@ bool ExplodeApp::load(std::shared_ptr<rhi::IRenderer> rhiRenderer){
 }
 
 void ExplodeApp::draw(const float dt) {
-	ImGui::Begin("OpenGL");
+	ImGui::Begin(rhi::backendDisplayName());
 	ImGui::End();
 
 	static float curTime = 0;
@@ -66,7 +66,7 @@ void ExplodeApp::draw(const float dt) {
 
 		renderer()->setPipeline(_pipeline);
 		renderer()->setVertexBuffer(_vb);
-		renderer()->setVertexBuffer(_normal, 2);
+		renderer()->setVertexBuffer(_normal, 1);
 		renderer()->setIndexBuffer(_ebo);
 		rhi::SetUniform(_ubo, "projection", projection);
 		rhi::SetUniform(_ubo, "view", view);

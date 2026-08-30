@@ -36,7 +36,7 @@ struct VertexOut {
 };
 
 vertex VertexOut Ambination_Object_vertex(VertexIn in [[stage_in]],
-                                         constant UniformBlock& ubo [[buffer(0)]]) {
+                                         constant UniformBlock& ubo [[buffer(8)]]) {
     VertexOut out;
     out.position = ubo.projection * ubo.view * ubo.model * in.pos;
     out.normal = in.aNormal;
@@ -45,9 +45,8 @@ vertex VertexOut Ambination_Object_vertex(VertexIn in [[stage_in]],
 }
 
 fragment float4 Ambination_Object_fragment(VertexOut in [[stage_in]],
-                                           constant UniformBlock& ubo [[buffer(0)]]) {
+                                           constant UniformBlock& ubo [[buffer(8)]]) {
     float ambientStrength = 0.2;
     float4 ambient = ambientStrength * ubo.vec4Pool[3];
-    float4 result = ambient * ubo.vec4Pool[4];
-    return result;
+    return ambient * ubo.vec4Pool[4];
 }

@@ -9,7 +9,7 @@
 namespace rhi::mtl {
 
 MetalRenderTarget::MetalRenderTarget(void* device)
-    : _device((__bridge id<MTLDevice>)device) {}
+    : _device(device) {}
 
 MetalRenderTarget::~MetalRenderTarget() { release(); }
 
@@ -93,7 +93,7 @@ bool MetalRenderTarget::attachCubeFace(ITexture3D* cube, int face, int mip) {
     _face = face;
     _mip = mip;
     _cubeIsDepth = false;
-    _cubeColorTexture = c3d->texture();
+    _cubeColorTexture = (__bridge id<MTLTexture>)c3d->texture();
     buildRenderPassDescriptor();
     return true;
 }
@@ -108,7 +108,7 @@ bool MetalRenderTarget::attachDepthCube(ITexture3D* cube, int mip) {
     _face = -1;
     _mip = mip;
     _cubeIsDepth = true;
-    _cubeDepthTexture = c3d->texture();
+    _cubeDepthTexture = (__bridge id<MTLTexture>)c3d->texture();
     return true;
 }
 
@@ -144,7 +144,7 @@ bool MetalRenderTarget::resolveTo(IRenderTarget& dst) {
     id<MTLTexture> dstTex = mtlDst.activeColorTexture();
     if (!srcTex || !dstTex) return false;
 
-    id<MTLCommandQueue> queue = [_device newCommandQueue];
+    id<MTLCommandQueue> queue = [(__bridge id<MTLDevice>)_device newCommandQueue];
     if (!queue) return false;
 
     id<MTLCommandBuffer> cmd = [queue commandBuffer];
@@ -192,7 +192,7 @@ id<MTLTexture> MetalRenderTarget::activeColorTexture() const {
     if (_cube && !_cubeIsDepth && _face >= 0 && _cubeColorTexture) {
         return _cubeColorTexture;
     }
-    if (!_colors.empty()) return _colors[0]->texture();
+    if (!_colors.empty()) return (__bridge id<MTLTexture>)_colors[0]->texture();
     return nil;
 }
 
@@ -200,7 +200,7 @@ id<MTLTexture> MetalRenderTarget::activeDepthTexture() const {
     if (_cube && _cubeIsDepth && _cubeDepthTexture) {
         return _cubeDepthTexture;
     }
-    if (_depth) return _depth->texture();
+    if (_depth) return (__bridge id<MTLTexture>)_depth->texture();
     return nil;
 }
 
@@ -210,7 +210,7 @@ void MetalRenderTarget::buildRenderPassDescriptor() {
     // Color attachment 0
     id<MTLTexture> colorTex = activeColorTexture();
     if (colorTex) {
-        auto& colorAtt = _rpd.colorAttachments[0];
+        MTLRenderPassColorAttachmentDescriptor* colorAtt = _rpd.colorAttachments[0];
         colorAtt.texture = colorTex;
         colorAtt.loadAction = MTLLoadActionClear;
         colorAtt.clearColor = MTLClearColorMake(0, 0, 0, 1);
@@ -222,7 +222,7 @@ void MetalRenderTarget::buildRenderPassDescriptor() {
         } else if (_samples > 1) {
             colorAtt.storeAction = MTLStoreActionMultisampleResolve;
             if (_colors.size() > 1) {
-                colorAtt.resolveTexture = _colors[1]->texture();
+                colorAtt.resolveTexture = (__bridge id<MTLTexture>)_colors[1]->texture();
             }
         } else {
             colorAtt.storeAction = MTLStoreActionStore;
@@ -232,11 +232,10 @@ void MetalRenderTarget::buildRenderPassDescriptor() {
     // Depth attachment
     id<MTLTexture> depthTex = activeDepthTexture();
     if (depthTex) {
-        auto& depthAtt = _rpd.depthAttachment;
+        MTLRenderPassDepthAttachmentDescriptor* depthAtt = _rpd.depthAttachment;
         depthAtt.texture = depthTex;
         depthAtt.loadAction = MTLLoadActionClear;
         depthAtt.clearDepth = 1.0;
-        depthAtt.clearStencil = 0;
 
         if (_cube && _cubeIsDepth && _face >= 0) {
             depthAtt.slice = _face;

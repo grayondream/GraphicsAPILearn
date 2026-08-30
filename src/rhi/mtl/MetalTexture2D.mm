@@ -2,12 +2,13 @@
 
 #include "MetalTexture2D.hpp"
 #include "MetalFormat.hpp"
+#import <Metal/Metal.h>
 #include <cstring>
 
 namespace rhi::mtl {
 
 MetalTexture2D::MetalTexture2D(void* device)
-    : _device((__bridge id<MTLDevice>)device) {}
+    : _device(device) {}
 
 MetalTexture2D::~MetalTexture2D() { release(); }
 
@@ -53,35 +54,38 @@ bool MetalTexture2D::createEmpty(const TextureDesc& desc, int width, int height)
 
 void MetalTexture2D::bind(unsigned int unit) { _unit = unit; }
 
-void* MetalTexture2D::handle() { return (__bridge void*)_texture; }
+void* MetalTexture2D::handle() { return _texture; }
 
 void MetalTexture2D::release() {
-    if (_sampler) { _sampler = nil; }
-    if (_texture) { _texture = nil; }
+    if (_sampler) { _sampler = nullptr; }
+    if (_texture) { _texture = nullptr; }
 }
 
 bool MetalTexture2D::createTexture(int width, int height, bool mipmapped) {
+    id<MTLDevice> device = (__bridge id<MTLDevice>)_device;
     MTLPixelFormat pixelFormat = ToMTLPixelFormat(_desc.format);
     MTLTextureDescriptor* desc = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:pixelFormat
-                                                                                    width:width
-                                                                                   height:height
-                                                                                mipmapped:mipmapped];
+                                                                                     width:width
+                                                                                    height:height
+                                                                                 mipmapped:mipmapped];
     desc.usage = MTLTextureUsageShaderRead;
-    desc.storageMode = MTLResourceStorageModeShared;
+    desc.storageMode = MTLStorageModeShared;
 
     if (_desc.multisample && _desc.samples > 1) {
         desc.sampleCount = _desc.samples;
         desc.usage = MTLTextureUsageShaderRead | MTLTextureUsageRenderTarget;
     }
 
-    _texture = [_device newTextureWithDescriptor:desc];
-    return _texture != nil;
+    id<MTLTexture> tex = [device newTextureWithDescriptor:desc];
+    _texture = (__bridge void*)tex;
+    return _texture != nullptr;
 }
 
 bool MetalTexture2D::uploadData(const void* data, int width, int height, int channels) {
-    if (!_texture || !data) return false;
+    id<MTLTexture> tex = (__bridge id<MTLTexture>)_texture;
+    if (!tex || !data) return false;
 
-    MTLPixelFormat pixelFormat = _texture.pixelFormat;
+    MTLPixelFormat pixelFormat = tex.pixelFormat;
     size_t bytesPerRow = 0;
     if (pixelFormat == MTLPixelFormatRGBA8Unorm || pixelFormat == MTLPixelFormatBGRA8Unorm) {
         bytesPerRow = width * 4;
@@ -98,17 +102,19 @@ bool MetalTexture2D::uploadData(const void* data, int width, int height, int cha
     }
 
     MTLRegion region = MTLRegionMake2D(0, 0, width, height);
-    [_texture replaceRegion:region
-               mipmapLevel:0
-                 withBytes:data
-               bytesPerRow:bytesPerRow];
+    [tex replaceRegion:region
+           mipmapLevel:0
+             withBytes:data
+           bytesPerRow:bytesPerRow];
     return true;
 }
 
 bool MetalTexture2D::generateMipmaps() {
-    if (!_texture || _texture.mipmapLevelCount <= 1) return true;
+    id<MTLTexture> tex = (__bridge id<MTLTexture>)_texture;
+    if (!tex || tex.mipmapLevelCount <= 1) return true;
 
-    id<MTLCommandQueue> queue = [_device newCommandQueue];
+    id<MTLDevice> device = (__bridge id<MTLDevice>)_device;
+    id<MTLCommandQueue> queue = [device newCommandQueue];
     if (!queue) return false;
 
     id<MTLCommandBuffer> cmd = [queue commandBuffer];
@@ -117,7 +123,7 @@ bool MetalTexture2D::generateMipmaps() {
     id<MTLBlitCommandEncoder> blit = [cmd blitCommandEncoder];
     if (!blit) return false;
 
-    [blit generateMipmapsForTexture:_texture];
+    [blit generateMipmapsForTexture:tex];
     [blit endEncoding];
     [cmd commit];
     [cmd waitUntilCompleted];
@@ -125,14 +131,15 @@ bool MetalTexture2D::generateMipmaps() {
     return true;
 }
 
-MTLSamplerState* MetalTexture2D::createSampler() {
+void* MetalTexture2D::createSampler() {
+    id<MTLDevice> device = (__bridge id<MTLDevice>)_device;
     MTLSamplerDescriptor* desc = [[MTLSamplerDescriptor alloc] init];
 
     auto toMTLWrap = [](TextureWrap w) -> MTLSamplerAddressMode {
         switch (w) {
             case TextureWrap::Repeat:        return MTLSamplerAddressModeRepeat;
             case TextureWrap::ClampToEdge:   return MTLSamplerAddressModeClampToEdge;
-            case TextureWrap::ClampToBorder: return MTLSamplerAddressModeClampToEdge; // Metal doesn't have ClampToBorder directly
+            case TextureWrap::ClampToBorder: return MTLSamplerAddressModeClampToEdge;
         }
         return MTLSamplerAddressModeRepeat;
     };
@@ -165,7 +172,8 @@ MTLSamplerState* MetalTexture2D::createSampler() {
     desc.maxAnisotropy = 16;
     desc.label = @"MetalTexture2D Sampler";
 
-    return [_device newSamplerStateWithDescriptor:desc];
+    id<MTLSamplerState> sampler = [device newSamplerStateWithDescriptor:desc];
+    return (__bridge void*)sampler;
 }
 
 } // namespace rhi::mtl

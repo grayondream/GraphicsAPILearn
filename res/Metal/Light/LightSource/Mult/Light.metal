@@ -33,13 +33,13 @@ struct VertexOut {
 };
 
 vertex VertexOut Mult_Light_vertex(VertexIn in [[stage_in]],
-                                   constant UniformBlock& ubo [[buffer(0)]]) {
+                                   constant UniformBlock& ubo [[buffer(8)]]) {
     VertexOut out;
     out.position = ubo.projection * ubo.view * ubo.model * in.pos;
     return out;
 }
 
 fragment float4 Mult_Light_fragment(VertexOut in [[stage_in]],
-                                    constant UniformBlock& ubo [[buffer(0)]]) {
+                                    constant UniformBlock& ubo [[buffer(8)]]) {
     return ubo.vec4Pool[3];
 }

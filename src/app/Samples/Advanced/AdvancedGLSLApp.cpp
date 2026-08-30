@@ -39,7 +39,7 @@ bool AdvancedGLSLApp::load(std::shared_ptr<rhi::IRenderer> rhiRenderer) {
 }
 
 void AdvancedGLSLApp::draw(const float dt) {
-    ImGui::Begin("OpenGL");
+    ImGui::Begin(rhi::backendDisplayName());
     static int count{ 1 };
     ImGui::Checkbox("Enable Point Size", &_enablePointSize);
     ImGui::Checkbox("Enable Frag Coord", &_enableFragCoord);

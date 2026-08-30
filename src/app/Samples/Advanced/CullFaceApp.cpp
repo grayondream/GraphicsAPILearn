@@ -1,4 +1,5 @@
 #include "CullFaceApp.hpp"
+#include "rhi/core/Common.hpp"
 #include "base/StaticCollector.hpp"
 #include "base/ErrorHandle.hpp"
 #include "rhi/core/IShader.hpp"
@@ -48,7 +49,7 @@ bool CullFaceApp::load(std::shared_ptr<rhi::IRenderer> rhiRenderer) {
 }
 
 void CullFaceApp::draw(const float dt) {
-    ImGui::Begin("OpenGL");
+    ImGui::Begin(rhi::backendDisplayName());
     ImGui::SetNextItemWidth(200);
     ImGui::SliderInt("Grass Count", &_grassCount, 1, 10);
     ImGui::DragFloat3("Position", &_objectPosition[0], 0.1f);

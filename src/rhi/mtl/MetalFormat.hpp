@@ -95,9 +95,9 @@ inline MTLVertexDescriptor* BuildVertexDescriptor(const VertexLayout& layout) {
     MTLVertexDescriptor* desc = [[MTLVertexDescriptor alloc] init];
     for (size_t i = 0; i < layout.elements.size(); ++i) {
         const auto& elem = layout.elements[i];
-        desc.attributes[i].format = ToMTLVertexFormat(elem.format);
-        desc.attributes[i].offset = elem.offset;
-        desc.attributes[i].bufferIndex = elem.binding;
+        desc.attributes[elem.semantic].format = ToMTLVertexFormat(elem.format);
+        desc.attributes[elem.semantic].offset = elem.offset;
+        desc.attributes[elem.semantic].bufferIndex = elem.binding;
         desc.layouts[elem.binding].stride = elem.stride;
         desc.layouts[elem.binding].stepFunction = (elem.inputRate == VertexInputRate::PerInstance)
             ? MTLVertexStepFunctionPerInstance

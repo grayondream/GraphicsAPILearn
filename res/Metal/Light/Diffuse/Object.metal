@@ -37,7 +37,7 @@ struct VertexOut {
 };
 
 vertex VertexOut Diffuse_Object_vertex(VertexIn in [[stage_in]],
-                                       constant UniformBlock& ubo [[buffer(0)]]) {
+                                       constant UniformBlock& ubo [[buffer(8)]]) {
     VertexOut out;
     out.fragPos = ubo.model * in.pos;
     out.position = ubo.projection * ubo.view * out.fragPos;
@@ -47,7 +47,7 @@ vertex VertexOut Diffuse_Object_vertex(VertexIn in [[stage_in]],
 }
 
 fragment float4 Diffuse_Object_fragment(VertexOut in [[stage_in]],
-                                         constant UniformBlock& ubo [[buffer(0)]]) {
+                                         constant UniformBlock& ubo [[buffer(8)]]) {
     float ambientStrength = 0.3;
     float4 ambient = ambientStrength * ubo.vec4Pool[3];
 

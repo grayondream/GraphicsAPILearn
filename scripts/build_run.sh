@@ -7,7 +7,12 @@ set -e
 GIT_ROOT=$(git rev-parse --show-toplevel)
 BUILD_DIR="$GIT_ROOT/build"
 VCPKG_TOOLCHAIN="${VCPKG_ROOT:-$HOME/apps/vcpkg}/scripts/buildsystems/vcpkg.cmake"
-VCPKG_TRIPLET="x64-linux"
+# 平台相关 triplet：macOS 用 arm64-osx，其余（Linux/CI）用 x64-linux。
+if [[ "$(uname)" == "Darwin" ]]; then
+    VCPKG_TRIPLET="arm64-osx"
+else
+    VCPKG_TRIPLET="x64-linux"
+fi
 
 MODE="${1:-all}"
 

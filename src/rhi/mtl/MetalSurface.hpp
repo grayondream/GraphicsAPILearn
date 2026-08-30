@@ -2,49 +2,30 @@
 
 #include "rhi/core/ISurface.hpp"
 
-#if defined(__APPLE__)
-
-#import <QuartzCore/CAMetalLayer.h>
+typedef struct GLFWwindow GLFWwindow;
 
 namespace rhi::mtl {
 
+// 从 GLFW 窗口的 NSView 取出（必要时创建）CAMetalLayer，返回其指针。
+// 实现位于 MetalSurface.mm（Objective-C++）。
+void* createMetalLayer(GLFWwindow* window);
+
 class MetalSurface : public ISurface {
 public:
-    explicit MetalSurface(CAMetalLayer* layer) : _layer(layer) {}
+    explicit MetalSurface(void* layer, int width = 0, int height = 0)
+        : _layer(layer), _width(width), _height(height) {}
     ~MetalSurface() override = default;
 
-    void* nativeHandle() override { return (__bridge void*)_layer; }
-    int width() const override {
-        if (!_layer) return 0;
-        return static_cast<int>(_layer.drawableSize.width);
-    }
-    int height() const override {
-        if (!_layer) return 0;
-        return static_cast<int>(_layer.drawableSize.height);
-    }
+    void* nativeHandle() override { return _layer; }
+    int width() const override { return _width; }
+    int height() const override { return _height; }
 
-    CAMetalLayer* layer() const { return _layer; }
+    void* layer() const { return _layer; }
 
 private:
-    CAMetalLayer* _layer{nullptr};
+    void* _layer{nullptr};
+    int _width{0};
+    int _height{0};
 };
 
 } // namespace rhi::mtl
-
-#else // non-Apple fallback
-
-namespace rhi::mtl {
-
-class MetalSurface : public ISurface {
-public:
-    MetalSurface() = default;
-    ~MetalSurface() override = default;
-
-    void* nativeHandle() override { return nullptr; }
-    int width() const override { return 0; }
-    int height() const override { return 0; }
-};
-
-} // namespace rhi::mtl
-
-#endif

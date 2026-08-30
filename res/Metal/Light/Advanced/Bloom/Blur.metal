@@ -34,7 +34,7 @@ struct VertexOut {
 };
 
 vertex VertexOut Bloom_Blur_vertex(VertexIn in [[stage_in]],
-                                   constant UniformBlock& ubo [[buffer(0)]]) {
+                                   constant UniformBlock& ubo [[buffer(8)]]) {
     VertexOut out;
     out.TexCoords = in.textureCoord;
     out.position = float4(in.pos, 1.0);
@@ -42,7 +42,7 @@ vertex VertexOut Bloom_Blur_vertex(VertexIn in [[stage_in]],
 }
 
 fragment float4 Bloom_Blur_fragment(VertexOut in [[stage_in]],
-                                    constant UniformBlock& ubo [[buffer(0)]],
+                                    constant UniformBlock& ubo [[buffer(8)]],
                                     texture2d<float> image [[texture(0)]],
                                     sampler imageSampler [[sampler(0)]]) {
     const float weight[5] = {0.2270270270, 0.1945945946, 0.1216216216, 0.0540540541, 0.0162162162};

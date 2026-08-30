@@ -41,14 +41,14 @@ struct VertexOut {
 };
 
 vertex VertexOut ParallaxMap_ParallaxMap_vertex(VertexIn in [[stage_in]],
-                                               constant UniformBlock& ubo [[buffer(0)]]) {
+                                               constant UniformBlock& ubo [[buffer(8)]]) {
     VertexOut out;
     out.FragPos = float3(ubo.model * float4(in.pos, 1.0));   
     out.TexCoords = in.textureCoord;   
     
-    float3 T = normalize(float3x3(ubo.model) * in.tangent);
-    float3 B = normalize(float3x3(ubo.model) * in.bitangent);
-    float3 N = normalize(float3x3(ubo.model) * in.normal);
+    float3 T = normalize(float3x3(ubo.model[0].xyz, ubo.model[1].xyz, ubo.model[2].xyz) * in.tangent);
+    float3 B = normalize(float3x3(ubo.model[0].xyz, ubo.model[1].xyz, ubo.model[2].xyz) * in.bitangent);
+    float3 N = normalize(float3x3(ubo.model[0].xyz, ubo.model[1].xyz, ubo.model[2].xyz) * in.normal);
     float3x3 TBN = transpose(float3x3(T, B, N));
 
     out.TangentLightPos = TBN * ubo.vec4Pool[2].xyz;
@@ -109,7 +109,7 @@ float2 ParallaxMappingSteep(float2 texCoords, float3 viewDir, texture2d<float> d
 }
 
 fragment float4 ParallaxMap_ParallaxMap_fragment(VertexOut in [[stage_in]],
-                                                constant UniformBlock& ubo [[buffer(0)]],
+                                                constant UniformBlock& ubo [[buffer(8)]],
                                                 texture2d<float> diffuseMap [[texture(0)]],
                                                 texture2d<float> normalMap [[texture(1)]],
                                                 texture2d<float> depthMap [[texture(2)]],

@@ -33,7 +33,7 @@ struct VertexOut {
 };
 
 vertex VertexOut SkyBox_vertex(VertexIn in [[stage_in]],
-                               constant UniformBlock& ubo [[buffer(0)]]) {
+                               constant UniformBlock& ubo [[buffer(8)]]) {
     VertexOut out;
     out.TexCoords = in.aPos;
     float4 pos = ubo.projection * ubo.view * float4(in.aPos, 1.0);
@@ -42,7 +42,7 @@ vertex VertexOut SkyBox_vertex(VertexIn in [[stage_in]],
 }
 
 fragment half4 SkyBox_fragment(VertexOut in [[stage_in]],
-                               texturecube skybox [[texture(1)]]) {
+                               texturecube<float> skybox [[texture(1)]]) {
     constexpr sampler s(mag_filter::linear, min_filter::linear);
-    return skybox.sample(s, in.TexCoords);
+    return half4(skybox.sample(s, in.TexCoords));
 }

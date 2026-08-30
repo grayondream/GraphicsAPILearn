@@ -49,7 +49,7 @@ bool UniformBufferApp::load(std::shared_ptr<rhi::IRenderer> rhiRenderer) {
 }
 
 void UniformBufferApp::draw(const float dt) {
-	ImGui::Begin("OpenGL");
+	ImGui::Begin(rhi::backendDisplayName());
 	ImGui::End();
 	const auto x = 1;
 	glm::vec3 cubePositions[] = {

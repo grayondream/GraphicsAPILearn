@@ -1,3 +1,4 @@
+#if ENABLE_DX11
 #include "ImGuiDirectx11Window.hpp"
 #include "base/Log.hpp"
 #include <GLFW/glfw3.h>
@@ -85,3 +86,5 @@ void ImGuiDirectx11Window::destroy() {
 #endif
     m_renderer.reset();
 }
+
+#endif

@@ -119,7 +119,7 @@ void PBRBaseApp::draw(const float dt) {
         renderSphere(m_program, lightModel);
     }
 
-    ImGui::Begin("OpenGL");
+    ImGui::Begin(rhi::backendDisplayName());
     ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
     ImGui::SliderFloat("Roughness", &m_roughness, 0.0f, 1.0f);
     ImGui::SliderFloat("Metallic", &m_metallic, 0.0f, 1.0f);

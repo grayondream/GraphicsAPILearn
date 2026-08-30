@@ -155,7 +155,7 @@ void MsaaApp::drawGLMssa() {
 
 void MsaaApp::draw(const float dt) {
 	
-	ImGui::Begin("OpenGL");
+	ImGui::Begin(rhi::backendDisplayName());
 	ImGui::SetNextItemWidth(200);
 	if (rhi::backendKind() == rhi::BackendKind::GL) {
 		ImGui::Checkbox("Enable MSSA", &_enableMsaa);

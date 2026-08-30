@@ -10,13 +10,13 @@
 namespace rhi::mtl {
 
 MetalPipeline::MetalPipeline(void* device)
-    : _device((__bridge id<MTLDevice>)device) {}
+    : _device(device) {}
 
 MetalPipeline::~MetalPipeline() {
     _pipelineState = nil;
     _depthStencilState = nil;
     _vertexDescriptor = nil;
-    _device = nil;
+    _device = nullptr;
 }
 
 void MetalPipeline::use() {}
@@ -25,7 +25,7 @@ void* MetalPipeline::handle() {
     return _pipelineState ? (__bridge void*)_pipelineState : nullptr;
 }
 
-bool MetalPipeline::bindShader(MetalShader* shader, const VertexLayout& layout) {
+bool MetalPipeline::bindShader(const std::shared_ptr<MetalShader>& shader, const VertexLayout& layout) {
     _shader = shader;
     _layout = layout;
     _vertexDescriptor = BuildVertexDescriptor(layout);
@@ -61,6 +61,7 @@ uint64_t MetalPipeline::stateHash() const {
 void MetalPipeline::ensurePipeline(MTLPixelFormat colorFormat, MTLPixelFormat depthFormat) {
     if (!_shader || !_device) return;
 
+    id<MTLDevice> device = (__bridge id<MTLDevice>)_device;
     uint64_t hash = stateHash();
     if (_pipelineState && hash == _lastStateHash
         && colorFormat == _lastColorFormat && depthFormat == _lastDepthFormat) {
@@ -70,8 +71,8 @@ void MetalPipeline::ensurePipeline(MTLPixelFormat colorFormat, MTLPixelFormat de
     @autoreleasepool {
         MTLRenderPipelineDescriptor* psoDesc = [[MTLRenderPipelineDescriptor alloc] init];
 
-        id<MTLFunction> vertFn = [(__bridge MetalShader*)_shader vertexFunction:"vertex_main"];
-        id<MTLFunction> fragFn = [(__bridge MetalShader*)_shader fragmentFunction:"fragment_main"];
+        id<MTLFunction> vertFn = _shader->vertexFunction();
+        id<MTLFunction> fragFn = _shader->fragmentFunction();
         if (!vertFn || !fragFn) {
             LOGE("MetalPipeline: missing vertex or fragment function");
             return;
@@ -98,7 +99,7 @@ void MetalPipeline::ensurePipeline(MTLPixelFormat colorFormat, MTLPixelFormat de
         }
 
         NSError* error = nil;
-        _pipelineState = [_device newRenderPipelineStateWithDescriptor:psoDesc error:&error];
+        _pipelineState = [device newRenderPipelineStateWithDescriptor:psoDesc error:&error];
         if (!_pipelineState || error) {
             NSString* errDesc = error ? [error localizedDescription] : @"unknown error";
             LOGE("MetalPipeline: PSO creation failed: {}", [errDesc UTF8String]);
@@ -110,7 +111,7 @@ void MetalPipeline::ensurePipeline(MTLPixelFormat colorFormat, MTLPixelFormat de
         dsDesc.depthWriteEnabled = _depthWrite;
 
         if (_stencilTest) {
-            dsDesc.frontFaceStencil.compareFunction = ToMTLCompare(_stencil.func);
+            dsDesc.frontFaceStencil.stencilCompareFunction = ToMTLCompare(_stencil.func);
             dsDesc.frontFaceStencil.stencilFailureOperation = ToMTLStencilOp(_stencil.opFail);
             dsDesc.frontFaceStencil.depthFailureOperation = ToMTLStencilOp(_stencil.opDepthFail);
             dsDesc.frontFaceStencil.depthStencilPassOperation = ToMTLStencilOp(_stencil.opDepthPass);
@@ -119,7 +120,7 @@ void MetalPipeline::ensurePipeline(MTLPixelFormat colorFormat, MTLPixelFormat de
             dsDesc.backFaceStencil = dsDesc.frontFaceStencil;
         }
 
-        _depthStencilState = [_device newDepthStencilStateWithDescriptor:dsDesc];
+        _depthStencilState = [device newDepthStencilStateWithDescriptor:dsDesc];
 
         _lastStateHash = hash;
         _lastColorFormat = colorFormat;
@@ -181,6 +182,7 @@ void MetalPipeline::setBlendFunc(BlendFactor src, BlendFactor dst) {
     _blend.dst = dst;
     _pipelineState = nil;
 }
+void MetalPipeline::setCullMode(bool enable, int face) { _cullEnable = enable; _cullFace = static_cast<CullFace>(face); }
 void MetalPipeline::setCullFaceEnable(bool enable) { _cullEnable = enable; }
 void MetalPipeline::setCullFace(CullFace face) { _cullFace = face; }
 void MetalPipeline::setFrontFace(bool ccw) { _frontCCW = ccw; }

@@ -1,5 +1,6 @@
 ﻿#include "DepthTestApp.hpp"
 #include "base/StaticCollector.hpp"
+#include "rhi/core/Common.hpp"
 #include "base/ErrorHandle.hpp"
 #include "rhi/core/IShader.hpp"
 #include "rhi/core/IPipeline.hpp"
@@ -59,7 +60,7 @@ static std::vector<glm::vec3> initializeCubePositions() {
 }
 
 void DepthTestApp::draw(const float dt) {
-    ImGui::Begin("OpenGL"); ImGui::End();
+    ImGui::Begin(rhi::backendDisplayName()); ImGui::End();
     std::vector<glm::vec3> cubePositions = initializeCubePositions();
     int count = (int)cubePositions.size();
     const auto projection = glm::perspective(glm::radians(_camera.zoom()), aspectRatio(), 0.1f, 100.0f);

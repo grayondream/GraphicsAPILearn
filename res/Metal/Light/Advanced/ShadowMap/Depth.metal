@@ -27,28 +27,25 @@ struct VertexIn {
     float4 pos [[attribute(0)]];
     float4 inColor [[attribute(1)]];
     float2 textureCoord [[attribute(2)]];
-    float4 normal [[attribute(3)]];
 };
 
 struct VertexOut {
     float4 position [[position]];
     float3 FragPos;
-    float3 Normal;
     float2 TexCoords;
 };
 
 vertex VertexOut ShadowMap_Depth_vertex(VertexIn in [[stage_in]],
-                                        constant UniformBlock& ubo [[buffer(0)]]) {
+                                        constant UniformBlock& ubo [[buffer(8)]]) {
     VertexOut out;
     out.FragPos = in.pos.xyz;
-    out.Normal = in.normal.xyz;
     out.TexCoords = in.textureCoord;
     out.position = in.pos;
     return out;
 }
 
 fragment float4 ShadowMap_Depth_fragment(VertexOut in [[stage_in]],
-                                         constant UniformBlock& ubo [[buffer(0)]],
+                                         constant UniformBlock& ubo [[buffer(8)]],
                                          texture2d<float> textureSampler [[texture(0)]],
                                          sampler sampler2D [[sampler(0)]]) {
     float depthValue = textureSampler.sample(sampler2D, in.TexCoords).r;

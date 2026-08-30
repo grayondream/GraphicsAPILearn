@@ -12,6 +12,8 @@ namespace StaticCollector{
 
 	std::string getDX12ShaderPath();
 
+	std::string getMetalShaderPath();
+
 	std::string getImagePath();
 
 	std::string getModelPath();

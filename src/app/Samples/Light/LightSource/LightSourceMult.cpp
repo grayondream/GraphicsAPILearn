@@ -1,4 +1,5 @@
 #include "LightSourceMult.hpp"
+#include "rhi/core/Common.hpp"
 #include "base/StaticCollector.hpp"
 #include "base/ErrorHandle.hpp"
 #include "base/Assert.hpp"
@@ -105,7 +106,7 @@ static std::vector<glm::vec3> GenerateLightPosition() {
 
 static int count{ 1 };
 void LightSourceMult::drawUI() {
-	ImGui::Begin("OpenGL");
+	ImGui::Begin(rhi::backendDisplayName());
 	ImGui::Text("Color Picker with Alpha:");
 	ImGui::ColorEdit4("Color with Alpha", &_lightColor[0]);
 

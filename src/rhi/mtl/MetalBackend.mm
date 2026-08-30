@@ -21,26 +21,14 @@
 #include "base/Log.hpp"
 
 #import <QuartzCore/CAMetalLayer.h>
+#import <Metal/Metal.h>
 
 #include <array>
 #include <map>
 #include <cstring>
+#include <cstdio>
 
 namespace rhi::mtl {
-
-namespace {
-
-static MTLPrimitiveType ToMTLPrimitive(PrimitiveType t) {
-    switch (t) {
-        case PrimitiveType::TriangleList:  return MTLPrimitiveTypeTriangle;
-        case PrimitiveType::TriangleStrip: return MTLPrimitiveTypeTriangleStrip;
-        case PrimitiveType::Lines:         return MTLPrimitiveTypeLine;
-        case PrimitiveType::Points:        return MTLPrimitiveTypePoint;
-    }
-    return MTLPrimitiveTypeTriangle;
-}
-
-} // namespace
 
 class MetalRenderer : public IRenderer {
 public:
@@ -51,7 +39,7 @@ public:
         _surface = surface;
 
         auto* mtlSurface = static_cast<MetalSurface*>(surface.get());
-        _layer = mtlSurface->layer();
+        _layer = (__bridge CAMetalLayer*)mtlSurface->layer();
         if (!_layer) {
             LOGE("[Metal] init: CAMetalLayer is null");
             return false;
@@ -69,8 +57,11 @@ public:
             return false;
         }
 
-        _swapchain = std::make_shared<MetalSwapchain>();
-        _swapchain->init(_layer, mtlSurface->width(), mtlSurface->height());
+        _layer.device = _device;
+
+        _mtlSwapchain = std::make_shared<MetalSwapchain>();
+        _mtlSwapchain->init(_layer, mtlSurface->width(), mtlSurface->height());
+        _swapchain = _mtlSwapchain;
 
         _renderPassDescriptor = [[MTLRenderPassDescriptor alloc] init];
 
@@ -81,7 +72,6 @@ public:
     void shutdown() override {
         _commandBuffer = nil;
         _renderEncoder = nil;
-        _blitEncoder = nil;
         _currentDrawable = nil;
         _swapchain.reset();
         _queue = nil;
@@ -101,7 +91,7 @@ public:
             return nullptr;
         }
         auto p = std::make_shared<MetalPipeline>((void*)_device);
-        p->bindShader(mtlShader.get(), layout);
+        p->bindShader(mtlShader, layout);
         return p;
     }
     std::shared_ptr<IBuffer> createBuffer() override {
@@ -110,7 +100,18 @@ public:
     }
     std::shared_ptr<IBuffer> createUniformBuffer() override {
         if (!_device) return nullptr;
-        return std::make_shared<MetalBuffer>((void*)_device);
+        auto buf = std::make_shared<MetalBuffer>((void*)_device);
+        std::weak_ptr<MetalBuffer> weakBuf = buf;
+        buf->setBindCallback([this, weakBuf](MetalBuffer*, uint32_t) {
+            auto b = weakBuf.lock();
+            if (!b) return;
+            bool found = false;
+            for (const auto& e : _uniformBuffers) {
+                if (e.get() == b.get()) { found = true; break; }
+            }
+            if (!found) _uniformBuffers.push_back(b);
+        });
+        return buf;
     }
     std::shared_ptr<ITexture2D> createTexture2D() override {
         if (!_device) return nullptr;
@@ -130,7 +131,7 @@ public:
     void beginFrame() override {
         if (!_swapchain || !_queue) return;
 
-        _currentDrawable = _swapchain->currentDrawable();
+        _currentDrawable = _mtlSwapchain->currentDrawable();
         if (!_currentDrawable) return;
 
         _commandBuffer = [_queue commandBuffer];
@@ -160,6 +161,114 @@ public:
 
     bool present() override {
         if (!_currentDrawable || !_swapchain) return false;
+        if (getenv("METAL_READBACK")) {
+            static int frameCount = 0;
+            ++frameCount;
+            @autoreleasepool {
+                @try {
+                    id<MTLTexture> src = _currentDrawable.texture;
+                    if (src) {
+                        MTLTextureDescriptor* td =
+                            [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:src.pixelFormat
+                                                                               width:src.width
+                                                                              height:src.height
+                                                                           mipmapped:NO];
+                        td.storageMode = MTLStorageModeShared;
+                        id<MTLTexture> dst = [(__bridge id<MTLDevice>)_device newTextureWithDescriptor:td];
+                        id<MTLCommandBuffer> cb = [_queue commandBuffer];
+                        id<MTLBlitCommandEncoder> blit = [cb blitCommandEncoder];
+                        [blit copyFromTexture:src toTexture:dst];
+                        [blit endEncoding];
+                        [cb commit];
+                        [cb waitUntilCompleted];
+                        std::vector<uint8_t> px((size_t)src.width * (size_t)src.height * 4);
+                        [dst getBytes:px.data()
+                            bytesPerRow:src.width * 4
+                             fromRegion:MTLRegionMake2D(0, 0, src.width, src.height)
+                            mipmapLevel:0];
+
+                        auto pixelAt = [&](int x, int y) -> std::string {
+                            if (x < 0 || x >= (int)src.width || y < 0 || y >= (int)src.height) return "OOB";
+                            size_t idx = ((size_t)y * src.width + x) * 4;
+                            return "(" + std::to_string(px[idx]) + "," + std::to_string(px[idx+1]) + "," + std::to_string(px[idx+2]) + "," + std::to_string(px[idx+3]) + ")";
+                        };
+
+                        int w = (int)src.width, h = (int)src.height;
+                        LOGI("READBACK frame={} w={} h={}", frameCount, w, h);
+                        LOGI("  corners: TL={} TR={} BL={} BR={}",
+                             pixelAt(0, 0), pixelAt(w-1, 0), pixelAt(0, h-1), pixelAt(w-1, h-1));
+                        LOGI("  center: {}  midTop={} midBot={} midLeft={} midRight={}",
+                             pixelAt(w/2, h/2), pixelAt(w/2, 0), pixelAt(w/2, h-1),
+                             pixelAt(0, h/2), pixelAt(w-1, h/2));
+                        LOGI("  viewport=({},{},{},{})", _viewport.x, _viewport.y, _viewport.width, _viewport.height);
+
+                        long nonblack = 0, bright = 0, maxlum = 0;
+                        for (long i = 0; i < (long)w * (long)h; ++i) {
+                            int l = px[i * 4] + px[i * 4 + 1] + px[i * 4 + 2];
+                            if (l > 12) ++nonblack;
+                            if (l > 200) ++bright;
+                            if (l > maxlum) maxlum = l;
+                        }
+                        LOGI("  stats: nonblack={} bright={} maxlum={}", nonblack, bright, (int)maxlum);
+
+                        if (frameCount <= 3) {
+                            char path[256];
+                            snprintf(path, sizeof(path), "/tmp/metal_frame%d.bmp", frameCount);
+                            FILE* f = fopen(path, "wb");
+                            if (f) {
+                                int rowBytes = w * 4;
+                                int paddedRow = (rowBytes + 3) & ~3;
+                                int dataSize = paddedRow * h;
+                                int fileSize = 14 + 40 + dataSize;
+                                // BMP file header (14 bytes)
+                                uint8_t fileHeader[14] = {};
+                                fileHeader[0] = 'B'; fileHeader[1] = 'M';
+                                fileHeader[2] = fileSize & 0xFF;
+                                fileHeader[3] = (fileSize >> 8) & 0xFF;
+                                fileHeader[4] = (fileSize >> 16) & 0xFF;
+                                fileHeader[5] = (fileSize >> 24) & 0xFF;
+                                fileHeader[10] = 54; // pixel data offset
+                                // DIB header (40 bytes)
+                                uint8_t dibHeader[40] = {};
+                                dibHeader[0] = 40; // header size
+                                dibHeader[4] = w & 0xFF;
+                                dibHeader[5] = (w >> 8) & 0xFF;
+                                dibHeader[6] = (w >> 16) & 0xFF;
+                                dibHeader[7] = (w >> 24) & 0xFF;
+                                dibHeader[8] = h & 0xFF;
+                                dibHeader[9] = (h >> 8) & 0xFF;
+                                dibHeader[10] = (h >> 16) & 0xFF;
+                                dibHeader[11] = (h >> 24) & 0xFF;
+                                dibHeader[12] = 1; // planes
+                                dibHeader[14] = 32; // bits per pixel
+                                dibHeader[20] = dataSize & 0xFF;
+                                dibHeader[21] = (dataSize >> 8) & 0xFF;
+                                dibHeader[22] = (dataSize >> 16) & 0xFF;
+                                dibHeader[23] = (dataSize >> 24) & 0xFF;
+                                fwrite(fileHeader, 1, 14, f);
+                                fwrite(dibHeader, 1, 40, f);
+                                // BMP stores bottom-up, BGRA
+                                std::vector<uint8_t> row(paddedRow, 0);
+                                for (int y = h - 1; y >= 0; --y) {
+                                    for (int x = 0; x < w; ++x) {
+                                        size_t si = ((size_t)y * w + x) * 4;
+                                        row[x * 4 + 0] = px[si + 2]; // B
+                                        row[x * 4 + 1] = px[si + 1]; // G
+                                        row[x * 4 + 2] = px[si + 0]; // R
+                                        row[x * 4 + 3] = px[si + 3]; // A
+                                    }
+                                    fwrite(row.data(), 1, paddedRow, f);
+                                }
+                                fclose(f);
+                                LOGI("  saved: {}", path);
+                            }
+                        }
+                    }
+                } @catch (NSException* e) {
+                    LOGE("READBACK exception: {}", [[e reason] UTF8String]);
+                }
+            }
+        }
         [_currentDrawable presentAfterMinimumDuration:0.0];
         _currentDrawable = nil;
         return true;
@@ -194,15 +303,16 @@ public:
 
     void setRenderTarget(const std::shared_ptr<IRenderTarget>& target) override {
         _renderTarget = target;
+        recreateEncoder();
     }
 
     void bindTexture(const std::shared_ptr<ITexture2D>& texture, unsigned int unit) override {
         if (texture && _renderEncoder) {
             auto* mtlTex = dynamic_cast<MetalTexture2D*>(texture.get());
             if (mtlTex && mtlTex->valid()) {
-                [_renderEncoder setFragmentTexture:mtlTex->texture() atIndex:unit];
+                [_renderEncoder setFragmentTexture:(__bridge id<MTLTexture>)mtlTex->texture() atIndex:unit];
                 if (mtlTex->sampler()) {
-                    [_renderEncoder setFragmentSamplerState:mtlTex->sampler() atIndex:unit];
+                    [_renderEncoder setFragmentSamplerState:(__bridge id<MTLSamplerState>)mtlTex->sampler() atIndex:unit];
                 }
             }
         }
@@ -212,9 +322,9 @@ public:
         if (texture && _renderEncoder) {
             auto* mtlTex = dynamic_cast<MetalTexture3D*>(texture.get());
             if (mtlTex && mtlTex->valid()) {
-                [_renderEncoder setFragmentTexture:mtlTex->texture() atIndex:unit];
+                [_renderEncoder setFragmentTexture:(__bridge id<MTLTexture>)mtlTex->texture() atIndex:unit];
                 if (mtlTex->sampler()) {
-                    [_renderEncoder setFragmentSamplerState:mtlTex->sampler() atIndex:unit];
+                    [_renderEncoder setFragmentSamplerState:(__bridge id<MTLSamplerState>)mtlTex->sampler() atIndex:unit];
                 }
             }
         }
@@ -224,9 +334,9 @@ public:
         if (texture && _renderEncoder) {
             auto* mtlTex = dynamic_cast<MetalTexture2D*>(texture);
             if (mtlTex && mtlTex->valid()) {
-                [_renderEncoder setFragmentTexture:mtlTex->texture() atIndex:unit];
+                [_renderEncoder setFragmentTexture:(__bridge id<MTLTexture>)mtlTex->texture() atIndex:unit];
                 if (mtlTex->sampler()) {
-                    [_renderEncoder setFragmentSamplerState:mtlTex->sampler() atIndex:unit];
+                    [_renderEncoder setFragmentSamplerState:(__bridge id<MTLSamplerState>)mtlTex->sampler() atIndex:unit];
                 }
             }
         }
@@ -243,7 +353,10 @@ public:
     void drawIndexed(uint32_t indexCount, uint32_t indexOffset, uint32_t vertexOffset) override {
         if (!prepareDraw()) return;
         auto* idxBuf = dynamic_cast<MetalBuffer*>(_indexBuffer.get());
-        if (!idxBuf || !idxBuf->handle()) return;
+        if (!idxBuf || !idxBuf->handle()) {
+            LOGE("[Metal] drawIndexed: index buffer is null! indexCount={}", indexCount);
+            return;
+        }
 
         [_renderEncoder drawIndexedPrimitives:ToMTLPrimitive(_pipeline ? _pipeline->primitiveType() : PrimitiveType::TriangleList)
                                    indexCount:indexCount
@@ -364,9 +477,9 @@ public:
         _pipeline = nullptr;
         _indexBuffer = nullptr;
         _vertexBuffers = {};
+        _uniformBuffers.clear();
         _renderTarget = nullptr;
         _clearColor = {0.0f, 0.0f, 0.0f, 1.0f};
-        _viewport = {};
     }
 
     void waitIdle() override {
@@ -383,7 +496,10 @@ public:
     using IRenderer::imguiInitInfo;
     bool imguiInitInfo(MetalImGuiInitInfo& out) {
         out.device = _device;
-        out.queue = _queue;
+        out.commandQueue = _queue;
+        out.renderPassDescriptor = _renderPassDescriptor;
+        out.commandBuffer = _commandBuffer;
+        out.renderEncoder = _renderEncoder;
         return _device && _queue;
     }
 
@@ -395,34 +511,80 @@ private:
     void buildRenderPassDescriptor() {
         if (!_renderPassDescriptor) return;
 
-        _renderPassDescriptor.colorAttachments[0].texture = _currentDrawable.texture;
+        id<MTLTexture> colorTex = _currentDrawable.texture;
+        id<MTLTexture> depthTex = nil;
+
+        if (_renderTarget) {
+            auto* rt = dynamic_cast<MetalRenderTarget*>(_renderTarget.get());
+            if (rt && rt->valid()) {
+                id<MTLTexture> rtColor = rt->activeColorTexture();
+                if (rtColor) colorTex = rtColor;
+                depthTex = rt->activeDepthTexture();
+            }
+        } else if (_mtlSwapchain) {
+            depthTex = _mtlSwapchain->depthTexture();
+        }
+
+        _renderPassDescriptor.colorAttachments[0].texture = colorTex;
         _renderPassDescriptor.colorAttachments[0].loadAction = MTLLoadActionClear;
         _renderPassDescriptor.colorAttachments[0].clearColor = MTLClearColorMake(
             _clearColor[0], _clearColor[1], _clearColor[2], _clearColor[3]);
         _renderPassDescriptor.colorAttachments[0].storeAction = MTLStoreActionStore;
 
-        if (_renderTarget) {
-            auto* rt = dynamic_cast<MetalRenderTarget*>(_renderTarget.get());
-            if (rt && rt->valid()) {
-                id<MTLTexture> depthTex = rt->activeDepthTexture();
-                if (depthTex) {
-                    _renderPassDescriptor.depthAttachment.texture = depthTex;
-                    _renderPassDescriptor.depthAttachment.loadAction = MTLLoadActionClear;
-                    _renderPassDescriptor.depthAttachment.clearDepth = 1.0;
-                    _renderPassDescriptor.depthAttachment.storeAction = MTLStoreActionStore;
-                }
-            }
+        // 默认无深度附件（与 PSO 的 MTLPixelFormatInvalid 对应）。主交换链通道
+        // 需要深度缓冲时，挂上交换链自带的 depth 纹理；离屏 RT 则使用其自身 depth。
+        // 注意：MTLRenderPassAttachmentDescriptor 没有 pixelFormat 属性，格式由 texture 推断，
+        // 因此 PSO 的 depthAttachmentPixelFormat 必须与 depthTex.pixelFormat 一致。
+        if (depthTex) {
+            _renderPassDescriptor.depthAttachment.texture = depthTex;
+            _renderPassDescriptor.depthAttachment.loadAction = MTLLoadActionClear;
+            _renderPassDescriptor.depthAttachment.clearDepth = 1.0;
+            _renderPassDescriptor.depthAttachment.storeAction =
+                _renderTarget ? MTLStoreActionStore : MTLStoreActionDontCare;
+        } else {
+            _renderPassDescriptor.depthAttachment.texture = nil;
         }
     }
 
+    // 切换渲染目标（离屏 RT <-> 交换链）时必须重建渲染编码器，
+    // 否则编码器仍使用 beginFrame 时构建的旧通道描述符（颜色附件指向交换链）。
+    void recreateEncoder() {
+        if (_renderEncoder && _encodingActive) {
+            [_renderEncoder endEncoding];
+            _renderEncoder = nil;
+            _encodingActive = false;
+        }
+        if (!_commandBuffer) {
+            _commandBuffer = [_queue commandBuffer];
+            if (!_commandBuffer) return;
+        }
+        buildRenderPassDescriptor();
+        _renderEncoder = [_commandBuffer renderCommandEncoderWithDescriptor:_renderPassDescriptor];
+        _encodingActive = true;
+    }
+
     bool prepareDraw() {
-        if (!_renderEncoder || !_pipeline) return false;
+        if (!_renderEncoder || !_pipeline) {
+            LOGE("[Metal] prepareDraw: FAILED encoder={} pipeline={}", (void*)_renderEncoder, (void*)_pipeline.get());
+            return false;
+        }
 
         auto* mtlPipeline = dynamic_cast<MetalPipeline*>(_pipeline.get());
-        if (!mtlPipeline) return false;
+        if (!mtlPipeline) {
+            LOGE("[Metal] prepareDraw: FAILED pipeline cast failed");
+            return false;
+        }
 
-        MTLPixelFormat colorFmt = _currentDrawable ? _currentDrawable.texture.pixelFormat : MTLPixelFormatBGRA8Unorm;
-        MTLPixelFormat depthFmt = MTLPixelFormatDepth32Float;
+        MTLPixelFormat colorFmt = MTLPixelFormatBGRA8Unorm;
+        if (_renderPassDescriptor && _renderPassDescriptor.colorAttachments[0].texture) {
+            colorFmt = _renderPassDescriptor.colorAttachments[0].texture.pixelFormat;
+        } else if (_currentDrawable) {
+            colorFmt = _currentDrawable.texture.pixelFormat;
+        }
+        MTLPixelFormat depthFmt = MTLPixelFormatInvalid;
+        if (_renderPassDescriptor && _renderPassDescriptor.depthAttachment.texture) {
+            depthFmt = _renderPassDescriptor.depthAttachment.texture.pixelFormat;
+        }
         mtlPipeline->ensurePipeline(colorFmt, depthFmt);
         mtlPipeline->applyRenderEncoder(_renderEncoder);
 
@@ -446,22 +608,38 @@ private:
             }
         }
 
+        static const uint32_t kMetalUniformBufferIndex = 8;
+        for (uint32_t i = 0; i < _uniformBuffers.size(); ++i) {
+            auto* buf = dynamic_cast<MetalBuffer*>(_uniformBuffers[i].get());
+            if (buf && buf->handle()) {
+                size_t uboOffset = (buf->type() == BufferType::Uniform) ? buf->submittedOffset() : 0;
+                [_renderEncoder setVertexBuffer:(__bridge id<MTLBuffer>)buf->handle()
+                                         offset:uboOffset
+                                        atIndex:kMetalUniformBufferIndex + i];
+                [_renderEncoder setFragmentBuffer:(__bridge id<MTLBuffer>)buf->handle()
+                                           offset:uboOffset
+                                          atIndex:kMetalUniformBufferIndex + i];
+            }
+        }
+
         return true;
     }
 
     std::shared_ptr<ISurface> _surface{};
     CAMetalLayer* _layer{nullptr};
-    id<MTLDevice> _device{nil};
-    id<MTLCommandQueue> _queue{nil};
+    id<MTLDevice> __strong _device{nil};
+    id<MTLCommandQueue> __strong _queue{nil};
     std::shared_ptr<ISwapchain> _swapchain{};
+    std::shared_ptr<MetalSwapchain> _mtlSwapchain{};
 
-    id<CAMetalDrawable> _currentDrawable{nil};
-    id<MTLCommandBuffer> _commandBuffer{nil};
-    id<MTLRenderCommandEncoder> _renderEncoder{nil};
-    id<MTLRenderPassDescriptor> _renderPassDescriptor{nil};
+    id<CAMetalDrawable> __strong _currentDrawable{nil};
+    id<MTLCommandBuffer> __strong _commandBuffer{nil};
+    id<MTLRenderCommandEncoder> __strong _renderEncoder{nil};
+    MTLRenderPassDescriptor* __strong _renderPassDescriptor{nil};
 
     std::shared_ptr<IPipeline> _pipeline{};
     std::array<std::shared_ptr<IBuffer>, 8> _vertexBuffers{};
+    std::vector<std::shared_ptr<IBuffer>> _uniformBuffers{};
     std::shared_ptr<IBuffer> _indexBuffer{};
     std::shared_ptr<IRenderTarget> _renderTarget{};
 

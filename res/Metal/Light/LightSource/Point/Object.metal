@@ -39,7 +39,7 @@ struct VertexOut {
 };
 
 vertex VertexOut Point_Object_vertex(VertexIn in [[stage_in]],
-                                     constant UniformBlock& ubo [[buffer(0)]]) {
+                                     constant UniformBlock& ubo [[buffer(8)]]) {
     VertexOut out;
     out.fragPos = ubo.model * in.pos;
     out.position = ubo.projection * ubo.view * out.fragPos;
@@ -50,9 +50,9 @@ vertex VertexOut Point_Object_vertex(VertexIn in [[stage_in]],
 }
 
 fragment float4 Point_Object_fragment(VertexOut in [[stage_in]],
-                                       constant UniformBlock& ubo [[buffer(0)]],
-                                       texture2d<half> diffuseMap [[texture(0)]],
-                                       texture2d<half> specularMap [[texture(1)]]) {
+                                       constant UniformBlock& ubo [[buffer(8)]],
+                                       texture2d<float> diffuseMap [[texture(0)]],
+                                       texture2d<float> specularMap [[texture(1)]]) {
     constexpr sampler s(mag_filter::linear, min_filter::linear);
 
     float3 norm = normalize(in.normal.rgb);

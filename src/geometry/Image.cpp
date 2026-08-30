@@ -4,7 +4,6 @@ extern "C" {
 	#include "stb_image.h"
 }
 
-#include <utils/GL/GLUtils.hpp>
 #include <exception>
 
 Image::Image(const std::string& file, const TextureOption& option) {
@@ -27,7 +26,7 @@ Image& Image::load(bool flip, int targetChannel) {
 			m_size.channel = targetChannel;   // stb 保证输出 targetChannel 字节/像素，同步通道数
 		}
 	}
-	m_format = GLUtils::PixelChannel2PixelFormat(m_size.channel, m_option.IsHdr);
+	m_format = PixelChannel2PixelFormat(m_size.channel, m_option.IsHdr);
 	return *this;
 }
 

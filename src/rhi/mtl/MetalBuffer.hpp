@@ -3,6 +3,7 @@
 #include "rhi/core/IBuffer.hpp"
 #include <cstdint>
 #include <cstring>
+#include <functional>
 
 #if defined(__APPLE__)
 
@@ -26,14 +27,29 @@ public:
     size_t bindSize() const { return _bindSize; }
     BufferType type() const { return _type; }
 
+    // Ring buffer: returns the byte offset within the MTLBuffer where the
+    // most recent update() wrote its data.  prepareDraw() uses this so that
+    // each draw call binds the correct slot even when multiple draws share
+    // the same uniform buffer.
+    size_t submittedOffset() const { return _submittedBase; }
+
+    void setBindCallback(std::function<void(MetalBuffer*, uint32_t)> cb) { _bindCb = std::move(cb); }
+
 private:
-    id<MTLDevice> _device{nil};
-    id<MTLBuffer> _buffer{nil};
+    void* _device{nullptr};
+    id<MTLBuffer> __strong _buffer{nil};
     BufferType _type{BufferType::Vertex};
-    size_t _size{0};
+    size_t _size{0};           // logical size (one slot)
     uint32_t _binding{0};
     size_t _bindOffset{0};
     size_t _bindSize{0};
+    std::function<void(MetalBuffer*, uint32_t)> _bindCb{};
+
+    // Ring buffer state for uniform buffers
+    static constexpr size_t kRingSlots = 256;
+    size_t _slotSize{0};       // one slot's byte count (uniform only)
+    uint32_t _ringHead{0};     // monotonically increasing update counter
+    size_t _submittedBase{0};  // byte offset of the last-written slot
 };
 
 } // namespace rhi::mtl

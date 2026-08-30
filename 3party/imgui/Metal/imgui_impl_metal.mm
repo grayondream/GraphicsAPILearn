@@ -345,7 +345,7 @@ bool ImGui_ImplMetal_CreateFontsTexture(id<MTLDevice> device)
     id <MTLTexture> texture = [device newTextureWithDescriptor:textureDescriptor];
     [texture replaceRegion:MTLRegionMake2D(0, 0, (NSUInteger)width, (NSUInteger)height) mipmapLevel:0 withBytes:pixels bytesPerRow:(NSUInteger)width * 4];
     bd->SharedMetalContext.fontTexture = texture;
-    io.Fonts->SetTexID((__bridge void*)bd->SharedMetalContext.fontTexture); // ImTextureID == void*
+    io.Fonts->SetTexID((__bridge uintptr_t)bd->SharedMetalContext.fontTexture);
 
     return (bd->SharedMetalContext.fontTexture != nil);
 }

@@ -2,12 +2,14 @@
 
 #include "MetalTexture3D.hpp"
 #include "MetalFormat.hpp"
+
 #include <cstring>
+#include <cmath>
 
 namespace rhi::mtl {
 
 MetalTexture3D::MetalTexture3D(void* device)
-    : _device((__bridge id<MTLDevice>)device) {}
+    : _device(device) {}
 
 MetalTexture3D::~MetalTexture3D() { release(); }
 
@@ -49,17 +51,19 @@ bool MetalTexture3D::createEmpty(const TextureDesc& desc, int width, int height)
 
 void MetalTexture3D::bind(unsigned int unit) { _unit = unit; }
 
-void* MetalTexture3D::handle() { return (__bridge void*)_texture; }
+void* MetalTexture3D::handle() { return _texture; }
 
 void MetalTexture3D::release() {
-    if (_sampler) { _sampler = nil; }
-    if (_texture) { _texture = nil; }
+    if (_sampler) { _sampler = nullptr; }
+    if (_texture) { _texture = nullptr; }
 }
 
 void MetalTexture3D::genCubeMipmaps() {
-    if (!_texture || _texture.mipmapLevelCount <= 1) return;
+    id<MTLTexture> tex = (__bridge id<MTLTexture>)_texture;
+    if (!tex || tex.mipmapLevelCount <= 1) return;
 
-    id<MTLCommandQueue> queue = [_device newCommandQueue];
+    id<MTLDevice> device = (__bridge id<MTLDevice>)_device;
+    id<MTLCommandQueue> queue = [device newCommandQueue];
     if (!queue) return;
 
     id<MTLCommandBuffer> cmd = [queue commandBuffer];
@@ -68,29 +72,36 @@ void MetalTexture3D::genCubeMipmaps() {
     id<MTLBlitCommandEncoder> blit = [cmd blitCommandEncoder];
     if (!blit) return;
 
-    [blit generateMipmapsForTexture:_texture];
+    [blit generateMipmapsForTexture:tex];
     [blit endEncoding];
     [cmd commit];
     [cmd waitUntilCompleted];
 }
 
 bool MetalTexture3D::createCubeTexture(int width, int height, bool mipmapped) {
+    id<MTLDevice> device = (__bridge id<MTLDevice>)_device;
     MTLPixelFormat pixelFormat = ToMTLPixelFormat(_desc.format);
-    MTLTextureDescriptor* desc = [MTLTextureDescriptor textureCubeDescriptorWithPixelFormat:pixelFormat
-                                                                                      width:width
-                                                                                     height:height
-                                                                                  mipmapped:mipmapped];
+    MTLTextureDescriptor* desc = [[MTLTextureDescriptor alloc] init];
+    desc.textureType = MTLTextureTypeCube;
+    desc.pixelFormat = pixelFormat;
+    desc.width = width;
+    desc.height = height;
+    if (mipmapped) {
+        desc.mipmapLevelCount = static_cast<NSUInteger>(std::floor(std::log2(static_cast<double>(std::max(width, height)))) + 1.0);
+    }
     desc.usage = MTLTextureUsageShaderRead;
-    desc.storageMode = MTLResourceStorageModeShared;
+    desc.storageMode = MTLStorageModeShared;
 
-    _texture = [_device newTextureWithDescriptor:desc];
-    return _texture != nil;
+    id<MTLTexture> tex = [device newTextureWithDescriptor:desc];
+    _texture = (__bridge void*)tex;
+    return _texture != nullptr;
 }
 
 bool MetalTexture3D::uploadFace(int faceIndex, const void* data, int width, int height, int channels) {
-    if (!_texture || !data || faceIndex < 0 || faceIndex > 5) return false;
+    id<MTLTexture> tex = (__bridge id<MTLTexture>)_texture;
+    if (!tex || !data || faceIndex < 0 || faceIndex > 5) return false;
 
-    MTLPixelFormat pixelFormat = _texture.pixelFormat;
+    MTLPixelFormat pixelFormat = tex.pixelFormat;
     size_t bytesPerRow = 0;
     if (pixelFormat == MTLPixelFormatRGBA8Unorm || pixelFormat == MTLPixelFormatBGRA8Unorm) {
         bytesPerRow = width * 4;
@@ -107,16 +118,17 @@ bool MetalTexture3D::uploadFace(int faceIndex, const void* data, int width, int 
     }
 
     MTLRegion region = MTLRegionMake2D(0, 0, width, height);
-    [_texture replaceRegion:region
-               mipmapLevel:0
-                     slice:faceIndex
-                 withBytes:data
-               bytesPerRow:bytesPerRow
-             bytesPerImage:bytesPerRow * height];
+    [tex replaceRegion:region
+           mipmapLevel:0
+                 slice:faceIndex
+             withBytes:data
+           bytesPerRow:bytesPerRow
+         bytesPerImage:bytesPerRow * height];
     return true;
 }
 
-MTLSamplerState* MetalTexture3D::createSampler() {
+void* MetalTexture3D::createSampler() {
+    id<MTLDevice> device = (__bridge id<MTLDevice>)_device;
     MTLSamplerDescriptor* desc = [[MTLSamplerDescriptor alloc] init];
 
     auto toMTLWrap = [](TextureWrap w) -> MTLSamplerAddressMode {
@@ -156,7 +168,8 @@ MTLSamplerState* MetalTexture3D::createSampler() {
     desc.maxAnisotropy = 16;
     desc.label = @"MetalTexture3D Sampler";
 
-    return [_device newSamplerStateWithDescriptor:desc];
+    id<MTLSamplerState> sampler = [device newSamplerStateWithDescriptor:desc];
+    return (__bridge void*)sampler;
 }
 
 } // namespace rhi::mtl

@@ -1,4 +1,5 @@
 #include "BlendApp.hpp"
+#include "rhi/core/Common.hpp"
 #include "base/StaticCollector.hpp"
 #include "base/ErrorHandle.hpp"
 #include "rhi/core/IShader.hpp"
@@ -77,7 +78,7 @@ bool BlendApp::load(std::shared_ptr<rhi::IRenderer> rhiRenderer) {
 }
 
 void BlendApp::draw(const float dt) {
-    ImGui::Begin("OpenGL");
+    ImGui::Begin(rhi::backendDisplayName());
     ImGui::SetNextItemWidth(200);
     ImGui::SliderInt("Window Count", &_winCount, 1, 5);
     ImGui::DragFloat3("Position", &_objectPosition[0], 0.1f);

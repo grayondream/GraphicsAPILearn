@@ -14,7 +14,6 @@ Geometry Create(rhi::IRenderer* renderer, Shape& shape,
     g.vertexCount = static_cast<uint32_t>(shape.size());
     const float stride32 = 32.0f;
 
-    // binding 0：交错 pos+color
     auto vb = renderer->createBuffer();
     vb->init(shape.toGL().data(), shape.byteSize(), BufferType::Vertex);
     g.vertexBuffer = vb;
@@ -23,18 +22,20 @@ Geometry Create(rhi::IRenderer* renderer, Shape& shape,
     g.layout.elements.push_back(VertexElement{VertexElement::Float4, 1, 0,
                                               VertexInputRate::PerVertex, 16, static_cast<int>(stride32)});
 
+    uint32_t nextBinding = 1;
+
     if (useUv && shape.uvSize() > 0) {
         auto ub = renderer->createBuffer();
         ub->init(shape.uv(), shape.uvSize(), BufferType::Vertex);
         g.uvBuffer = ub;
-        g.layout.elements.push_back(VertexElement{VertexElement::Float2, layout.uvLocation, 1,
+        g.layout.elements.push_back(VertexElement{VertexElement::Float2, layout.uvLocation, static_cast<int>(nextBinding++),
                                                   VertexInputRate::PerVertex, 0, 8});
     }
     if (useNormal && shape.normalSize() > 0) {
         auto nb = renderer->createBuffer();
         nb->init(shape.normal(), shape.normalSize(), BufferType::Vertex);
         g.normalBuffer = nb;
-        g.layout.elements.push_back(VertexElement{VertexElement::Float4, layout.normalLocation, 2,
+        g.layout.elements.push_back(VertexElement{VertexElement::Float4, layout.normalLocation, static_cast<int>(nextBinding++),
                                                   VertexInputRate::PerVertex, 0, 16});
     }
     if (useIndex && shape.idxSize() > 0) {

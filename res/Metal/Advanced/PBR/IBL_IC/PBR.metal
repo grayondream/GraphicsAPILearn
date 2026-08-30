@@ -38,7 +38,7 @@ struct VertexOut {
 };
 
 vertex VertexOut IBL_IC_PBR_vertex(VertexIn in [[stage_in]],
-                                   constant UniformBlock& ubo [[buffer(0)]]) {
+                                   constant UniformBlock& ubo [[buffer(8)]]) {
     VertexOut out;
     out.TexCoords = in.aTexCoords;
     out.WorldPos = (ubo.model * in.pos).xyz;
@@ -48,7 +48,7 @@ vertex VertexOut IBL_IC_PBR_vertex(VertexIn in [[stage_in]],
 }
 
 fragment float4 IBL_IC_PBR_fragment(VertexOut in [[stage_in]],
-                                    constant UniformBlock& ubo [[buffer(0)]]) {
+                                    constant UniformBlock& ubo [[buffer(8)]]) {
     const float PI = 3.14159265359;
     
     float3 albedo = ubo.vec4Pool[10].xyz;

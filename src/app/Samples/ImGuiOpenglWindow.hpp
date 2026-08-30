@@ -1,3 +1,4 @@
+#if ENABLE_OPENGL
 #pragma once
 #include "app/IImGuiWindow.hpp"
 
@@ -12,3 +13,5 @@ public:
     virtual void render() override;
     virtual void destroy() override;
 };
+
+#endif

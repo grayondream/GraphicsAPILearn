@@ -36,7 +36,7 @@ struct VertexOut {
 };
 
 vertex VertexOut IBL_Specular_Irradiance_vertex(VertexIn in [[stage_in]],
-                                                constant UniformBlock& ubo [[buffer(0)]]) {
+                                                constant UniformBlock& ubo [[buffer(8)]]) {
     VertexOut out;
     out.WorldPos = in.pos.xyz;
     out.position = ubo.projection * ubo.view * float4(out.WorldPos, 1.0);
@@ -44,7 +44,7 @@ vertex VertexOut IBL_Specular_Irradiance_vertex(VertexIn in [[stage_in]],
 }
 
 fragment float4 IBL_Specular_Irradiance_fragment(VertexOut in [[stage_in]],
-                                                 constant UniformBlock& ubo [[buffer(0)]],
+                                                 constant UniformBlock& ubo [[buffer(8)]],
                                                  texturecube<float> environmentMap [[texture(0)]],
                                                  sampler smp [[sampler(0)]]) {
     const float PI = 3.14159265359;

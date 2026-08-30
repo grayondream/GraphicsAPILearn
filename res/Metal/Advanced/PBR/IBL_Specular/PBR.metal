@@ -38,7 +38,7 @@ struct VertexOut {
 };
 
 vertex VertexOut IBL_Specular_PBR_vertex(VertexIn in [[stage_in]],
-                                         constant UniformBlock& ubo [[buffer(0)]]) {
+                                         constant UniformBlock& ubo [[buffer(8)]]) {
     VertexOut out;
     out.TexCoords = in.aTexCoords;
     out.WorldPos = (ubo.model * in.pos).xyz;
@@ -48,7 +48,7 @@ vertex VertexOut IBL_Specular_PBR_vertex(VertexIn in [[stage_in]],
 }
 
 fragment float4 IBL_Specular_PBR_fragment(VertexOut in [[stage_in]],
-                                          constant UniformBlock& ubo [[buffer(0)]],
+                                          constant UniformBlock& ubo [[buffer(8)]],
                                           texturecube<float> irradianceMap [[texture(0)]],
                                           texturecube<float> prefilterMap [[texture(1)]],
                                           texture2d<float> brdfLUT [[texture(2)]],

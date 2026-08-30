@@ -34,7 +34,7 @@ struct VertexOut {
 };
 
 vertex VertexOut SSAO_SSAOBlur_vertex(VertexIn in [[stage_in]],
-                                       constant UniformBlock& ubo [[buffer(0)]]) {
+                                       constant UniformBlock& ubo [[buffer(8)]]) {
     VertexOut out;
     out.TexCoords = in.textureCoord;
     out.position = float4(in.pos, 1.0);
@@ -42,7 +42,7 @@ vertex VertexOut SSAO_SSAOBlur_vertex(VertexIn in [[stage_in]],
 }
 
 fragment float SSAO_SSAOBlur_fragment(VertexOut in [[stage_in]],
-                                       constant UniformBlock& ubo [[buffer(0)]],
+                                       constant UniformBlock& ubo [[buffer(8)]],
                                        texture2d<float> ssaoInput [[texture(0)]],
                                        sampler ssaoSampler [[sampler(0)]]) {
     float2 texelSize = 1.0 / float2(ssaoInput.get_width(), ssaoInput.get_height());

@@ -1,3 +1,4 @@
+#if ENABLE_DX12
 #pragma once
 #include "app/IImGuiWindow.hpp"
 #include "rhi/core/IRenderer.hpp"
@@ -27,3 +28,5 @@ private:
     std::shared_ptr<rhi::IRenderer> m_renderer{};
     bool m_ready{false};
 };
+
+#endif

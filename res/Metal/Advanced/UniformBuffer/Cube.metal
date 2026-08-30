@@ -36,7 +36,7 @@ struct VertexOut {
 };
 
 vertex VertexOut UniformBufferCube_vertex(VertexIn in [[stage_in]],
-                                          constant UniformBlock& ubo [[buffer(0)]]) {
+                                          constant UniformBlock& ubo [[buffer(8)]]) {
     VertexOut out;
     out.position = ubo.projection * ubo.view * ubo.model * in.pos;
     out.textureCoord = in.inTextureCoord;
@@ -45,7 +45,7 @@ vertex VertexOut UniformBufferCube_vertex(VertexIn in [[stage_in]],
 }
 
 fragment half4 UniformBufferCube_fragment(VertexOut in [[stage_in]],
-                                          constant UniformBlock& ubo [[buffer(0)]]) {
+                                          constant UniformBlock& ubo [[buffer(8)]]) {
     float4 color = ubo.vec4Pool[5] * in.fragColor;
     return half4(color);
 }

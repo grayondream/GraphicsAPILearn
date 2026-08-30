@@ -36,7 +36,7 @@ struct VertexOut {
 };
 
 vertex VertexOut Screen_vertex(VertexIn in [[stage_in]],
-                               constant UniformBlock& ubo [[buffer(0)]]) {
+                               constant UniformBlock& ubo [[buffer(8)]]) {
     VertexOut out;
     out.position = in.pos;
     out.textureCoord = in.inTextureCoord;
@@ -44,66 +44,66 @@ vertex VertexOut Screen_vertex(VertexIn in [[stage_in]],
     return out;
 }
 
+constexpr sampler g_screenSampler(mag_filter::linear, min_filter::linear);
+
+half4 screenOrigin(texture2d<half> tex, float2 uv) {
+    return tex.sample(g_screenSampler, uv);
+}
+
+half4 screenInversion(texture2d<half> tex, float2 uv) {
+    half4 color = tex.sample(g_screenSampler, uv);
+    return half4(half3(1.0h - color.rgb), 1.0h);
+}
+
+half4 screenGray(texture2d<half> tex, float2 uv) {
+    half4 color = tex.sample(g_screenSampler, uv);
+    half average = 0.2126h * color.r + 0.7152h * color.g + 0.0722h * color.b;
+    return half4(average, average, average, 1.0h);
+}
+
+half4 screenKernel(texture2d<half> tex, float2 uv) {
+    const float offset = 1.0 / 300.0;
+    float2 offsets[9] = {
+        float2(-offset,  offset),
+        float2( 0.0,     offset),
+        float2( offset,  offset),
+        float2(-offset,  0.0),
+        float2( 0.0,     0.0),
+        float2( offset,  0.0),
+        float2(-offset, -offset),
+        float2( 0.0,    -offset),
+        float2( offset, -offset)
+    };
+
+    float kern[9] = {
+        -1, -1, -1,
+        -1,  9, -1,
+        -1, -1, -1
+    };
+
+    half3 sampleTex[9];
+    for (int i = 0; i < 9; i++) {
+        sampleTex[i] = half3(tex.sample(g_screenSampler, uv + offsets[i]).rgb);
+    }
+    half3 col = half3(0.0);
+    for (int i = 0; i < 9; i++) {
+        col += sampleTex[i] * half(kern[i]);
+    }
+    return half4(col, 1.0h);
+}
+
 fragment half4 Screen_fragment(VertexOut in [[stage_in]],
-                               constant UniformBlock& ubo [[buffer(0)]],
-                               texture2d<half> textureSampler [[texture(0)]]) {
-    constexpr sampler s(mag_filter::linear, min_filter::linear);
-
-    auto origin_color = [&]() -> half4 {
-        return textureSampler.sample(s, in.textureCoord);
-    };
-
-    auto inversion = [&]() -> half4 {
-        half4 color = textureSampler.sample(s, in.textureCoord);
-        return half4(half3(1.0h - color.rgb), 1.0h);
-    };
-
-    auto gray = [&]() -> half4 {
-        half4 color = textureSampler.sample(s, in.textureCoord);
-        half average = 0.2126h * color.r + 0.7152h * color.g + 0.0722h * color.b;
-        return half4(average, average, average, 1.0h);
-    };
-
-    auto kernel = [&]() -> half4 {
-        const float offset = 1.0 / 300.0;
-        float2 offsets[9] = {
-            float2(-offset,  offset),
-            float2( 0.0,     offset),
-            float2( offset,  offset),
-            float2(-offset,  0.0),
-            float2( 0.0,     0.0),
-            float2( offset,  0.0),
-            float2(-offset, -offset),
-            float2( 0.0,    -offset),
-            float2( offset, -offset)
-        };
-
-        float kernel[9] = {
-            -1, -1, -1,
-            -1,  9, -1,
-            -1, -1, -1
-        };
-
-        half3 sampleTex[9];
-        for (int i = 0; i < 9; i++) {
-            sampleTex[i] = half3(textureSampler.sample(s, in.textureCoord + offsets[i]).rgb);
-        }
-        half3 col = half3(0.0);
-        for (int i = 0; i < 9; i++) {
-            col += sampleTex[i] * half(kernel[i]);
-        }
-        return half4(col, 1.0h);
-    };
-
+                                constant UniformBlock& ubo [[buffer(8)]],
+                                texture2d<half> textureSampler [[texture(0)]]) {
     half4 ocolor;
     if (ubo.floatPool[15] > 2.5) {
-        ocolor = kernel();
+        ocolor = screenKernel(textureSampler, in.textureCoord);
     } else if (ubo.floatPool[15] > 1.5) {
-        ocolor = gray();
+        ocolor = screenGray(textureSampler, in.textureCoord);
     } else if (ubo.floatPool[15] > 0.5) {
-        ocolor = inversion();
+        ocolor = screenInversion(textureSampler, in.textureCoord);
     } else {
-        ocolor = origin_color();
+        ocolor = screenOrigin(textureSampler, in.textureCoord);
     }
     return ocolor;
 }

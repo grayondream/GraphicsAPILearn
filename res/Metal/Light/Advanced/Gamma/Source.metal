@@ -33,13 +33,13 @@ struct VertexOut {
 };
 
 vertex VertexOut Gamma_Source_vertex(VertexIn in [[stage_in]],
-                                     constant UniformBlock& ubo [[buffer(0)]]) {
+                                     constant UniformBlock& ubo [[buffer(8)]]) {
     VertexOut out;
     out.position = ubo.projection * ubo.view * ubo.model * in.pos;
     return out;
 }
 
 fragment float4 Gamma_Source_fragment(VertexOut in [[stage_in]],
-                                      constant UniformBlock& ubo [[buffer(0)]]) {
+                                      constant UniformBlock& ubo [[buffer(8)]]) {
     return ubo.vec4Pool[3];   // lightColor
 }

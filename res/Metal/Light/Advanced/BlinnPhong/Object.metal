@@ -38,7 +38,7 @@ struct VertexOut {
 };
 
 vertex VertexOut BlinnPhong_Object_vertex(VertexIn in [[stage_in]],
-                                          constant UniformBlock& ubo [[buffer(0)]]) {
+                                          constant UniformBlock& ubo [[buffer(8)]]) {
     VertexOut out;
     out.FragPos = in.pos.xyz;
     out.Normal = in.normal.xyz;
@@ -48,7 +48,7 @@ vertex VertexOut BlinnPhong_Object_vertex(VertexIn in [[stage_in]],
 }
 
 fragment float4 BlinnPhong_Object_fragment(VertexOut in [[stage_in]],
-                                           constant UniformBlock& ubo [[buffer(0)]],
+                                           constant UniformBlock& ubo [[buffer(8)]],
                                            texture2d<float> textureSampler [[texture(0)]],
                                            sampler sampler2D [[sampler(0)]]) {
     float3 color = textureSampler.sample(sampler2D, in.TexCoords).rgb;

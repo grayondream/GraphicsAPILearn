@@ -1,4 +1,5 @@
 #include "SimpleLightAmbination.hpp"
+#include "rhi/core/Common.hpp"
 #include "base/StaticCollector.hpp"
 #include "base/ErrorHandle.hpp"
 #include "rhi/core/IShader.hpp"
@@ -56,7 +57,7 @@ bool SimpleLightAmbination::load(std::shared_ptr<rhi::IRenderer> rhiRenderer) {
 }
 
 void SimpleLightAmbination::draw(const float dt) {
-	ImGui::Begin("OpenGL");
+	ImGui::Begin(rhi::backendDisplayName());
 	ImGui::Text("Color Picker with Alpha:");
 	ImGui::ColorEdit4("Color with Alpha", &_lightColor[0]);
 	ImGui::End();
@@ -66,11 +67,11 @@ void SimpleLightAmbination::draw(const float dt) {
 	const auto projection = glm::perspective(glm::radians(_camera.zoom()), aspectRatio(), 0.1f, 100.0f);
 	const auto view = _camera.getViewMatrix();
 
-	//draw object（pos+color+normal，normal=2）
+	//draw object（pos+color+normal）
 	{
 		renderer()->setPipeline(_targetPipeline);
 		renderer()->setVertexBuffer(_vb);
-		renderer()->setVertexBuffer(_normal, 2);
+		renderer()->setVertexBuffer(_normal, 1);
 		glm::mat4 model = glm::mat4(1.0f);
 		model = glm::translate(model, glm::vec3(0.0f, 0.0f, 0.0f));
 		model = glm::rotate(model, glm::radians(0.0f), glm::vec3(1.0f, 0.3f, 0.5f));
@@ -92,7 +93,7 @@ void SimpleLightAmbination::draw(const float dt) {
 		glm::mat4 model = glm::mat4(1.0f);
 		model = glm::translate(model, glm::vec3(1.0f, 1.0f, 1.0f));
 		model = glm::rotate(model, glm::radians(0.0f), glm::vec3(1.0f, 0.3f, 0.5f));
-		model = glm::scale(model, glm::vec3(0.2, 0.2, 0.2));
+		model = glm::scale(model, glm::vec3(0.2, 0.2, 0.31f));
 		rhi::SetUniform(_ubo, "projection", projection);
 		rhi::SetUniform(_ubo, "view", view);
 		rhi::SetUniform(_ubo, "lightColor", _lightColor);

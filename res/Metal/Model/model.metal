@@ -35,7 +35,7 @@ struct VertexOut {
 };
 
 vertex VertexOut model_vertex(VertexIn in [[stage_in]],
-                              constant UniformBlock& ubo [[buffer(0)]]) {
+                              constant UniformBlock& ubo [[buffer(8)]]) {
     VertexOut out;
     out.TexCoords = in.aTexCoords;
     out.position = ubo.projection * ubo.view * ubo.model * float4(in.aPos, 1.0);
@@ -43,7 +43,7 @@ vertex VertexOut model_vertex(VertexIn in [[stage_in]],
 }
 
 fragment float4 model_fragment(VertexOut in [[stage_in]],
-                               constant UniformBlock& ubo [[buffer(0)]],
+                               constant UniformBlock& ubo [[buffer(8)]],
                                texture2d<float> texture_diffuse1 [[texture(0)]],
                                sampler smp [[sampler(0)]]) {
     return texture_diffuse1.sample(smp, in.TexCoords);

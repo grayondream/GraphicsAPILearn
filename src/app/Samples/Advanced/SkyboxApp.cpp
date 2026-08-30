@@ -1,5 +1,6 @@
 
 #include "SkyboxApp.hpp"
+#include "rhi/core/Common.hpp"
 #include "base/StaticCollector.hpp"
 #include "base/ErrorHandle.hpp"
 #include "rhi/core/IShader.hpp"
@@ -101,7 +102,7 @@ void SkyboxApp::drawSkybox() {
 }
 
 void SkyboxApp::draw(const float dt) {
-	ImGui::Begin("OpenGL");
+	ImGui::Begin(rhi::backendDisplayName());
 	ImGui::Checkbox("Enable Reflection", &_enableReflect);
 	ImGui::Checkbox("Enable Refraction", &_enableRefraction);
 	if (_enableReflect && _enableRefraction) {

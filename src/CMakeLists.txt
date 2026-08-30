@@ -32,7 +32,13 @@ if(${ENABLE_OPENGL})
     target_compile_definitions(${PROJECT_NAME} PRIVATE ENABLE_OPENGL=1)
 endif()
 
-if(${ENABLE_VULKAN})
+if(${ENABLE_VULKAN} AND APPLE)
+    # macOS 无系统 Vulkan，需 MoltenVK 且本项目在 macOS 以 Metal/OpenGL 为主，
+    # 故 Vulkan 后端在 macOS 上整体跳过（不影响其他平台 REQUIRED 行为）。
+    message(WARNING "Vulkan requested but skipped on macOS (Apple) - VK backend disabled; other platforms still require Vulkan SDK")
+endif()
+
+if(${ENABLE_VULKAN} AND NOT APPLE)
     message("Graphic API Enable Vulkan")
     target_compile_definitions(${PROJECT_NAME} PRIVATE ENABLE_VULKAN=1)
     # VKRenderer 需要 imgui_impl_vulkan.h（imgui Vulkan 后端头，位于 3party/imgui/Vulkan）。

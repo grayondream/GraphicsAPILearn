@@ -286,7 +286,7 @@ void DeferApp::draw(const float dt) {
 
 	renderLightBox(m_lightBoxProgram, projection, view);
 
-	ImGui::Begin("OpenGL");
+	ImGui::Begin(rhi::backendDisplayName());
 	ImGui::SliderInt("Cube Count", &m_Count, 1, 13);
 	ImGui::Checkbox("Enable Volume", &m_enableVolume);
 	ImGui::End();

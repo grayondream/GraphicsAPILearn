@@ -148,7 +148,7 @@ void ShadowMapApp::reanderFraemBuffer() {
 }
 
 void ShadowMapApp::draw(const float dt) {
-	ImGui::Begin("OpenGL");
+	ImGui::Begin(rhi::backendDisplayName());
 	ImGui::End();
 
 	static float curTime = 0;

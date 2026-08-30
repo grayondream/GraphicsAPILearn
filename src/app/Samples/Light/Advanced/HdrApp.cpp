@@ -196,7 +196,7 @@ void HdrApp::renderHdr() {
 }
 
 void HdrApp::draw(const float dt) {
-	ImGui::Begin("OpenGL");
+	ImGui::Begin(rhi::backendDisplayName());
 	ImGui::Checkbox("Enable Hdr", &_enableHdr);
 	ImGui::InputFloat("Exposure", &_exposure, 0.1f, 4.0f, "%.2f");
 	ImGui::Text("Camera Pos: (%.2f, %.2f, %.2f)", _camera.getAttr().pos.x, _camera.getAttr().pos.y, _camera.getAttr().pos.z);

@@ -1,3 +1,4 @@
+#if ENABLE_VULKAN
 #include "ImGuiVulkanWindow.hpp"
 #include "base/Log.hpp"
 #include <GLFW/glfw3.h>
@@ -97,3 +98,5 @@ void ImGuiVulkanWindow::destroy() {
 #endif
     m_renderer.reset();
 }
+
+#endif

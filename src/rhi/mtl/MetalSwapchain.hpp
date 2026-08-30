@@ -20,9 +20,18 @@ public:
 
     id<CAMetalDrawable> currentDrawable();
 
+    id<MTLTexture> depthTexture() { return _depthTexture; }
+    MTLPixelFormat depthFormat() const { return MTLPixelFormatDepth32Float; }
+
 private:
+    void rebuildDepthTexture();
+
     CAMetalLayer* _layer{nullptr};
-    id<CAMetalDrawable> _drawable{nil};
+    id<MTLDevice> __strong _device{nil};
+    id<MTLTexture> __strong _depthTexture{nil};
+    int _width{0};
+    int _height{0};
+    id<CAMetalDrawable> __strong _drawable{nil};
 };
 
 } // namespace rhi::mtl

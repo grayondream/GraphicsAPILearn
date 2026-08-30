@@ -1,5 +1,6 @@
 ﻿#include "TemplateTestApp.hpp"
 #include "base/StaticCollector.hpp"
+#include "rhi/core/Common.hpp"
 #include "base/ErrorHandle.hpp"
 #include "rhi/core/IShader.hpp"
 #include "rhi/core/IPipeline.hpp"
@@ -95,7 +96,7 @@ void TemplateTestApp::draw(const float dt) {
 	renderer()->clearColor(0.1f, 0.1f, 0.1f, 1.0f);
 	renderer()->bindTexture(_cubeTexture, 0);
 	renderer()->bindTexture(_planeTexture, 1);
-	ImGui::Begin("OpenGL");
+	ImGui::Begin(rhi::backendDisplayName());
 	ImGui::SetNextItemWidth(200);
 	//ImGui::SliderInt("Cube Count", &count, 1, 10);
 	ImGui::End();

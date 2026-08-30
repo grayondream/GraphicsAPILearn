@@ -53,7 +53,7 @@ bool SimpleGemoteryApp::load(std::shared_ptr<rhi::IRenderer> rhiRenderer) {
 }
 
 void SimpleGemoteryApp::draw(const float dt) {
-	ImGui::Begin("OpenGL");
+	ImGui::Begin(rhi::backendDisplayName());
 	ImGui::End();
 
 	renderer()->setPipeline(_pipeline);

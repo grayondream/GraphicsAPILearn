@@ -69,7 +69,21 @@ public:
     void setViewport(const Viewport& vp) override {
         _viewportW = vp.width;
         _viewportH = vp.height;
-        glViewport(vp.x, vp.y, vp.width, vp.height);
+        // GLFW 默认帧缓冲为物理像素（Retina 下为窗口点数的 2 倍），
+        // 而传入的 vp 为窗口点数坐标，需按 content scale 放大，否则画面只渲染到左下 1/4。
+        GLFWwindow* w = static_cast<GLFWwindow*>(_surface ? _surface->nativeHandle() : nullptr);
+        float sx = 1.0f, sy = 1.0f;
+        if (w) {
+            int winW = 0, winH = 0, fbW = 0, fbH = 0;
+            glfwGetWindowSize(w, &winW, &winH);
+            glfwGetFramebufferSize(w, &fbW, &fbH);
+            if (winW > 0 && winH > 0) {
+                sx = static_cast<float>(fbW) / static_cast<float>(winW);
+                sy = static_cast<float>(fbH) / static_cast<float>(winH);
+            }
+        }
+        glViewport(static_cast<int>(vp.x * sx), static_cast<int>(vp.y * sy),
+                   static_cast<int>(vp.width * sx), static_cast<int>(vp.height * sy));
     }
     void setPipeline(const std::shared_ptr<IPipeline>& pipeline) override {
         _pipeline = pipeline;

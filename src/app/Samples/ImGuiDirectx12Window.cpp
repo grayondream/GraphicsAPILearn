@@ -1,3 +1,4 @@
+#if ENABLE_DX12
 #include "ImGuiDirectx12Window.hpp"
 #include "base/Log.hpp"
 #include <GLFW/glfw3.h>
@@ -89,3 +90,5 @@ void ImGuiDirectx12Window::destroy() {
 #endif
     m_renderer.reset();
 }
+
+#endif

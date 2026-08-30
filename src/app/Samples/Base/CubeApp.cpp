@@ -1,4 +1,5 @@
 #include "CubeApp.hpp"
+#include "rhi/core/Common.hpp"
 #include "base/StaticCollector.hpp"
 #include "base/ErrorHandle.hpp"
 #include "rhi/core/IShader.hpp"
@@ -57,7 +58,7 @@ void CubeApp::draw(const float dt) {
 	renderer()->setVertexBuffer(_uv, 1);
 	renderer()->setVertexBuffer(_normal, 2);
 
-	ImGui::Begin("OpenGL");
+	ImGui::Begin(rhi::backendDisplayName());
 	static int count{ 1 };
 	ImGui::SetNextItemWidth(200);
 	ImGui::SliderInt("Cube Count", &count, 1, 10);
